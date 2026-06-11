@@ -1,0 +1,26 @@
+{
+  "name": "mono-source",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend/shared",
+    "frontend/admin",
+    "frontend/website",
+    "backend"
+  ],
+  "scripts": {
+    "dev:fe-admin": "yarn workspace @frontend/admin dev",
+    "dev:fe-website": "yarn workspace @frontend/website dev",
+    "dev:be-admin": "yarn workspace @backend/monorepo dev:admin",
+    "dev:be-website": "yarn workspace @backend/monorepo dev:website",
+    "build:be-admin": "yarn workspace @backend/monorepo build:admin",
+    "build:be-website": "yarn workspace @backend/monorepo build:website",
+    "build:fe-admin": "yarn workspace @frontend/admin build",
+    "build:fe-website": "yarn workspace @frontend/website build",
+    "lint:fe-admin": "yarn workspace @frontend/admin lint",
+    "lint:fe-admin:fix": "yarn workspace @frontend/admin lint:fix",
+    "lint:fe-website": "yarn workspace @frontend/website lint",
+    "lint:fe-website:fix": "yarn workspace @frontend/website lint:fix"
+  },
+  "packageManager": "yarn@4.9.2+sha512.1fc009bc09d13cfd0e19efa44cbfc2b9cf6ca61482725eb35bbc5e257e093ebf4130db6dfe15d604ff4b79efd8e1e8e99b25fa7d0a6197c9f9826358d4d65c3c"
+}

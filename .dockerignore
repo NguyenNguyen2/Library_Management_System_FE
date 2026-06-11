@@ -1,0 +1,25 @@
+# Node
+**/node_modules/
+**/dist/
+
+# Build artifacts
+**/*.tsbuildinfo
+
+# Secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Test/dev files
+**/test/
+**/*.spec.ts
+**/*.e2e-spec.ts
+**/coverage/
+
+# Git
+.git/
+.gitignore
+
+# Frontend build artifacts only
+frontend/**/dist/
+frontend/**/node_modules/
