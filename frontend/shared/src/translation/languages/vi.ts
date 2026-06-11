@@ -188,7 +188,7 @@ const ViTranslation = {
   not_available: 'Không có dữ liệu',
   login_failed_attempts: 'Đăng nhập thất bại {count} lần',
   // Login
-  login_subtitle: 'Đăng nhập để truy cập khóa học phong thủy',
+  login_subtitle: 'Đăng nhập để truy cập vào hệ thống',
   login_admin_title: 'Đăng nhập quản lý',
   forgot_password: 'Quên mật khẩu?',
   demo_account: 'Tài khoản demo:',
