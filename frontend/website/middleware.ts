@@ -9,6 +9,11 @@ import { STORAGES } from '@shared/constants/storage';
 const PUBLIC_PREFIX_PATHS = ['/login', '/signup', '/forgot-password'];
 
 /**
+ * Development-only public paths (only when mock data is enabled)
+ */
+const DEV_PUBLIC_PREFIX_PATHS = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' ? ['/mock-test'] : [];
+
+/**
  * Paths matched exactly — the landing page `/` is public,
  * but NOT its subpaths (`/home`, `/courses/...` etc.).
  */
@@ -20,12 +25,13 @@ export function middleware(req: NextRequest) {
 
   const isExactPublic = PUBLIC_EXACT_PATHS.includes(pathname);
   const isPrefixPublic = PUBLIC_PREFIX_PATHS.some((p) => pathname.startsWith(p));
-  const isPublic = isExactPublic || isPrefixPublic;
+  const isDevPublic = DEV_PUBLIC_PREFIX_PATHS.some((p) => pathname.startsWith(p));
+  const isPublic = isExactPublic || isPrefixPublic || isDevPublic;
 
   // 1. Public paths
   if (isPublic) {
     // Already logged-in users visiting auth pages get bounced to /home.
-    // The landing `/` remains accessible to everyone (logged-in or not).
+    // The landing `/` and dev pages remain accessible to everyone.
     if (token && isPrefixPublic) {
       const url = req.nextUrl.clone();
       url.pathname = '/home';

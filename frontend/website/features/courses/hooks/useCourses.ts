@@ -1,8 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BaseListParams } from '@shared/types/GeneralType';
 import { courseApi } from '../api/courseApi';
+import { useMockCourses } from '@/lib/mock/useMockCourses';
+
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
 export const useCourses = (params: BaseListParams) => {
+  // If mock mode is enabled, use mock data
+  if (USE_MOCK) {
+    const mockData = useMockCourses({
+      page: params.page ?? 1,
+      limit: params.limit ?? 10,
+    });
+    return {
+      data: mockData.data,
+      isLoading: mockData.isLoading,
+      error: mockData.error,
+    };
+  }
+
+  // Otherwise, use real API
   return useQuery({
     queryKey: ['courses', params],
     queryFn: () => courseApi.getList(params),

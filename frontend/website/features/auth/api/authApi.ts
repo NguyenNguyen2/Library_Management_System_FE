@@ -9,4 +9,8 @@ export const authApi = {
   signOut: async () => {
     return await axiosInstance.post('/v1/auth/logout');
   },
+  signUp: async (body: { email: string; password: string; name: string }) => {
+    const response = await axiosInstance.post('/v1/auth/register', body);
+    return response?.data?.results?.object;
+  },
 };

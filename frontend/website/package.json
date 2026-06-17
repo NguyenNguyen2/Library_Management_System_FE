@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node ./scripts/run.js dev --turbopack",
+    "build": "node ./scripts/run.js build",
+    "start": "node ./scripts/run.js start",
     "lint": "next lint",
     "lint:fix": "next lint --fix"
   },

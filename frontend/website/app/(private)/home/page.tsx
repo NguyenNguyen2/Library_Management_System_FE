@@ -1,417 +1,392 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Card, Button, Tag, Input, Progress, Spin } from 'antd';
-import { useRouter } from 'next/navigation';
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button, Input } from "antd";
+import {
+  SearchOutlined,
+  BookOutlined,
+  ReadOutlined,
+  WarningOutlined,
+  ClockCircleOutlined,
+  ThunderboltOutlined,
+  FireOutlined,
+  BulbOutlined,
+  TrophyOutlined,
+  StarFilled,
+  RightOutlined,
+  RiseOutlined,
+} from "@ant-design/icons";
 import { getCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
-import { IDetailUser } from '@shared/types/user-type';
-import { formatNumber } from '@shared/utils/numberUtils';
-import {
-  ACHIEVEMENT_STATUS,
-  type AchievementStatusType,
-} from '@/constants/status';
-import { useAchievements } from '@/features/achievements/hooks/useAchievements';
-import { StatsBarChartIcon } from '../_icons/StatsBarChartIcon';
-import { ActivateKeyIcon } from '../_icons/ActivateKeyIcon';
-import { AchievementTrophyIcon } from '../_icons/AchievementTrophyIcon';
-import { AchievementMedalIcon } from '../_icons/AchievementMedalIcon';
-import { WelcomeTrophyIcon } from '../_icons/WelcomeTrophyIcon';
-import { useTranslations } from 'next-intl';
-import { cn } from '@shared/constants/commonConst';
-import { HOVER_CLICKABLE } from '@shared/constants/animation';
-import { IListAchievement } from '@/features/shared/types/AchievementType';
-import { useUser } from '@shared/provider/UserProvider';
-import Image from 'next/image';
-import { IListCourse } from '@shared/types/CourseType';
+import type { IDetailUser } from '@shared/types/UserType';
+import { useCourses } from '@/features/courses/hooks/useCourses';
+import { useMockBorrowedBooks } from '@/lib/mock/useMockBorrowedBooks';
+import { useMockReadingList } from '@/lib/mock/useMockReadingList';
+import { useMockReservations } from '@/lib/mock/useMockReservations';
+import { READER_BORROW_LIMIT, READER_CATEGORIES, type MockCourse } from '@/lib/mock/mockData';
+import { getDaysUntil } from '@/lib/utils/date';
 import { APP_ROUTE } from '@/constants/routes';
 
-// ===== Types =====
-interface AchievementItem {
-  id: string;
-  name: string;
-  requiredCourses: number;
-  status: AchievementStatusType;
-}
-
-// ===== Constants =====
-// Card border + background colors mapped per achievement status
-const achievementCardClassByStatus: Record<AchievementStatusType, string> = {
-  [ACHIEVEMENT_STATUS.COMPLETED]: 'border-(--greenMedium) bg-(--greenPale)',
-  [ACHIEVEMENT_STATUS.CURRENT]: 'border-(--yellowGold) bg-(--yellowPale)',
-  [ACHIEVEMENT_STATUS.PENDING]: 'border-(--grayBorder) bg-(--grayLightest)',
-};
-
-const achievementIconClassByStatus: Record<AchievementStatusType, string> = {
-  [ACHIEVEMENT_STATUS.COMPLETED]: 'bg-(--greenMedium)',
-  [ACHIEVEMENT_STATUS.CURRENT]: 'bg-(--yellowGold)',
-  [ACHIEVEMENT_STATUS.PENDING]: 'bg-(--grayBorder)',
-};
-
-const achievementNameClassByStatus: Record<AchievementStatusType, string> = {
-  [ACHIEVEMENT_STATUS.COMPLETED]: 'text-(--greenMedium)',
-  [ACHIEVEMENT_STATUS.CURRENT]: 'text-(--yellowDark)',
-  [ACHIEVEMENT_STATUS.PENDING]: 'text-(--grayMedium)',
-};
-
-// TODO: replace with courses API when ready
-const COURSES_PLACEHOLDER = [
-  {
-    id: 1,
-    title: 'Phong Thủy Cơ Bản',
-    description: 'Khóa học giới thiệu các kiến thức nền tảng về phong thủy, bao gồm âm dương ngũ hành, bát quái và cách bố trí không gian sống hợp lý.',
-    progress: 100,
-    thumbnail: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
-  },
-  {
-    id: 2,
-    title: 'Phong Thủy Nhà Ở',
-    description: 'Học cách áp dụng phong thủy vào thiết kế và bố trí nhà ở để mang lại vận khí tốt cho gia đình.',
-    progress: 100,
-    thumbnail: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&q=80',
-  },
-];
-
-// ===== Component =====
-export default function HomePage() {
+function BookCard({ book }: { book: MockCourse }) {
   const router = useRouter();
-  const t = useTranslations();
-  const [showActivate, setShowActivate] = useState(false);
-  const [activateCode, setActivateCode] = useState('');
-
-  // Read logged-in user from cookie (set by useLogin on success)
-  const user = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
-  const userName = user?.name ?? '';
-  const achievementLabel = user?.achievement?.label ?? '';
-  const completedCourses = user?.completedCourses ?? 0;
-
-  // Fetch achievements from API (sorted by requiredCourses ASC)
-  const { data: achievementsData, isLoading: achievementsLoading } =
-    useAchievements({ page: 1, limit: 100 });
-  const achievementRows = achievementsData?.rows ?? [];
-
-  // Compute status by comparing user's completedCourses vs each achievement's requiredCourses
-  const achievements: AchievementItem[] = achievementRows.map(
-    (item: { id: string; name: string; requiredCourses: number }) => ({
-      ...item,
-      status:
-        completedCourses >= item.requiredCourses
-          ? ACHIEVEMENT_STATUS.COMPLETED
-          : ACHIEVEMENT_STATUS.PENDING,
-    })
-  );
-
-  // Mark the highest completed achievement as CURRENT (user's active rank)
-  const lastCompletedIndex = achievements.findLastIndex(
-    (a) => a.status === ACHIEVEMENT_STATUS.COMPLETED
-  );
-  if (lastCompletedIndex >= 0) {
-    achievements[lastCompletedIndex].status = ACHIEVEMENT_STATUS.CURRENT;
-  }
+  const isAvailable = (book.availableCopies ?? 0) > 0;
 
   return (
-    <div>
-      <div className="flex flex-col gap-8">
-        {/* Welcome Banner */}
-        <div className="bg-linear-to-r from-(--blueGradientStart) to-(--blueGradientEnd) p-6 rounded-[10px] flex items-center gap-3">
-          <div className="shrink-0 w-8 h-8">
-            <WelcomeTrophyIcon />
-          </div>
-          <div>
-            <p className="font-bold text-2xl leading-8 text-(--whiteColor)">
-              {t('user_home_greeting', {
-                achievement: achievementLabel,
-                name: userName,
-              })}
-            </p>
-            <p className="font-normal text-base leading-6 text-(--blueLight) mt-1">
-              {t('user_home_welcome_back')}
-            </p>
-          </div>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card
-            onClick={() => router.push(APP_ROUTE.profile)}
-            className={cn(
-              'border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]',
-              HOVER_CLICKABLE
-            )}
-            styles={{ body: { padding: 24 } }}
+    <div
+      className="flex-shrink-0 w-40 snap-start group cursor-pointer"
+      onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+    >
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all h-full">
+        <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden flex items-center justify-center">
+          {book.coverImage ? (
+            <img
+              src={book.coverImage}
+              alt={book.name}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-12 h-16 bg-gray-300 rounded text-gray-400">📖</div>
+          )}
+          <span
+            className={`absolute top-2 left-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white ${
+              isAvailable ? "bg-emerald-500" : "bg-orange-400"
+            }`}
           >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-[10px] flex items-center justify-center bg-(--blueLightest)">
-                <StatsBarChartIcon />
+            {isAvailable ? "Có sẵn" : "Đặt trước"}
+          </span>
+          {book.isFeatured && (
+            <span className="absolute top-2 right-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-yellow-400 text-yellow-900">
+              Nổi bật
+            </span>
+          )}
+        </div>
+        <div className="p-3">
+          <p className="text-xs text-gray-900 line-clamp-2 leading-snug mb-0.5 group-hover:text-blue-600 transition-colors font-semibold">
+            {book.name}
+          </p>
+          <p className="text-[11px] text-gray-500 truncate">{book.instructorName}</p>
+          {book.rating != null && (
+            <div className="flex items-center gap-1 mt-1.5">
+              <StarFilled className="text-[10px] text-yellow-400" />
+              <span className="text-[11px] text-gray-700 font-semibold">{book.rating.toFixed(1)}</span>
+              {book.reviewCount != null && (
+                <span className="text-[11px] text-gray-400">({book.reviewCount})</span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatPill({
+  icon,
+  label,
+  value,
+  onClick,
+  accent = "text-white/80",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  onClick?: () => void;
+  accent?: string;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className="bg-white/15 backdrop-blur border border-white/20 rounded-xl p-4 h-full hover:bg-white/20 transition-colors cursor-pointer"
+    >
+      <div className={`flex items-center gap-2 text-xs ${accent}`}>
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="text-2xl mt-1 text-white">{value}</div>
+    </div>
+  );
+}
+
+function BookSection({
+  title,
+  icon,
+  subtitle,
+  books,
+  viewAllLink,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  subtitle?: string;
+  books: MockCourse[];
+  viewAllLink?: string;
+}) {
+  const router = useRouter();
+  if (books.length === 0) return null;
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-1">
+        <h2 className="flex items-center gap-2 text-xl text-gray-900 font-semibold">
+          {icon}
+          {title}
+        </h2>
+        <Button type="link" className="text-blue-600" onClick={() => router.push(viewAllLink ?? '/courses')}>
+          Xem tất cả →
+        </Button>
+      </div>
+      {subtitle && <p className="text-sm text-gray-500 mb-3">{subtitle}</p>}
+      <div className={`flex gap-4 overflow-x-auto pb-3 snap-x scrollbar-none -mx-1 px-1 ${subtitle ? "" : "mt-4"}`}>
+        {books.map((b) => (
+          <BookCard key={b.id} book={b} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export default function HomePage() {
+  const router = useRouter();
+  const [searchQ, setSearchQ] = useState("");
+
+  const user = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
+  const userName = user?.name ?? "Độc giả";
+
+  const { data: coursesData } = useCourses({ page: 1, limit: 20 });
+  const { data: borrowedData } = useMockBorrowedBooks();
+  const { data: reservationsData } = useMockReservations();
+  const { data: readingListData } = useMockReadingList();
+
+  const courses = useMemo(() => (coursesData?.rows ?? []) as MockCourse[], [coursesData]);
+
+  const borrowedBooks = borrowedData?.rows ?? [];
+  const reservationsList = reservationsData?.rows ?? [];
+  const readingList = readingListData?.rows ?? [];
+
+  const borrowedCount = borrowedBooks.length;
+  const overdueCount = borrowedBooks.filter((b) => getDaysUntil(b.dueDate) < 0).length;
+  const activeReservationsCount = reservationsList.filter(
+    (r) => r.status === 'waiting' || r.status === 'ready',
+  ).length;
+  const readingListCount = readingList.length;
+
+  const newArrivals = useMemo(
+    () => [...courses].sort((a, b) => Number(b.isNew ?? false) - Number(a.isNew ?? false)).slice(0, 10),
+    [courses],
+  );
+  const mostBorrowed = useMemo(
+    () => [...courses].sort((a, b) => (b.borrowCount ?? 0) - (a.borrowCount ?? 0)).slice(0, 10),
+    [courses],
+  );
+  const suggested = useMemo(() => courses.slice(10, 20), [courses]);
+  const featured = useMemo(() => courses.filter((c) => c.isFeatured).slice(0, 10), [courses]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQ.trim()) router.push(`/courses?q=${encodeURIComponent(searchQ.trim())}`);
+    else router.push('/courses');
+  };
+
+  return (
+    <div className="bg-gray-50 min-h-screen pb-12">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white">
+        {/* Decorative blobs */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-yellow-300/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative max-w-7xl mx-auto px-6 py-12 lg:py-16">
+          <div className="grid lg:grid-cols-2 gap-10 items-center">
+            {/* Left content */}
+            <div>
+              <div className="inline-flex items-center gap-2 bg-white/15 border border-white/25 rounded-full px-4 py-1.5 text-sm mb-4">
+                👋 Xin chào, <span className="font-semibold">{userName}</span>
               </div>
-              <div>
-                <p className="font-semibold text-base text-(--blackSoft)">
-                  {t('stats_title')}
-                </p>
-                <p className="text-sm text-(--grayMedium) mt-0.5">
-                  {t('stats_subtitle')}
-                </p>
+              <h1 className="text-4xl lg:text-5xl leading-tight drop-shadow">
+                Khám phá hàng ngàn<br />đầu sách hay
+              </h1>
+              <p className="mt-3 text-white/85 text-lg">
+                Mượn nhanh chóng · Đọc thông minh · Trả tiện lợi
+              </p>
+
+              {/* Search bar */}
+              <form onSubmit={handleSearch} className="mt-6 bg-white rounded-2xl p-2 flex gap-2 shadow-2xl max-w-xl">
+                <Input
+                  prefix={<SearchOutlined className="text-gray-400" />}
+                  placeholder="Tìm sách, tác giả, thể loại..."
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  className="border-0 h-11 focus:ring-0"
+                  style={{ fontSize: "14px" }}
+                />
+                <Button type="primary" htmlType="submit" className="h-11 bg-blue-600 hover:bg-blue-700 px-6 rounded-xl border-0">
+                  Tìm kiếm
+                </Button>
+              </form>
+
+              {/* Category tags */}
+              <div className="flex flex-wrap gap-2 mt-4">
+                {READER_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => router.push(`/courses?category=${cat}`)}
+                    className="bg-white/15 hover:bg-white/25 backdrop-blur px-3 py-1.5 rounded-full text-sm transition-colors"
+                  >
+                    {cat}
+                  </button>
+                ))}
               </div>
             </div>
-          </Card>
 
-          <Card
-            onClick={() => setShowActivate(!showActivate)}
-            className={cn(
-              'border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]',
-              HOVER_CLICKABLE
-            )}
-            styles={{ body: { padding: 24 } }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-[10px] flex items-center justify-center bg-(--greenPale)">
-                <ActivateKeyIcon />
-              </div>
-              <div>
-                <p className="font-semibold text-base text-(--blackSoft)">
-                  {t('activate_title')}
-                </p>
-                <p className="text-sm text-(--grayMedium) mt-0.5">
-                  {t('activate_subtitle')}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Activate Code Section */}
-        {showActivate && (
-          <Card
-            className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
-            styles={{ body: { padding: 24 } }}
-          >
-            <p className="font-semibold text-lg text-(--blackSoft) mb-2">
-              {t('activate_title')}
-            </p>
-            <p className="text-(--grayMedium) mb-4">
-              {t('activate_description')}
-            </p>
-            <div className="flex gap-2">
-              <Input
-                placeholder={t('activate_placeholder')}
-                value={activateCode}
-                onChange={(e) => setActivateCode(e.target.value)}
-                className="flex-1"
+            {/* Right stats (desktop only) */}
+            <div className="hidden lg:grid grid-cols-2 gap-3">
+              <StatPill
+                icon={<BookOutlined />}
+                label="Đang mượn"
+                value={`${borrowedCount} / ${READER_BORROW_LIMIT}`}
+                onClick={() => router.push(APP_ROUTE.borrowed)}
               />
-              <Button type="primary" className="h-10 rounded-lg font-medium">
-                {t('activate_button')}
-              </Button>
+              <StatPill
+                icon={<WarningOutlined />}
+                label="Quá hạn"
+                value={overdueCount}
+                accent="text-red-200"
+                onClick={() => router.push(APP_ROUTE.borrowed)}
+              />
+              <StatPill
+                icon={<ClockCircleOutlined />}
+                label="Đặt trước"
+                value={activeReservationsCount}
+                accent="text-amber-200"
+                onClick={() => router.push(APP_ROUTE.reservations)}
+              />
+              <StatPill
+                icon={<ReadOutlined />}
+                label="Danh sách đọc"
+                value={readingListCount}
+                onClick={() => router.push(APP_ROUTE.readingList)}
+              />
             </div>
-          </Card>
+          </div>
+
+          {/* Mobile stats */}
+          <div className="grid grid-cols-4 gap-2 mt-6 lg:hidden">
+            {[
+              { label: "Mượn", value: `${borrowedCount}/${READER_BORROW_LIMIT}` },
+              { label: "Quá hạn", value: overdueCount },
+              { label: "Đặt trước", value: activeReservationsCount },
+              { label: "DS đọc", value: readingListCount },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="bg-white/15 border border-white/20 rounded-xl p-3 text-center hover:bg-white/20 transition-colors"
+              >
+                <p className="text-2xl text-white font-bold">{stat.value}</p>
+                <p className="text-[11px] text-white/70 mt-0.5">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Overdue alert */}
+      {overdueCount > 0 && (
+        <div className="max-w-7xl mx-auto px-6 mt-6">
+          <button
+            onClick={() => router.push(APP_ROUTE.borrowed)}
+            className="w-full flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 hover:bg-red-100 transition-colors text-left"
+          >
+            <WarningOutlined className="text-red-500 text-lg flex-shrink-0" />
+            <p className="text-sm text-red-700">
+              Bạn có <span className="font-bold">{overdueCount} sách quá hạn</span>. Vui lòng trả sớm để tránh phát sinh phí.
+            </p>
+            <RightOutlined className="text-red-400 ml-auto text-xs flex-shrink-0" />
+          </button>
+        </div>
+      )}
+
+      {/* Book Sections */}
+      <div className="max-w-7xl mx-auto px-6 mt-10 space-y-10">
+        <BookSection
+          title="Sách mới nhập"
+          icon={<ThunderboltOutlined className="text-blue-500" />}
+          books={newArrivals}
+          viewAllLink="/courses"
+        />
+        <BookSection
+          title="Mượn nhiều nhất"
+          icon={<FireOutlined className="text-rose-500" />}
+          books={mostBorrowed}
+          viewAllLink="/courses"
+        />
+
+        {suggested.length > 0 ? (
+          <BookSection
+            title="Gợi ý dành cho bạn"
+            icon={<BulbOutlined className="text-violet-500" />}
+            books={suggested}
+            viewAllLink="/courses"
+          />
+        ) : (
+          <div className="bg-violet-50 border border-violet-200 rounded-xl px-5 py-4 flex items-center gap-3">
+            <BulbOutlined className="text-violet-500 text-lg flex-shrink-0" />
+            <p className="text-sm text-violet-700">
+              Bạn đã đọc hầu hết sách trong các thể loại yêu thích! Khám phá thêm thể loại mới nhé.
+            </p>
+            <Button
+              type="primary"
+              size="small"
+              className="ml-auto bg-violet-600 hover:bg-violet-700 flex-shrink-0"
+              onClick={() => router.push(APP_ROUTE.courses)}
+            >
+              Khám phá
+            </Button>
+          </div>
         )}
 
-        {/* Achievement Section */}
-        <Card
-          className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
-          styles={{ body: { padding: 24 } }}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <AchievementTrophyIcon />
-            <p className="font-semibold text-lg text-(--blackSoft)">
-              {t('ranking_title')}
-            </p>
-          </div>
-          <p className="text-base text-(--grayMedium) mb-4">
-            {t('user_home_achievement_hint')}
-          </p>
+        {featured.length > 0 && (
+          <BookSection
+            title="Sách nổi bật"
+            icon={<TrophyOutlined className="text-yellow-500" />}
+            books={featured}
+            viewAllLink="/courses"
+          />
+        )}
 
-          <div className="flex flex-col gap-3">
-            {achievementsLoading ? (
-              <div className="flex justify-center py-4">
-                <Spin />
-              </div>
-            ) : (
-              achievements.map((item) => (
-                <div
-                  key={item.id}
-                  className={`flex justify-between items-center p-4 rounded-[10px] border ${achievementCardClassByStatus[item.status]}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center ${achievementIconClassByStatus[item.status]}`}
-                    >
-                      <AchievementMedalIcon />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p
-                          className={`font-semibold text-base ${achievementNameClassByStatus[item.status]}`}
-                        >
-                          {item.name}
-                        </p>
-                        {item.status === ACHIEVEMENT_STATUS.COMPLETED && (
-                          <Tag color="green">
-                            {t('achievement_status_achieved')}
-                          </Tag>
-                        )}
-                        {item.status === ACHIEVEMENT_STATUS.CURRENT && (
-                          <Tag color="gold">
-                            {t('achievement_status_current')}
-                          </Tag>
-                        )}
-                      </div>
-                      <p className="text-sm text-(--grayDark) mt-0.5">
-                        {t('achievement_required_courses', {
-                          count: formatNumber(item.requiredCourses),
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-
-        {/* Courses Section — TODO: replace COURSES_PLACEHOLDER with courses API when ready */}
-        <div>
-          <p className="font-semibold text-lg text-(--blackSoft) mb-4">
-            {t('your_courses')}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<<<<<<< HEAD
-            {COURSES_PLACEHOLDER.map((course) => (
-              <Card
-                key={course.id}
-                onClick={() => router.push(`/courses/${course.id}`)}
-                className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)] overflow-hidden cursor-pointer"
-                styles={{ body: { padding: 0 } }}
-              >
-                <img
-                  src={course.thumbnail}
-                  alt={course.title}
-                  className="w-full h-40 object-cover"
-                />
-                <div className="p-4 flex flex-col gap-3">
-                  <p className="font-semibold text-base text-(--blackSoft) truncate">
-                    {course.title}
-                  </p>
-                  <p className="text-sm text-(--grayDark) line-clamp-2">
-                    {course.description}
-                  </p>
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm text-(--grayDark)">
-                        {t('progress_label')}
-                      </span>
-                      <span className="text-sm font-medium text-(--blackSoft)">
-                        {formatNumber(course.progress)}%
-                      </span>
-                    </div>
-                    <Progress percent={course.progress} showInfo={false} />
-                  </div>
-                  <Button
-                    type="primary"
-                    className="h-10 rounded-lg font-medium"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {t('complete_btn')}
-                  </Button>
-                </div>
-              </Card>
-            ))}
-=======
-            {coursesLoading ? (
-              <div className="flex justify-center py-4 col-span-full">
-                <Spin />
-              </div>
-            ) : userCourses.length === 0 ? (
-              <p className="col-span-full text-center text-(--grayMedium) py-8">
-                {t('no_courses_yet')}
-              </p>
-            ) : (
-              userCourses.map((course: IListCourse) => {
-                // Backend returns progress 0-100 (rounded). Fallback to 0
-                // when the field is missing (legacy clients / cached data).
-                const progress = course.progress ?? 0;
-                const isDone = progress >= 100;
-                return (
-                  <Card
-                    key={course.id}
-                    onClick={() =>
-                      router.push(
-                        APP_ROUTE.courseDetails.replace('[courseId]', course.id)
-                      )
-                    }
-                    className={cn(
-                      'border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)] overflow-hidden',
-                      HOVER_CLICKABLE
-                    )}
-                    styles={{ body: { padding: 0 } }}
-                  >
-                    {course?.image && (
-                      <Image
-                        src={course?.image}
-                        alt={course?.name}
-                        className="w-full h-40 object-cover"
-                        width={500}
-                        height={200}
-                      />
-                    )}
-                    <div className="p-4 flex flex-col gap-3">
-                      <p className="font-semibold text-base text-(--blackSoft) truncate">
-                        {course?.name}
-                      </p>
-                      {course.description && (
-                        <p className="text-sm text-(--grayDark) line-clamp-2 min-h-10">
-                          {course.description}
-                        </p>
-                      )}
-
-                      <div className="flex flex-col gap-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-(--grayDark)">
-                            {t('progress_label')}
-                          </span>
-                          <span className="text-sm font-semibold text-(--blueMedium)">
-                            {progress}%
-                          </span>
-                        </div>
-                        <Progress
-                          percent={progress}
-                          showInfo={false}
-                          strokeColor="var(--blueMedium)"
-                          className="m-0!"
-                        />
-                      </div>
-
-                      <Button
-                        type="primary"
-                        disabled={isDone}
-                        className="h-10 rounded-lg font-medium"
-                        onClick={(e) => {
-                          // Card already has onClick to navigate; stop bubbling
-                          // so "Đã hoàn thành" (disabled) doesn't inherit the
-                          // card click and behaves as a pure status indicator.
-                          e.stopPropagation();
-                          if (!isDone)
-                            router.push(
-                              APP_ROUTE.courseDetails.replace(
-                                '[courseId]',
-                                course.id
-                              )
-                            );
-                        }}
-                      >
-                        {t(
-                          isDone
-                            ? 'course_completed_btn'
-                            : 'course_continue_btn'
-                        )}
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })
-            )}
->>>>>>> c538635685df329f9e65815ac39c125a0a2e12a7
-          </div>
-        </div>
+        {/* Quick stats */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            {
+              icon: <BookOutlined className="text-xl text-blue-500" />,
+              label: "Tổng đầu sách",
+              value: courses.length,
+              bg: "bg-blue-50 border-blue-200",
+            },
+            {
+              icon: <FireOutlined className="text-xl text-rose-500" />,
+              label: "Lượt mượn nhiều nhất",
+              value: Math.max(0, ...courses.map((c) => c.borrowCount ?? 0)),
+              bg: "bg-rose-50 border-rose-200",
+            },
+            {
+              icon: <StarFilled className="text-xl text-yellow-500" />,
+              label: "Sách nổi bật",
+              value: courses.filter((c) => c.isFeatured).length,
+              bg: "bg-yellow-50 border-yellow-200",
+            },
+            {
+              icon: <RiseOutlined className="text-xl text-emerald-500" />,
+              label: "Thể loại",
+              value: READER_CATEGORIES.length,
+              bg: "bg-emerald-50 border-emerald-200",
+            },
+          ].map((stat) => (
+            <div key={stat.label} className={`${stat.bg} border rounded-xl px-5 py-4`}>
+              {stat.icon}
+              <p className="text-2xl text-gray-900 mt-2 font-bold">{stat.value}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{stat.label}</p>
+            </div>
+          ))}
+        </section>
       </div>
     </div>
   );

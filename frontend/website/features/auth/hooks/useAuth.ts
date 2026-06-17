@@ -6,6 +6,9 @@ import { STORAGES } from '@shared/constants/storage';
 import { IResponseLogin } from '@shared/types/AuthType';
 import { APP_ROUTE } from '@/constants/routes';
 import { authApi } from '../api/authApi';
+import { mockSignIn, mockSignUp } from '@/lib/mock/mockAuth';
+
+const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
 export const useLogin = () => {
   const router = useRouter();
@@ -15,9 +18,27 @@ export const useLogin = () => {
     AxiosError,
     { email: string; password: string }
   >({
-    mutationFn: authApi.signIn,
+    mutationFn: USE_MOCK ? mockSignIn : authApi.signIn,
     onSuccess: (data) => {
-      console.log('data', data);
+      setCookie(STORAGES.ACCESS_TOKEN, data?.accessToken);
+      if (data?.user) {
+        setCookie(STORAGES.USER_LOGIN, data.user);
+      }
+      router.push(APP_ROUTE.home);
+    },
+  });
+};
+
+export const useRegister = () => {
+  const router = useRouter();
+
+  return useMutation<
+    IResponseLogin,
+    AxiosError,
+    { email: string; password: string; name: string }
+  >({
+    mutationFn: USE_MOCK ? mockSignUp : authApi.signUp,
+    onSuccess: (data) => {
       setCookie(STORAGES.ACCESS_TOKEN, data?.accessToken);
       if (data?.user) {
         setCookie(STORAGES.USER_LOGIN, data.user);
@@ -31,7 +52,7 @@ export const useLogout = () => {
   const router = useRouter();
 
   return useMutation({
-    mutationFn: authApi.signOut,
+    mutationFn: USE_MOCK ? async () => undefined : authApi.signOut,
     onSettled: () => {
       clearCookie(STORAGES.ACCESS_TOKEN);
       clearCookie(STORAGES.REFRESH_TOKEN);
