@@ -1,32 +1,35 @@
-import { Menu, MenuProps, Button, Flex } from 'antd';
+import { Button, Flex } from 'antd';
 import {
   BarChartOutlined,
   CrownOutlined,
   LockOutlined,
   LogoutOutlined,
-  MenuFoldOutlined,
-  MenuUnfoldOutlined,
   SettingOutlined,
   UserOutlined,
   BookOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  DownOutlined,
+  UpOutlined,
+  DeploymentUnitOutlined,
 } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ROUTES } from '../../constants/routers';
 import { cn } from '@shared/constants/commonConst';
-import { LOGO_HEARTBEAT } from '@shared/constants/animation';
 import { getKey } from '@shared/types/I18nKeyType';
 import { useLogout } from '../../hooks/useAuth';
+import { useGlobalVariable } from '../../hooks/GlobalVariableProvider';
 
-type TMenuItem = Required<MenuProps>['items'][number];
-
-type TMenuNode = {
+type NavChild = { label: string; to: string };
+type NavItem = {
   key: string;
-  label: React.ReactNode;
-  icon?: React.ReactNode;
-  children?: TMenuNode[];
-  visible?: boolean;
+  label: string;
+  icon: React.ReactNode;
+  to: string;
+  badge?: number;
+  children?: NavChild[];
 };
 
 interface IDefaultNavigate {
@@ -36,138 +39,249 @@ interface IDefaultNavigate {
 
 const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
   const [selectItem, setSelectItem] = useState<string>('');
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const navigate = useNavigate();
   const pathname = useLocation();
   const { t } = useTranslation();
   const logoutMutation = useLogout();
+  const { user } = useGlobalVariable();
+
+  const menuConfig: NavItem[] = [
+    {
+      key: 'dashboard',
+      label: 'Dashboard',
+      icon: <BarChartOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.DASHBOARD,
+    },
+    {
+      key: 'users',
+      label: 'Quản lý độc giả',
+      icon: <UserOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.USERS,
+    },
+    {
+      key: 'books',
+      label: 'Quản lý Sách',
+      icon: <BookOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.COURSES,
+      children: [
+        { label: 'Danh sách sách', to: ROUTES.COURSES },
+        { label: 'Tác giả & Thể loại', to: ROUTES.COURSES + '?tab=authors' },
+        { label: 'Sách nổi bật', to: ROUTES.COURSES + '?tab=featured' },
+      ],
+    },
+    {
+      key: 'inventory',
+      label: 'Quản lý Kho',
+      icon: <DeploymentUnitOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.COURSES + '?tab=copies',
+      children: [
+        { label: 'Danh sách bản sao', to: ROUTES.COURSES + '?tab=copies' },
+        { label: 'Thêm bản sao & In QR', to: ROUTES.COURSES + '?tab=add-copy' },
+        { label: 'Import & Thanh lý', to: ROUTES.COURSES + '?tab=import' },
+        { label: 'Báo cáo kho', to: ROUTES.COURSES + '?tab=report' },
+      ],
+    },
+    {
+      key: 'transactions',
+      label: 'Giao dịch',
+      icon: <LockOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.CODES,
+      badge: 47,
+      children: [
+        { label: 'Mượn / Trả sách', to: ROUTES.CODES },
+        { label: 'Gia hạn & Đặt trước', to: ROUTES.CODES + '?tab=reservations' },
+        { label: 'Lịch sử giao dịch', to: ROUTES.DASHBOARD },
+        { label: 'Quản lý độc giả', to: ROUTES.USERS },
+      ],
+    },
+    {
+      key: 'achievements',
+      label: 'Quản lý Danh hiệu',
+      icon: <CrownOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.ACHIEVEMENTS,
+    },
+    {
+      key: 'settings',
+      label: 'Cấu hình hệ thống',
+      icon: <SettingOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.SETTINGS,
+      children: [
+        { label: 'Tất cả cấu hình', to: ROUTES.SETTINGS },
+        { label: 'Thủ thư & phân quyền', to: ROUTES.USERS + '?tab=librarians' },
+      ],
+    },
+  ];
+
+  // Check if a parent menu item should be active (only highlights if it does NOT have children)
+  const isActive = (item: NavItem) => {
+    const path = pathname.pathname + pathname.search;
+    if (item.children) {
+      return false; // Parent directories never get highlighted in solid blue
+    }
+    return path === item.to;
+  };
 
   useEffect(() => {
     if (!pathname) return;
-    setSelectItem(pathname?.pathname);
+    const path = pathname.pathname + pathname.search;
+    setSelectItem(path);
   }, [pathname]);
 
   const handleLogout = () => {
     logoutMutation.mutate();
   };
 
-  const menuConfig: TMenuNode[] = [
-    {
-      key: ROUTES.DASHBOARD,
-      label: t(getKey('dashboard')),
-      icon: <BarChartOutlined style={{ fontSize: 20 }} />,
-    },
-    {
-      key: ROUTES.USERS,
-      label: t(getKey('user_management')),
-      icon: <UserOutlined style={{ fontSize: 20 }} />,
-    },
-    {
-      key: ROUTES.COURSES,
-      label: t(getKey('course_management')),
-      icon: <BookOutlined style={{ fontSize: 20 }} />,
-    },
-    {
-      key: ROUTES.CODES,
-      label: t(getKey('code_management')),
-      icon: <LockOutlined style={{ fontSize: 20 }} />,
-    },
-    {
-      key: ROUTES.ACHIEVEMENTS,
-      label: 'Quản lý Danh hiệu',
-      icon: <CrownOutlined style={{ fontSize: 20 }} />,
-    },
-    {
-      key: ROUTES.SETTINGS,
-      label: t(getKey('settings_title')),
-      icon: <SettingOutlined style={{ fontSize: 20 }} />,
-    },
-  ];
+  const handleMenuClick = (item: NavItem) => {
+    if (item.children) {
+      if (collapsed) {
+        onToggle(); // expand Sider if collapsed
+        setOpenMenu(item.key);
+      } else {
+        setOpenMenu(openMenu === item.key ? null : item.key);
+      }
+    } else {
+      navigate(item.to);
+    }
+  };
 
-  const items: TMenuItem[] = menuConfig.map((item) => {
-    if (item.visible === false) return null;
-    const filterChildren = item.children?.filter(
-      (child) => child.visible !== false
-    );
-    return {
-      key: item.key,
-      label: item.label,
-      icon: item.icon,
-      children: filterChildren,
-      onClick: (info) => {
-        const route = info?.keyPath?.[0];
-        navigate(route);
-      },
-    };
-  });
+  const initials = (user?.name ?? 'A').slice(0, 1).toUpperCase();
 
   return (
-    <div className={cn('flex h-full flex-col bg-white')}>
-      {/* Header */}
+    <div className={cn('flex h-full flex-col bg-[#1E2A3B] text-[#8FA3BF]')}>
+      {/* Header / Logo */}
       <Flex
-        gap={16}
+        gap={12}
         align="center"
-        justify="space-between"
-        className={cn('relative p-6')}
+        justify={collapsed ? 'center' : 'space-between'}
+        className={cn('relative px-4 border-b border-[#2D3F52] h-16 shrink-0')}
       >
-        {!collapsed && (
-          <Flex
-            vertical
-            onClick={() => navigate(ROUTES.DASHBOARD)}
-            className={cn(LOGO_HEARTBEAT)}
-          >
-            <div className={cn('text-xl font-bold leading-7 text-navyDark')}>
-              ADMIN PANEL
-            </div>
-            <div className={cn('text-base leading-5 text-grayDark')}>
-              {t(getKey('admin'))}
-            </div>
-          </Flex>
+        {!collapsed ? (
+          <>
+            <Flex align="center" gap={12} className="min-w-0">
+              <BookOutlined style={{ fontSize: 24, color: '#60A5FA' }} className="shrink-0" />
+              <span style={{ fontSize: '16px', fontWeight: 600 }} className="text-white truncate">
+                Thư Viện ABC
+              </span>
+            </Flex>
+            <Button
+              type="text"
+              onClick={onToggle}
+              icon={<MenuFoldOutlined className="text-[#8FA3BF]" />}
+              className={cn(
+                'h-8 w-8 px-2 flex items-center justify-center rounded-lg hover:!bg-[#263A50] border-0 cursor-pointer bg-transparent'
+              )}
+            />
+          </>
+        ) : (
+          <Button
+            type="text"
+            onClick={onToggle}
+            icon={<MenuUnfoldOutlined className="text-white" />}
+            className={cn(
+              'h-8 w-8 px-2 flex items-center justify-center rounded-lg hover:!bg-[#263A50] border-0 cursor-pointer bg-transparent'
+            )}
+          />
         )}
-
-        <Button
-          type="text"
-          size="large"
-          onClick={onToggle}
-          icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-          className={cn(
-            'h-8 w-8 px-2 items-center justify-center rounded-lg text-blackSoft hover:bg-bgAdvanceSection'
-          )}
-        />
       </Flex>
 
       {/* Navigation */}
-      <div
-        className={cn(
-          'flex-1 overflow-y-auto pt-4',
-          collapsed ? 'px-2' : 'px-4'
-        )}
-      >
-        <Menu
-          mode="inline"
-          items={items}
-          selectedKeys={[selectItem]}
-          className={cn('sidebar-light-menu border-none')}
-          inlineCollapsed={collapsed}
-        />
+      <div className={cn('flex-1 overflow-y-auto p-2 space-y-0.5')}>
+        {menuConfig.map((item) => {
+          const isParentActive = isActive(item);
+          const isOpen = openMenu === item.key;
+
+          return (
+            <div key={item.key}>
+              <button
+                onClick={() => handleMenuClick(item)}
+                title={collapsed ? item.label : undefined}
+                className={cn(
+                  'w-full flex items-center rounded-md text-sm transition-all duration-200 relative h-11 border-0 cursor-pointer',
+                  collapsed ? 'justify-center px-0' : 'justify-start gap-2.5 px-3',
+                  isParentActive
+                    ? 'bg-[#2563EB] text-white'
+                    : 'text-[#8FA3BF] bg-transparent hover:bg-[#263A50] hover:text-white'
+                )}
+              >
+                {isParentActive && (
+                  <span className="absolute left-0 top-1 bottom-1 w-[3px] bg-[#60A5FA] rounded-r" />
+                )}
+                <span className="shrink-0 flex items-center justify-center">
+                  {item.icon}
+                </span>
+                {!collapsed && (
+                  <>
+                    <span className="text-sm truncate flex-1 text-left">{item.label}</span>
+                    {item.badge && (
+                      <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full mr-1">
+                        {item.badge}
+                      </span>
+                    )}
+                    {item.children && (
+                      <span className="text-xs shrink-0 ml-1">
+                        {isOpen ? <UpOutlined /> : <DownOutlined />}
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
+
+              {/* Sub-menu rendering */}
+              {item.children && isOpen && !collapsed && (
+                <div className="mt-0.5 pl-3 space-y-0.5">
+                  {item.children.map((c) => {
+                    const isChildActive = selectItem === c.to;
+                    return (
+                      <button
+                        key={c.label}
+                        onClick={() => navigate(c.to)}
+                        className={cn(
+                          'w-full text-left pl-7 pr-3 h-9 flex items-center rounded-md text-[13px] border-0 cursor-pointer transition-all duration-200',
+                          isChildActive
+                            ? 'text-white bg-[#263A50]'
+                            : 'text-[#8FA3BF] hover:text-white hover:bg-[#263A50]'
+                        )}
+                      >
+                        {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Logout button — centre the icon when collapsed, keep it left-aligned
-          with the label when expanded. */}
-      <div
-        className={cn(
-          'border-t border-blackLight p-4 flex items-center justify-center'
+      {/* Bottom user card */}
+      <div className="border-t border-[#2D3F52] p-4 flex items-center gap-2 shrink-0">
+        {collapsed ? (
+          <button
+            onClick={handleLogout}
+            className="text-[#8FA3BF] hover:text-red-400 p-1 mx-auto flex items-center justify-center bg-transparent border-0 cursor-pointer"
+            title={t(getKey('logout'))}
+          >
+            <LogoutOutlined style={{ fontSize: 18 }} />
+          </button>
+        ) : (
+          <>
+            <div className="w-8 h-8 rounded-full bg-[#2563EB] flex items-center justify-center text-white font-bold shrink-0 text-sm">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-[13px] text-white truncate font-medium m-0 leading-none">{user?.name ?? 'Admin'}</p>
+              <p className="text-[11px] text-[#8FA3BF] m-0 mt-1.5 leading-none">Quản trị viên</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="text-[#8FA3BF] hover:text-red-400 p-1 shrink-0 bg-transparent border-0 cursor-pointer flex items-center justify-center"
+              title={t(getKey('logout'))}
+            >
+              <LogoutOutlined style={{ fontSize: 16 }} />
+            </button>
+          </>
         )}
-      >
-        <Button
-          type="text"
-          danger
-          icon={<LogoutOutlined className={cn('text-xl')} />}
-          onClick={handleLogout}
-          size="large"
-          className={cn('w-full')}
-        >
-          {!collapsed && t(getKey('logout'))}
-        </Button>
       </div>
     </div>
   );
