@@ -381,6 +381,7 @@ const ViTranslation = {
   personal_info_title: 'Thông tin cá nhân',
   edit_button: 'Chỉnh sửa',
   email_cannot_change: 'Email không thể thay đổi',
+  address: 'Địa chỉ',
   stats_overview_title: 'Thống kê tổng quan',
   completed_label: 'Đã hoàn thành',
   completion_progress_label: 'Tiến độ hoàn thành',

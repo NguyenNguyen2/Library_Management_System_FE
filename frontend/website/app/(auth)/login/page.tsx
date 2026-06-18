@@ -8,7 +8,7 @@ import {
   MailOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
-import { useLogin, useRegister } from '@/features/auth/hooks/useAuth';
+import { useLogin, useRegister, useForgotPassword } from '@/features/auth/hooks/useAuth';
 
 type View = 'login' | 'register' | 'forgot' | 'forgot-sent';
 
@@ -72,18 +72,20 @@ const LoginPage = () => {
   const { message } = App.useApp();
   const loginMutation = useLogin();
   const registerMutation = useRegister();
+  const forgotPasswordMutation = useForgotPassword();
 
   const [view, setView] = useState<View>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [forgotEmail, setForgotEmail] = useState('');
   const [error, setError] = useState('');
-  const [forgotLoading, setForgotLoading] = useState(false);
   const [resendCountdown, setResendCountdown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isPending = loginMutation.isPending || registerMutation.isPending;
+  const isForgotPending = forgotPasswordMutation.isPending;
 
   useEffect(() => {
     return () => {
@@ -108,8 +110,13 @@ const LoginPage = () => {
     e.preventDefault();
     setError('');
 
-    if (!email || !password || (view === 'register' && !name)) {
+    if (!email || !password || (view === 'register' && (!fullName || !passwordConfirmation))) {
       setError('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    if (view === 'register' && password !== passwordConfirmation) {
+      setError('Mật khẩu xác nhận không khớp');
       return;
     }
 
@@ -125,7 +132,7 @@ const LoginPage = () => {
       );
     } else {
       registerMutation.mutate(
-        { email, password, name },
+        { full_name: fullName, email, password, password_confirmation: passwordConfirmation },
         {
           onError: (err) =>
             setError(extractErrorMessage(err, 'Đăng ký thất bại. Vui lòng thử lại.')),
@@ -143,22 +150,31 @@ const LoginPage = () => {
       return;
     }
 
-    setForgotLoading(true);
-    setTimeout(() => {
-      setForgotLoading(false);
-      setView('forgot-sent');
-      startResendCountdown();
-    }, 1000);
+    forgotPasswordMutation.mutate(
+      { email: forgotEmail.trim() },
+      {
+        onSuccess: () => {
+          setView('forgot-sent');
+          startResendCountdown();
+        },
+        onError: (err) =>
+          setError(extractErrorMessage(err, 'Gửi yêu cầu thất bại. Vui lòng thử lại.')),
+      }
+    );
   };
 
   const handleResendForgot = () => {
     if (resendCountdown > 0) return;
-    setForgotLoading(true);
-    setTimeout(() => {
-      setForgotLoading(false);
-      message.success('Đã gửi lại email khôi phục!');
-      startResendCountdown();
-    }, 600);
+    forgotPasswordMutation.mutate(
+      { email: forgotEmail.trim() },
+      {
+        onSuccess: () => {
+          message.success('Đã gửi lại email khôi phục!');
+          startResendCountdown();
+        },
+        onError: () => message.error('Gửi lại thất bại. Vui lòng thử lại.'),
+      }
+    );
   };
 
   const goToLogin = () => {
@@ -297,7 +313,7 @@ const LoginPage = () => {
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
                       className="h-10 text-sm rounded-lg"
-                      disabled={forgotLoading}
+                      disabled={isForgotPending}
                       required
                       autoFocus
                     />
@@ -313,7 +329,7 @@ const LoginPage = () => {
                   <Button
                     type="primary"
                     htmlType="submit"
-                    loading={forgotLoading}
+                    loading={isForgotPending}
                     className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold tracking-wide border-none"
                   >
                     GỬI LINK ĐẶT LẠI MẬT KHẨU
@@ -353,12 +369,12 @@ const LoginPage = () => {
                   <button
                     type="button"
                     onClick={handleResendForgot}
-                    disabled={resendCountdown > 0 || forgotLoading}
+                    disabled={resendCountdown > 0 || isForgotPending}
                     className={`text-xs flex items-center gap-1 mx-auto transition-colors ${
                       resendCountdown > 0 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600 hover:underline cursor-pointer'
                     }`}
                   >
-                    <ReloadOutlined className={forgotLoading ? 'animate-spin' : ''} />
+                    <ReloadOutlined className={isForgotPending ? 'animate-spin' : ''} />
                     {resendCountdown > 0 ? `Gửi lại sau ${resendCountdown}s` : 'Gửi lại email'}
                   </button>
 
@@ -380,8 +396,8 @@ const LoginPage = () => {
                       <Input
                         type="text"
                         placeholder="Họ và tên"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
                         className="h-10 text-sm rounded-lg"
                         disabled={isPending}
                         required
@@ -411,6 +427,19 @@ const LoginPage = () => {
                       required
                     />
                   </div>
+
+                  {view === 'register' && (
+                    <div>
+                      <Input.Password
+                        placeholder="Xác nhận mật khẩu"
+                        value={passwordConfirmation}
+                        onChange={(e) => setPasswordConfirmation(e.target.value)}
+                        className="h-10 text-sm rounded-lg"
+                        disabled={isPending}
+                        required
+                      />
+                    </div>
+                  )}
 
                   {error && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">

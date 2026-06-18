@@ -6,7 +6,7 @@ import { STORAGES } from '@shared/constants/storage';
 import { IResponseLogin } from '@shared/types/AuthType';
 import { APP_ROUTE } from '@/constants/routes';
 import { authApi } from '../api/authApi';
-import { mockSignIn, mockSignUp } from '@/lib/mock/mockAuth';
+import { mockSignIn, mockSignUp, mockForgotPassword, mockResetPassword } from '@/lib/mock/mockAuth';
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
@@ -35,7 +35,7 @@ export const useRegister = () => {
   return useMutation<
     IResponseLogin,
     AxiosError,
-    { email: string; password: string; name: string }
+    { full_name: string; email: string; password: string; password_confirmation: string }
   >({
     mutationFn: USE_MOCK ? mockSignUp : authApi.signUp,
     onSuccess: (data) => {
@@ -45,6 +45,22 @@ export const useRegister = () => {
       }
       router.push(APP_ROUTE.home);
     },
+  });
+};
+
+export const useForgotPassword = () => {
+  return useMutation<{ message: string }, AxiosError, { email: string }>({
+    mutationFn: USE_MOCK ? mockForgotPassword : authApi.forgotPassword,
+  });
+};
+
+export const useResetPassword = () => {
+  return useMutation<
+    { message: string },
+    AxiosError,
+    { token: string; email: string; password: string; password_confirmation: string }
+  >({
+    mutationFn: USE_MOCK ? mockResetPassword : authApi.resetPassword,
   });
 };
 

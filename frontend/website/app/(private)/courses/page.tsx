@@ -1,60 +1,64 @@
 'use client';
 
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Input, Select, Spin } from 'antd';
-import { SearchOutlined, BookOutlined, StarFilled } from '@ant-design/icons';
-import { useCourses } from '@/features/courses/hooks/useCourses';
-import { READER_CATEGORIES, type MockCourse } from '@/lib/mock/mockData';
+import { Input, InputNumber, Select, Spin } from 'antd';
+import { SearchOutlined, BookOutlined } from '@ant-design/icons';
+import { useSearchBooks, useBookFilterOptions } from '@/features/books/hooks/useBooks';
+import { IBookSearchParams } from '@/features/books/api/bookApi';
 import { APP_ROUTE } from '@/constants/routes';
-
-type SortKey = 'name' | 'rating' | 'popular';
-
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: 'name', label: 'Theo tên' },
-  { value: 'rating', label: 'Đánh giá cao' },
-  { value: 'popular', label: 'Được mượn nhiều' },
-];
 
 function CoursesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data, isLoading } = useCourses({ page: 1, limit: 100 });
-  const books = useMemo(() => (data?.rows ?? []) as MockCourse[], [data]);
 
   const [search, setSearch] = useState(searchParams.get('q') ?? '');
-  const [category, setCategory] = useState(searchParams.get('category') ?? 'all');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   const [onlyAvailable, setOnlyAvailable] = useState(false);
-  const [sort, setSort] = useState<SortKey>('name');
 
-  const filtered = useMemo(() => {
-    const result = books.filter((book) => {
-      if (search) {
-        const q = search.toLowerCase();
-        const matches =
-          book.name.toLowerCase().includes(q) ||
-          book.instructorName.toLowerCase().includes(q) ||
-          book.description.toLowerCase().includes(q);
-        if (!matches) return false;
-      }
-      if (category !== 'all' && book.category !== category) return false;
-      if (onlyAvailable && (book.availableCopies ?? 0) === 0) return false;
-      return true;
-    });
+  // filter state
+  const [categoryId, setCategoryId] = useState<number | undefined>(undefined);
+  const [authorId, setAuthorId] = useState<number | undefined>(undefined);
+  const [publisherId, setPublisherId] = useState<number | undefined>(undefined);
+  const [language, setLanguage] = useState<string | undefined>(undefined);
+  const [yearFrom, setYearFrom] = useState<number | undefined>(undefined);
+  const [yearTo, setYearTo] = useState<number | undefined>(undefined);
 
-    return [...result].sort((a, b) => {
-      switch (sort) {
-        case 'rating':
-          return (b.rating ?? 0) - (a.rating ?? 0);
-        case 'popular':
-          return (b.borrowCount ?? 0) - (a.borrowCount ?? 0);
-        default:
-          return a.name.localeCompare(b.name, 'vi');
-      }
-    });
-  }, [books, search, category, onlyAvailable, sort]);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  if (isLoading) {
+  const { data: filterOptions } = useBookFilterOptions();
+
+  const params: IBookSearchParams = {
+    q: debouncedSearch || undefined,
+    category_id: categoryId,
+    author_id: authorId,
+    publisher_id: publisherId,
+    language: language,
+    year_from: yearFrom,
+    year_to: yearTo,
+    available_only: onlyAvailable ? 1 : undefined,
+  };
+
+  const { data: books, isLoading, isFetching } = useSearchBooks(params);
+
+  const filtered = books ?? [];
+
+  const hasActiveFilters = !!(categoryId || authorId || publisherId || language || yearFrom || yearTo || onlyAvailable);
+
+  const clearFilters = () => {
+    setCategoryId(undefined);
+    setAuthorId(undefined);
+    setPublisherId(undefined);
+    setLanguage(undefined);
+    setYearFrom(undefined);
+    setYearTo(undefined);
+    setOnlyAvailable(false);
+  };
+
+  if (isLoading || isFetching) {
     return (
       <div className="flex justify-center py-24">
         <Spin size="large" />
@@ -78,49 +82,87 @@ function CoursesPageContent() {
           prefix={<SearchOutlined className="text-gray-400" />}
           allowClear
         />
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex flex-wrap gap-2">
+
+        {/* Row 1: checkbox + clear */}
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={onlyAvailable}
+              onChange={(e) => setOnlyAvailable(e.target.checked)}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded"
+            />
+            Chỉ sách có sẵn
+          </label>
+          {hasActiveFilters && (
             <button
-              onClick={() => setCategory('all')}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                category === 'all'
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-              }`}
+              onClick={clearFilters}
+              className="text-xs text-red-500 hover:text-red-700 underline"
             >
-              Tất cả
+              Xóa bộ lọc
             </button>
-            {READER_CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${
-                  category === cat
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-3 ml-auto">
-            <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={onlyAvailable}
-                onChange={(e) => setOnlyAvailable(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded"
-              />
-              Chỉ sách có sẵn
-            </label>
-            <Select<SortKey> value={sort} onChange={setSort} options={SORT_OPTIONS} className="w-40" />
-          </div>
+          )}
+        </div>
+
+        {/* Row 2: filter dropdowns */}
+        <div className="flex flex-wrap gap-2">
+          <Select
+            placeholder="Thể loại"
+            allowClear
+            value={categoryId}
+            onChange={(val: number | undefined) => setCategoryId(val)}
+            options={filterOptions?.categories.map((c) => ({ value: c.category_id, label: c.category_name }))}
+            style={{ minWidth: 150 }}
+          />
+          <Select
+            placeholder="Tác giả"
+            allowClear
+            value={authorId}
+            onChange={(val: number | undefined) => setAuthorId(val)}
+            options={filterOptions?.authors.map((a) => ({ value: a.author_id, label: a.author_name }))}
+            style={{ minWidth: 160 }}
+          />
+          <Select
+            placeholder="Nhà xuất bản"
+            allowClear
+            value={publisherId}
+            onChange={(val: number | undefined) => setPublisherId(val)}
+            options={filterOptions?.publishers.map((p) => ({ value: p.publisher_id, label: p.name }))}
+            style={{ minWidth: 160 }}
+          />
+          <Select
+            placeholder="Ngôn ngữ"
+            allowClear
+            value={language}
+            onChange={(val: string | undefined) => setLanguage(val)}
+            options={filterOptions?.languages.map((l) => ({ value: l, label: l }))}
+            style={{ minWidth: 130 }}
+          />
+          <InputNumber
+            placeholder="Năm từ"
+            value={yearFrom ?? null}
+            onChange={(val) => setYearFrom(val ?? undefined)}
+            min={1900}
+            max={new Date().getFullYear()}
+            style={{ width: 110 }}
+          />
+          <InputNumber
+            placeholder="Đến năm"
+            value={yearTo ?? null}
+            onChange={(val) => setYearTo(val ?? undefined)}
+            min={1900}
+            max={new Date().getFullYear()}
+            style={{ width: 110 }}
+          />
         </div>
       </div>
 
       <p className="text-sm text-gray-500 mb-4">
-        Tìm thấy <span className="font-semibold text-gray-900">{filtered.length}</span> kết quả
+        {debouncedSearch || hasActiveFilters ? (
+          <>Tìm thấy <span className="font-semibold text-gray-900">{filtered.length}</span> kết quả</>
+        ) : (
+          <>Hiển thị <span className="font-semibold text-gray-900">{filtered.length}</span> cuốn sách</>
+        )}
       </p>
 
       {filtered.length === 0 ? (
@@ -132,47 +174,37 @@ function CoursesPageContent() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {filtered.map((book) => (
             <div
-              key={book.id}
+              key={book.book_id}
               className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer group"
-              onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+              onClick={() => router.push(`${APP_ROUTE.courses}/${book.book_id}`)}
             >
               <div className="relative aspect-[3/4] bg-gray-100 flex items-center justify-center overflow-hidden">
-                {book.coverImage ? (
+                {book.cover_image ? (
                   <img
-                    src={book.coverImage}
-                    alt={book.name}
+                    src={book.cover_image}
+                    alt={book.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 ) : (
                   <span className="text-4xl text-gray-300">📖</span>
                 )}
-                {book.isNew && (
-                  <span className="absolute top-2 right-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-500 text-white">
-                    Mới
-                  </span>
-                )}
                 <span
                   className={`absolute top-2 left-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white ${
-                    (book.availableCopies ?? 0) > 0 ? 'bg-emerald-500' : 'bg-orange-400'
+                    book.available_copies > 0 ? 'bg-emerald-500' : 'bg-orange-400'
                   }`}
                 >
-                  {(book.availableCopies ?? 0) > 0 ? 'Có sẵn' : 'Đặt trước'}
+                  {book.available_copies > 0 ? 'Có sẵn' : 'Đặt trước'}
                 </span>
               </div>
               <div className="p-3">
                 <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-snug min-h-[2.5rem] group-hover:text-blue-600 transition-colors">
-                  {book.name}
+                  {book.title}
                 </h3>
-                <p className="text-xs text-gray-500 truncate mt-0.5">{book.instructorName}</p>
-                <div className="flex items-center gap-1 mt-1.5">
-                  <StarFilled className="text-xs text-yellow-400" />
-                  <span className="text-xs text-gray-700 font-semibold">{(book.rating ?? 0).toFixed(1)}</span>
-                  {book.reviewCount != null && <span className="text-xs text-gray-400">({book.reviewCount})</span>}
-                </div>
-                {book.category && (
-                  <span className="inline-block mt-2 text-[11px] px-2 py-0.5 rounded-full border border-gray-200 text-gray-500">
-                    {book.category}
-                  </span>
+                {book.author && (
+                  <p className="text-xs text-gray-500 truncate mt-0.5">{book.author}</p>
+                )}
+                {book.isbn && (
+                  <p className="text-xs text-gray-400 mt-1">ISBN: {book.isbn}</p>
                 )}
               </div>
             </div>

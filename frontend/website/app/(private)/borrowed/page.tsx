@@ -286,7 +286,7 @@ export default function BorrowedBooksPage() {
                 <div className="flex gap-4 p-4">
                   <div
                     className="flex-shrink-0 w-20 h-28 rounded-lg overflow-hidden cursor-pointer bg-gray-100 flex items-center justify-center"
-                    onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+                    onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
                   >
                     {book.coverImage ? (
                       <img
@@ -304,7 +304,7 @@ export default function BorrowedBooksPage() {
                       <div className="min-w-0">
                         <h3
                           className="text-gray-900 font-semibold hover:text-blue-600 cursor-pointer transition-colors leading-snug"
-                          onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+                          onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
                         >
                           {book.name}
                         </h3>
@@ -354,7 +354,7 @@ export default function BorrowedBooksPage() {
                       </Button>
 
                       <button
-                        onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+                        onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
                         className="flex items-center gap-1 text-xs text-blue-600 hover:underline h-8 px-2"
                       >
                         Xem sách <RightOutlined className="text-[10px]" />

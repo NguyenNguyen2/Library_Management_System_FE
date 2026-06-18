@@ -61,9 +61,25 @@ export const mockSignIn = ({ email }: { email: string; password: string }): Prom
   });
 };
 
+export const mockForgotPassword = (_body: { email: string }): Promise<{ message: string }> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ message: 'Link đặt lại mật khẩu đã được gửi.' });
+    }, MOCK_DELAY);
+  });
+};
+
+export const mockResetPassword = (_body: { token: string; email: string; password: string; password_confirmation: string }): Promise<{ message: string }> => {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve({ message: 'Đổi mật khẩu thành công.' });
+    }, MOCK_DELAY);
+  });
+};
+
 // New accounts always register as readers. Demo emails are treated as
 // already taken, mirroring the "tài khoản demo" list shown on the login page.
-export const mockSignUp = ({ email, name }: { email: string; password: string; name: string }): Promise<IResponseLogin> => {
+export const mockSignUp = ({ full_name, email }: { full_name: string; email: string; password: string; password_confirmation: string }): Promise<IResponseLogin> => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (MOCK_ACCOUNTS[email.toLowerCase().trim()]) {
@@ -76,7 +92,7 @@ export const mockSignUp = ({ email, name }: { email: string; password: string; n
         user: {
           id: `mock-reader-${Date.now()}`,
           email,
-          name,
+          name: full_name,
           role: 'reader',
         },
       });

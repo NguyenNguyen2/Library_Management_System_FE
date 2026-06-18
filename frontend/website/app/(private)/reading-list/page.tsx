@@ -392,7 +392,7 @@ export default function ReadingListPage() {
                 <div className="flex gap-4 p-4">
                   <div
                     className="flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden cursor-pointer bg-gray-100 flex items-center justify-center"
-                    onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+                    onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
                   >
                     {book.coverImage ? (
                       <img
@@ -410,7 +410,7 @@ export default function ReadingListPage() {
                       <div className="min-w-0">
                         <h3
                           className="text-gray-900 font-semibold hover:text-blue-600 cursor-pointer truncate transition-colors"
-                          onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+                          onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
                         >
                           {book.name}
                         </h3>
@@ -470,7 +470,7 @@ export default function ReadingListPage() {
                         </button>
                       ))}
                       <button
-                        onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+                        onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
                         className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors ml-auto"
                       >
                         Xem chi tiết <RightOutlined className="text-[10px]" />

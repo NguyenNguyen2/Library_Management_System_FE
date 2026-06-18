@@ -190,7 +190,7 @@ export default function ReservationsPage() {
                 <div className="flex gap-4 p-4">
                   <div
                     className="flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer"
-                    onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+                    onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
                   >
                     {book.coverImage ? (
                       <img
@@ -208,7 +208,7 @@ export default function ReservationsPage() {
                       <div className="min-w-0">
                         <h3
                           className="text-gray-900 font-semibold text-sm hover:text-blue-600 cursor-pointer transition-colors"
-                          onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+                          onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
                         >
                           {book.name}
                         </h3>
@@ -262,7 +262,7 @@ export default function ReservationsPage() {
                     {(reservation.status === 'waiting' || reservation.status === 'ready') && (
                       <div className="flex items-center gap-2 mt-3">
                         <button
-                          onClick={() => router.push(`${APP_ROUTE.books}/${book.id}`)}
+                          onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
                           className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
                         >
                           Xem sách <RightOutlined className="text-[10px]" />
