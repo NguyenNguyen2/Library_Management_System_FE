@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Empty, Input, Spin } from "antd";
 import {
@@ -11,71 +11,50 @@ import {
   ClockCircleOutlined,
   ThunderboltOutlined,
   FireOutlined,
-  BulbOutlined,
   TrophyOutlined,
-  StarFilled,
   RightOutlined,
-  RiseOutlined,
 } from "@ant-design/icons";
 import { getCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
 import type { IDetailUser } from '@shared/types/UserType';
-import { useCourses } from '@/features/courses/hooks/useCourses';
 import { useMockBorrowedBooks } from '@/lib/mock/useMockBorrowedBooks';
 import { useMockReadingList } from '@/lib/mock/useMockReadingList';
 import { useMockReservations } from '@/lib/mock/useMockReservations';
-import { READER_BORROW_LIMIT, READER_CATEGORIES, type MockCourse } from '@/lib/mock/mockData';
+import { READER_BORROW_LIMIT, READER_CATEGORIES } from '@/lib/mock/mockData';
 import { getDaysUntil } from '@/lib/utils/date';
 import { APP_ROUTE } from '@/constants/routes';
-import { useSearchBooks } from '@/features/books/hooks/useBooks';
+import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
+import type { IHomeBook } from '@/features/books/api/bookApi';
 
-function BookCard({ book }: { book: MockCourse }) {
-  const router = useRouter();
-  const isAvailable = (book.availableCopies ?? 0) > 0;
-
+function HomeBookCard({ book, onClick }: { book: IHomeBook; onClick: () => void }) {
   return (
     <div
       className="flex-shrink-0 w-40 snap-start group cursor-pointer"
-      onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
+      onClick={onClick}
     >
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all h-full">
         <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden flex items-center justify-center">
-          {book.coverImage ? (
+          {book.cover_image ? (
             <img
-              src={book.coverImage}
-              alt={book.name}
+              src={book.cover_image}
+              alt={book.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
-            <div className="w-12 h-16 bg-gray-300 rounded text-gray-400">📖</div>
+            <BookOutlined style={{ fontSize: 36 }} className="text-gray-300" />
           )}
           <span
             className={`absolute top-2 left-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white ${
-              isAvailable ? "bg-emerald-500" : "bg-orange-400"
+              book.available_copies > 0 ? "bg-emerald-500" : "bg-orange-400"
             }`}
           >
-            {isAvailable ? "Có sẵn" : "Đặt trước"}
+            {book.available_copies > 0 ? "Có sẵn" : "Đặt trước"}
           </span>
-          {book.isFeatured && (
-            <span className="absolute top-2 right-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-yellow-400 text-yellow-900">
-              Nổi bật
-            </span>
-          )}
         </div>
         <div className="p-3">
-          <p className="text-xs text-gray-900 line-clamp-2 leading-snug mb-0.5 group-hover:text-blue-600 transition-colors font-semibold">
-            {book.name}
+          <p className="text-xs text-gray-900 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors font-semibold">
+            {book.title}
           </p>
-          <p className="text-[11px] text-gray-500 truncate">{book.instructorName}</p>
-          {book.rating != null && (
-            <div className="flex items-center gap-1 mt-1.5">
-              <StarFilled className="text-[10px] text-yellow-400" />
-              <span className="text-[11px] text-gray-700 font-semibold">{book.rating.toFixed(1)}</span>
-              {book.reviewCount != null && (
-                <span className="text-[11px] text-gray-400">({book.reviewCount})</span>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>
@@ -112,33 +91,30 @@ function StatPill({
 function BookSection({
   title,
   icon,
-  subtitle,
   books,
-  viewAllLink,
+  onBookClick,
 }: {
   title: string;
   icon: React.ReactNode;
-  subtitle?: string;
-  books: MockCourse[];
-  viewAllLink?: string;
+  books: IHomeBook[];
+  onBookClick: (bookId: number) => void;
 }) {
   const router = useRouter();
   if (books.length === 0) return null;
   return (
     <section>
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="flex items-center gap-2 text-xl text-gray-900 font-semibold">
           {icon}
           {title}
         </h2>
-        <Button type="link" className="text-blue-600" onClick={() => router.push(viewAllLink ?? '/courses')}>
+        <Button type="link" className="text-blue-600" onClick={() => router.push(APP_ROUTE.courses)}>
           Xem tất cả →
         </Button>
       </div>
-      {subtitle && <p className="text-sm text-gray-500 mb-3">{subtitle}</p>}
-      <div className={`flex gap-4 overflow-x-auto pb-3 snap-x scrollbar-none -mx-1 px-1 ${subtitle ? "" : "mt-4"}`}>
+      <div className="flex gap-4 overflow-x-auto pb-3 snap-x scrollbar-none -mx-1 px-1">
         {books.map((b) => (
-          <BookCard key={b.id} book={b} />
+          <HomeBookCard key={b.book_id} book={b} onClick={() => onBookClick(b.book_id)} />
         ))}
       </div>
     </section>
@@ -152,12 +128,9 @@ export default function HomePage() {
   const user = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
   const userName = user?.name ?? "Độc giả";
 
-  const { data: coursesData } = useCourses({ page: 1, limit: 20 });
   const { data: borrowedData } = useMockBorrowedBooks();
   const { data: reservationsData } = useMockReservations();
   const { data: readingListData } = useMockReadingList();
-
-  const courses = useMemo(() => (coursesData?.rows ?? []) as MockCourse[], [coursesData]);
 
   const borrowedBooks = borrowedData?.rows ?? [];
   const reservationsList = reservationsData?.rows ?? [];
@@ -170,16 +143,11 @@ export default function HomePage() {
   ).length;
   const readingListCount = readingList.length;
 
-  const newArrivals = useMemo(
-    () => [...courses].sort((a, b) => Number(b.isNew ?? false) - Number(a.isNew ?? false)).slice(0, 10),
-    [courses],
-  );
-  const mostBorrowed = useMemo(
-    () => [...courses].sort((a, b) => (b.borrowCount ?? 0) - (a.borrowCount ?? 0)).slice(0, 10),
-    [courses],
-  );
-  const suggested = useMemo(() => courses.slice(10, 20), [courses]);
-  const featured = useMemo(() => courses.filter((c) => c.isFeatured).slice(0, 10), [courses]);
+  const { data: homeBooks, isLoading: isHomeBooksLoading } = useHomeBooks();
+
+  const handleBookClick = (bookId: number) => {
+    router.push(`${APP_ROUTE.courses}/${bookId}`);
+  };
 
   const [debouncedQ, setDebouncedQ] = useState('');
   useEffect(() => {
@@ -377,90 +345,31 @@ export default function HomePage() {
               </>
             )}
           </section>
+        ) : isHomeBooksLoading ? (
+          <div className="flex justify-center py-16">
+            <Spin size="large" />
+          </div>
         ) : (
-          /* ── Normal book sections ── */
+          /* ── Book collections ── */
           <>
+            <BookSection
+              title="Sách nổi bật"
+              icon={<TrophyOutlined className="text-yellow-500" />}
+              books={homeBooks?.featured ?? []}
+              onBookClick={handleBookClick}
+            />
             <BookSection
               title="Sách mới nhập"
               icon={<ThunderboltOutlined className="text-blue-500" />}
-              books={newArrivals}
-              viewAllLink="/courses"
+              books={homeBooks?.new_books ?? []}
+              onBookClick={handleBookClick}
             />
             <BookSection
-              title="Mượn nhiều nhất"
+              title="Sách được mượn nhiều nhất"
               icon={<FireOutlined className="text-rose-500" />}
-              books={mostBorrowed}
-              viewAllLink="/courses"
+              books={homeBooks?.most_borrowed ?? []}
+              onBookClick={handleBookClick}
             />
-
-            {suggested.length > 0 ? (
-              <BookSection
-                title="Gợi ý dành cho bạn"
-                icon={<BulbOutlined className="text-violet-500" />}
-                books={suggested}
-                viewAllLink="/courses"
-              />
-            ) : (
-              <div className="bg-violet-50 border border-violet-200 rounded-xl px-5 py-4 flex items-center gap-3">
-                <BulbOutlined className="text-violet-500 text-lg flex-shrink-0" />
-                <p className="text-sm text-violet-700">
-                  Bạn đã đọc hầu hết sách trong các thể loại yêu thích! Khám phá thêm thể loại mới nhé.
-                </p>
-                <Button
-                  type="primary"
-                  size="small"
-                  className="ml-auto bg-violet-600 hover:bg-violet-700 flex-shrink-0"
-                  onClick={() => router.push(APP_ROUTE.courses)}
-                >
-                  Khám phá
-                </Button>
-              </div>
-            )}
-
-            {featured.length > 0 && (
-              <BookSection
-                title="Sách nổi bật"
-                icon={<TrophyOutlined className="text-yellow-500" />}
-                books={featured}
-                viewAllLink="/courses"
-              />
-            )}
-
-            {/* Quick stats */}
-            <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                {
-                  icon: <BookOutlined className="text-xl text-blue-500" />,
-                  label: "Tổng đầu sách",
-                  value: courses.length,
-                  bg: "bg-blue-50 border-blue-200",
-                },
-                {
-                  icon: <FireOutlined className="text-xl text-rose-500" />,
-                  label: "Lượt mượn nhiều nhất",
-                  value: Math.max(0, ...courses.map((c) => c.borrowCount ?? 0)),
-                  bg: "bg-rose-50 border-rose-200",
-                },
-                {
-                  icon: <StarFilled className="text-xl text-yellow-500" />,
-                  label: "Sách nổi bật",
-                  value: courses.filter((c) => c.isFeatured).length,
-                  bg: "bg-yellow-50 border-yellow-200",
-                },
-                {
-                  icon: <RiseOutlined className="text-xl text-emerald-500" />,
-                  label: "Thể loại",
-                  value: READER_CATEGORIES.length,
-                  bg: "bg-emerald-50 border-emerald-200",
-                },
-              ].map((stat) => (
-                <div key={stat.label} className={`${stat.bg} border rounded-xl px-5 py-4`}>
-                  {stat.icon}
-                  <p className="text-2xl text-gray-900 mt-2 font-bold">{stat.value}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{stat.label}</p>
-                </div>
-              ))}
-            </section>
           </>
         )}
       </div>
