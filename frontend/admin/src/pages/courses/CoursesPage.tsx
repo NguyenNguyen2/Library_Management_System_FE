@@ -1,14 +1,16 @@
 import {
-  DeleteOutlined,
-  DownOutlined,
-  DownloadOutlined,
-  EditOutlined,
-  ExclamationCircleFilled,
-  EyeInvisibleOutlined,
-  EyeOutlined,
   PlusOutlined,
-  UpOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  EyeInvisibleOutlined,
   UploadOutlined,
+  DownloadOutlined,
+  SearchOutlined,
+  InfoCircleOutlined,
+  ExclamationCircleFilled,
+  BookOutlined,
+  FileExcelOutlined,
 } from '@ant-design/icons';
 import {
   Button,
@@ -18,11 +20,11 @@ import {
   Image,
   Input,
   Modal,
-  Skeleton,
   Table,
   Tag,
   Typography,
   Upload,
+  Tooltip,
 } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -41,184 +43,11 @@ import {
   initSearchParams,
 } from '@shared/constants/commonConst';
 import { getKey } from '@shared/types/I18nKeyType';
-import { formatNumber } from '@shared/utils/numberUtils';
 import ModalCreateUpdateCourse from './components/ModalCreateUpdateCourse';
 
 const { Text } = Typography;
 const { confirm } = Modal;
 
-// ===== Lesson Row =====
-interface ILessonRowProps {
-  lesson: IDetailLesson;
-  onEdit: (lesson: IDetailLesson) => void;
-  onImport: (lesson: IDetailLesson) => void;
-  onViewQuestions: (lesson: IDetailLesson) => void;
-  onDelete: (lessonId: string) => void;
-}
-
-const LessonRow = ({
-  lesson,
-  onEdit,
-  onImport,
-  onViewQuestions,
-  onDelete,
-}: ILessonRowProps) => {
-  const { t } = useTranslation();
-
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-[10px] border border-black/10 px-3 py-3">
-      <div className="min-w-0 flex-1">
-        <Text className="!block !text-base !font-medium">{lesson?.name}</Text>
-        <Text className="!block !text-sm !text-grayDark">
-          {lesson?.duration} • {formatNumber(lesson?.questionCount ?? 0)}{' '}
-          {t(getKey('question_unit'))}
-        </Text>
-      </div>
-      <Flex gap={8} className="shrink-0">
-        <Button icon={<UploadOutlined />} onClick={() => onImport(lesson)}>
-          {t(getKey('import_questions'))}
-        </Button>
-        <Button type="primary" ghost onClick={() => onViewQuestions(lesson)}>
-          {t(getKey('view_questions'), { count: lesson?.questionCount ?? 0 })}
-        </Button>
-        <Button
-          type="text"
-          icon={<EditOutlined />}
-          onClick={() => onEdit(lesson)}
-        />
-        <Button
-          type="text"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => onDelete(lesson?.id)}
-        />
-      </Flex>
-    </div>
-  );
-};
-
-// ===== Course Card =====
-// Accept IListCourse because the list endpoint types `lessons` as optional
-// (website drops it). Admin's list response still carries `lessons`, so all
-// access below goes through optional chaining and renders nothing when absent.
-interface ICourseCardProps {
-  course: IListCourse;
-  onAddLesson: (courseId: string) => void;
-  onEdit: (course: IListCourse) => void;
-  onDelete: (courseId: string) => void;
-  onToggleVisibility: (course: IListCourse) => void;
-  onEditLesson: (lesson: IDetailLesson, courseId: string) => void;
-  onImportLesson: (lesson: IDetailLesson) => void;
-  onViewQuestions: (lesson: IDetailLesson, courseId: string) => void;
-  onDeleteLesson: (lessonId: string) => void;
-}
-
-const CourseCard = ({
-  course,
-  onAddLesson,
-  onEdit,
-  onDelete,
-  onToggleVisibility,
-  onEditLesson,
-  onImportLesson,
-  onViewQuestions,
-  onDeleteLesson,
-}: ICourseCardProps) => {
-  const { t } = useTranslation();
-  // Lessons collapse state — default expanded so the admin sees content on open.
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  return (
-    <Card className="!rounded-[10px] border border-gray-200 shadow-sm">
-      <Flex gap={16} align="start">
-        <Image
-          src={course?.image}
-          alt={course?.name}
-          width={128}
-          height={80}
-          className="!rounded-md object-contain border border-gray-400"
-          preview={{ rootClassName: 'rounded-md' }}
-          fallback={IMAGE_FALLBACK}
-        />
-        <div className="min-w-0 flex-1">
-          <Text className="!text-lg !font-semibold" ellipsis>
-            {course?.name}
-          </Text>
-          <Text
-            className="!mt-1 !block !text-sm !text-grayDark line-clamp-4"
-            ellipsis
-          >
-            {course?.description}
-          </Text>
-          <Text className="!mt-1 !block !text-sm !text-grayMedium">
-            {t(getKey('lesson_count'), {
-              count: formatNumber(
-                course?.lessons?.length ?? 0
-              ) as unknown as number,
-            })}
-          </Text>
-        </div>
-        <Flex gap={8} className="shrink-0">
-          {/* Collapse toggle — folds the lesson list to keep long courses scannable. */}
-          {(course?.lessons?.length ?? 0) > 0 && (
-            <Button
-              type="text"
-              icon={isExpanded ? <UpOutlined /> : <DownOutlined />}
-              onClick={() => setIsExpanded((v) => !v)}
-            />
-          )}
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => onAddLesson(course?.id)}
-          >
-            {t(getKey('add_lesson'))}
-          </Button>
-          {/* Soft-hide the course from website users without deleting it. */}
-          <Button
-            type="text"
-            icon={
-              course?.isActive === false ? (
-                <EyeInvisibleOutlined />
-              ) : (
-                <EyeOutlined />
-              )
-            }
-            onClick={() => onToggleVisibility(course)}
-          />
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => onEdit(course)}
-          />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => onDelete(course?.id)}
-          />
-        </Flex>
-      </Flex>
-
-      {isExpanded && (course?.lessons?.length ?? 0) > 0 && (
-        <div className="mt-4 flex flex-col gap-2">
-          {course?.lessons?.map((lesson: IListLesson) => (
-            <LessonRow
-              key={lesson?.id}
-              lesson={lesson}
-              onEdit={(lesson) => onEditLesson(lesson, course.id)}
-              onImport={onImportLesson}
-              onViewQuestions={(lesson) => onViewQuestions(lesson, course.id)}
-              onDelete={onDeleteLesson}
-            />
-          ))}
-        </div>
-      )}
-    </Card>
-  );
-};
-
-// ===== Courses Page =====
 const CoursesPage = () => {
   const { t } = useTranslation();
 
@@ -232,6 +61,8 @@ const CoursesPage = () => {
   const createLessonsMutation = courseHooks.useCreateLessons();
   const downloadTemplateMutation = courseHooks.useDownloadQuestionTemplate();
   const importQuestionsMutation = courseHooks.useImportQuestions();
+
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [courseModal, setCourseModal] = useState<{
     open: boolean;
@@ -315,10 +146,6 @@ const CoursesPage = () => {
         key: 'options',
         width: 280,
         render: (options: string[], record: IListQuestion) => {
-          // correctAnswer is a letter ("A".."D"); map it to the 0-based
-          // position in the options array. Options are stored as plain text
-          // (no "A."/"B." prefix) after the Excel import fix, so matching by
-          // `opt.charAt(0)` no longer works — compare by index instead.
           const LETTER_TO_INDEX: Record<string, number> = {
             A: 0,
             B: 1,
@@ -372,9 +199,6 @@ const CoursesPage = () => {
         ),
       },
     ],
-    // Rebuild columns when the open lesson changes so the delete handler
-    // captures the current lessonId (otherwise the closure stays at null
-    // from the first render and the mutation early-returns silently).
     [t, questionModal?.lesson?.id]
   );
 
@@ -397,11 +221,6 @@ const CoursesPage = () => {
     formCourse.resetFields();
   };
 
-  /**
-   * Confirm-then-toggle the course's `isActive` flag. Uses `updateMutation`
-   * already wired for the edit modal so the admin list cache patches in-place
-   * (no refetch / no page flicker).
-   */
   const handleToggleVisibility = (course: IListCourse) => {
     const nextActive = !(course?.isActive !== false);
     const index = data?.rows?.findIndex((c) => c.id === course.id) ?? -1;
@@ -550,15 +369,262 @@ const CoursesPage = () => {
   const lessonFields = Form.useWatch('lessons', formAddLesson);
   const lessonCount = lessonFields?.length ?? 0;
 
+  // Statistics Calculation
+  const totalBooks = data?.rows?.length ?? 0;
+  const activeBooksCount = data?.rows?.filter((c) => c.isActive !== false)?.length ?? 0;
+  const hiddenBooksCount = data?.rows?.filter((c) => c.isActive === false)?.length ?? 0;
+  const totalCopiesCount = data?.rows?.reduce((acc, c) => acc + (c.lessons?.length ?? 0), 0) ?? 0;
+
+  // Filter locally based on search query
+  const filteredCourses = useMemo(() => {
+    if (!data?.rows) return [];
+    return data.rows.filter(
+      (course) =>
+        course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (course.description ?? '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [data?.rows, searchQuery]);
+
+  // Main columns configuration
+  const columns = [
+    {
+      title: 'Mã',
+      dataIndex: 'id',
+      key: 'id',
+      width: 100,
+      render: (id: string) => (
+        <span className="font-mono text-xs text-gray-400 font-semibold">
+          {id.slice(0, 8).toUpperCase()}
+        </span>
+      ),
+    },
+    {
+      title: 'Tên sách',
+      key: 'name',
+      className: 'text-left',
+      render: (_: unknown, record: IListCourse) => (
+        <Flex gap={12} align="center">
+          <Image
+            src={record.image}
+            alt={record.name}
+            width={48}
+            height={48}
+            className="!rounded object-cover border border-gray-200 shrink-0"
+            fallback={IMAGE_FALLBACK}
+            preview={false}
+          />
+          <div className="min-w-0">
+            <span className="font-semibold text-navyDark text-sm block truncate">
+              {record.name}
+            </span>
+          </div>
+        </Flex>
+      ),
+    },
+    {
+      title: 'Mô tả',
+      dataIndex: 'description',
+      key: 'description',
+      ellipsis: true,
+      className: 'text-left',
+      render: (text: string) => (
+        <span className="text-xs text-gray-500 line-clamp-2" title={text}>
+          {text || t(getKey('not_available'))}
+        </span>
+      ),
+    },
+    {
+      title: 'Bản sao',
+      key: 'copiesCount',
+      align: 'center' as const,
+      width: 100,
+      render: (_: unknown, record: IListCourse) => (
+        <span className="font-semibold text-navyDark">{record.lessons?.length ?? 0}</span>
+      ),
+    },
+    {
+      title: 'Trạng thái',
+      key: 'status',
+      width: 140,
+      render: (_: unknown, record: IListCourse) => {
+        const active = record.isActive !== false;
+        return (
+          <Tag
+            color={active ? 'success' : 'default'}
+            className="!rounded-full !px-2.5 !py-0.5 font-medium border-0"
+          >
+            {active ? 'Đang hiển thị' : 'Đang ẩn'}
+          </Tag>
+        );
+      },
+    },
+    {
+      title: 'Thao tác',
+      key: 'actions',
+      width: 180,
+      align: 'right' as const,
+      render: (_: unknown, record: IListCourse, index: number) => (
+        <Flex gap={4} justify="end" onClick={(e) => e.stopPropagation()}>
+          <Tooltip title={t(getKey('add_lesson'))}>
+            <Button
+              type="text"
+              icon={<PlusOutlined />}
+              onClick={() =>
+                setAddLessonModal({
+                  open: true,
+                  courseId: record.id,
+                  courseIndex: index,
+                })
+              }
+              className="text-blue-600 hover:bg-blue-50"
+            />
+          </Tooltip>
+          <Tooltip title={record.isActive === false ? 'Hiện sách' : 'Ẩn sách'}>
+            <Button
+              type="text"
+              icon={record.isActive === false ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+              onClick={() => handleToggleVisibility(record)}
+              className="text-gray-500 hover:bg-gray-100"
+            />
+          </Tooltip>
+          <Tooltip title="Chỉnh sửa">
+            <Button
+              type="text"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenEdit(record, index)}
+              className="text-amber-600 hover:bg-amber-50"
+            />
+          </Tooltip>
+          <Tooltip title="Xóa">
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete('course', record.id)}
+              className="hover:bg-red-50"
+            />
+          </Tooltip>
+        </Flex>
+      ),
+    },
+  ];
+
+  // Nested table showing lessons (copies)
+  const expandedRowRender = (course: IListCourse) => {
+    const subColumns = [
+      {
+        title: 'Mã bản sao',
+        dataIndex: 'id',
+        key: 'id',
+        width: 140,
+        render: (id: string) => (
+          <span className="font-mono text-xs text-gray-400">
+            {id.slice(0, 8).toUpperCase()}
+          </span>
+        ),
+      },
+      {
+        title: 'Mã vạch bản sao',
+        dataIndex: 'name',
+        key: 'name',
+        className: 'font-semibold text-navyDark text-left',
+      },
+      {
+        title: 'Kệ sách',
+        dataIndex: 'youtubeUrl',
+        key: 'youtubeUrl',
+        render: (url: string | null) => (
+          <span className="text-gray-500 font-medium">{url || '—'}</span>
+        ),
+      },
+      {
+        title: 'Tình trạng',
+        dataIndex: 'duration',
+        key: 'duration',
+        render: (duration: string | null) => (
+          <Tag color="cyan" className="!rounded-md border-0">
+            {duration || 'Mới'}
+          </Tag>
+        ),
+      },
+      {
+        title: 'Giao dịch',
+        dataIndex: 'questionCount',
+        key: 'questionCount',
+        align: 'center' as const,
+        width: 100,
+        render: (count: number) => (
+          <span className="font-bold text-blue-600">{count ?? 0}</span>
+        ),
+      },
+      {
+        title: 'Thao tác',
+        key: 'actions',
+        width: 280,
+        align: 'right' as const,
+        render: (_: unknown, lesson: IDetailLesson) => (
+          <Flex gap={4} justify="end">
+            <Button
+              size="small"
+              icon={<UploadOutlined />}
+              onClick={() => handleOpenImport(lesson)}
+              className="text-xs hover:bg-gray-100"
+            >
+              {t(getKey('import_questions'))}
+            </Button>
+            <Button
+              size="small"
+              type="primary"
+              ghost
+              icon={<InfoCircleOutlined />}
+              onClick={() => {
+                setQuestionModal({ open: true, lesson });
+              }}
+              className="text-xs"
+            >
+              Giao dịch ({lesson.questionCount ?? 0})
+            </Button>
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleOpenEditLesson(lesson, course.id)}
+              className="text-amber-600 hover:bg-amber-50"
+            />
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDelete('lesson', lesson.id)}
+              className="hover:bg-red-50"
+            />
+          </Flex>
+        ),
+      },
+    ];
+
+    return (
+      <Table
+        columns={subColumns}
+        dataSource={course.lessons || []}
+        rowKey="id"
+        pagination={false}
+        size="small"
+        className="nested-table bg-gray-50/50 p-2 rounded-lg border border-gray-100"
+      />
+    );
+  };
+
   return (
-    <Flex vertical gap={24} align="stretch">
+    <Flex vertical gap={24} align="stretch" className="max-w-[1400px] mx-auto">
       {/* Page header */}
-      <Flex justify="space-between" align="center">
-        <div>
-          <h1 className="m-0 text-[30px] font-bold leading-[36px] text-navyDark">
+      <Flex justify="space-between" align="center" wrap="wrap" gap={12}>
+        <div className="text-left">
+          <h1 className="m-0 text-[24px] font-semibold leading-[32px] text-navyDark">
             {t(getKey('course_management'))}
           </h1>
-          <p className="m-0 mt-1 text-base leading-6 text-grayDark">
+          <p className="m-0 mt-1 text-sm text-gray-500">
             {t(getKey('course_management_desc'))}
           </p>
         </div>
@@ -568,6 +634,7 @@ const CoursesPage = () => {
             size="large"
             onClick={handleDownloadTemplate}
             loading={downloadTemplateMutation?.isPending}
+            className="flex items-center justify-center text-sm rounded-md"
           >
             {t(getKey('download_question_template'))}
           </Button>
@@ -576,56 +643,128 @@ const CoursesPage = () => {
             size="large"
             icon={<PlusOutlined className="text-white" />}
             onClick={handleOpenCreate}
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] border-0 text-sm rounded-md flex items-center justify-center text-white"
           >
-            <span className="text-white text-base font-medium">
+            <span className="text-white font-medium">
               {t(getKey('add_course'))}
             </span>
           </Button>
         </Flex>
       </Flex>
 
-      {/* Course card list */}
-      {isLoading ? (
-        <div className="flex flex-col gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="!rounded-[10px]">
-              <Skeleton active />
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-4">
-          {data?.rows?.map((course, index) => (
-            <CourseCard
-              key={course?.id}
-              course={course}
-              onAddLesson={(id) =>
-                setAddLessonModal({
-                  open: true,
-                  courseId: id,
-                  courseIndex: index,
-                })
-              }
-              onEdit={() => handleOpenEdit(course, index)}
-              onDelete={(id) => handleDelete('course', id)}
-              onToggleVisibility={handleToggleVisibility}
-              onEditLesson={handleOpenEditLesson}
-              onImportLesson={handleOpenImport}
-              onViewQuestions={(lesson) =>
-                setQuestionModal({ open: true, lesson })
-              }
-              onDeleteLesson={(id) => handleDelete('lesson', id)}
+      {/* Statistics Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-left">
+        <Card
+          className="!rounded-[10px] border border-gray-200 shadow-sm"
+          bodyStyle={{ padding: '16px' }}
+          loading={isLoading}
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-50 p-2.5 rounded-lg shrink-0 flex items-center justify-center">
+              <BookOutlined style={{ fontSize: 20 }} className="text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 m-0 font-medium">{t(getKey('total_courses'))}</p>
+              <p className="m-0 text-[20px] font-bold text-navyDark mt-0.5">{totalBooks}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card
+          className="!rounded-[10px] border border-gray-200 shadow-sm"
+          bodyStyle={{ padding: '16px' }}
+          loading={isLoading}
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-50 p-2.5 rounded-lg shrink-0 flex items-center justify-center">
+              <EyeOutlined style={{ fontSize: 20 }} className="text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 m-0 font-medium">Đang hiển thị</p>
+              <p className="m-0 text-[20px] font-bold text-emerald-600 mt-0.5">{activeBooksCount}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card
+          className="!rounded-[10px] border border-gray-200 shadow-sm"
+          bodyStyle={{ padding: '16px' }}
+          loading={isLoading}
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-red-50 p-2.5 rounded-lg shrink-0 flex items-center justify-center">
+              <EyeInvisibleOutlined style={{ fontSize: 20 }} className="text-red-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 m-0 font-medium">Đang ẩn</p>
+              <p className="m-0 text-[20px] font-bold text-red-600 mt-0.5">{hiddenBooksCount}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Card
+          className="!rounded-[10px] border border-gray-200 shadow-sm"
+          bodyStyle={{ padding: '16px' }}
+          loading={isLoading}
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-purple-50 p-2.5 rounded-lg shrink-0 flex items-center justify-center">
+              <FileExcelOutlined style={{ fontSize: 20 }} className="text-purple-600" />
+            </div>
+            <div>
+              <p className="text-xs text-gray-500 m-0 font-medium">Tổng số bản sao</p>
+              <p className="m-0 text-[20px] font-bold text-purple-600 mt-0.5">{totalCopiesCount}</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Main Table Card */}
+      <Card
+        className="!rounded-[10px] border border-gray-200 shadow-sm"
+        bodyStyle={{ padding: '20px' }}
+      >
+        {/* Search toolbar */}
+        <div className="flex items-center justify-between mb-4 gap-3 text-left">
+          <div className="relative flex-1 max-w-md">
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Tìm theo tên sách hoặc mô tả..."
+              prefix={<SearchOutlined className="text-gray-400" />}
+              className="!h-10 !rounded-lg"
+              allowClear
             />
-          ))}
+          </div>
         </div>
-      )}
+
+        {/* Main Books Table */}
+        <Table
+          columns={columns}
+          dataSource={filteredCourses}
+          loading={isLoading}
+          rowKey="id"
+          expandable={{
+            expandedRowRender,
+            defaultExpandAllRows: false,
+          }}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} sách`,
+            className: 'custom-pagination',
+          }}
+          size="middle"
+          className="custom-table"
+        />
+      </Card>
 
       {/* ── Edit lesson modal ── */}
       <Modal
         centered
         open={editLessonModal?.open}
         onCancel={handleCancelEditLesson}
-        destroyOnHidden
+        destroyOnClose
         maskClosable={false}
         footer={null}
         width={512}
@@ -634,8 +773,7 @@ const CoursesPage = () => {
           form={formEditLesson}
           layout="vertical"
           onFinish={handleSubmitEditLesson}
-          className="max-h-[75vh] overflow-y-auto overflow-x-hidden px-1"
-          clearOnDestroy
+          className="max-h-[75vh] overflow-y-auto overflow-x-hidden px-1 text-left"
           scrollToFirstError={{
             behavior: 'instant',
             focus: true,
@@ -667,8 +805,7 @@ const CoursesPage = () => {
               name="youtubeUrl"
               rules={[
                 {
-                  pattern:
-                    /^https?:\/\/(www\.)?(youtube\.com\/watch\?|youtu\.be\/|youtube\.com\/embed\/)/,
+                  required: true,
                   message: t(getKey('youtube_url_invalid')),
                 },
               ]}
@@ -710,7 +847,7 @@ const CoursesPage = () => {
         centered
         open={courseModal?.open}
         onCancel={handleCancelCourseModal}
-        destroyOnHidden
+        destroyOnClose
         maskClosable={false}
         width={512}
         footer={null}
@@ -719,8 +856,7 @@ const CoursesPage = () => {
           form={formCourse}
           layout="vertical"
           onFinish={handleSubmitCourse}
-          className="max-h-[90dvh] overflow-y-auto overflow-x-hidden px-1"
-          clearOnDestroy
+          className="max-h-[90dvh] overflow-y-auto overflow-x-hidden px-1 text-left"
           scrollToFirstError={{
             behavior: 'instant',
             focus: true,
@@ -755,7 +891,7 @@ const CoursesPage = () => {
         centered
         open={addLessonModal?.open}
         onCancel={handleCancelAddLesson}
-        destroyOnHidden
+        destroyOnClose
         maskClosable={false}
         footer={null}
         width={768}
@@ -764,8 +900,7 @@ const CoursesPage = () => {
           form={formAddLesson}
           layout="vertical"
           onFinish={handleSubmitAddLesson}
-          className="max-h-[75vh] overflow-y-auto overflow-x-hidden px-1"
-          clearOnDestroy
+          className="max-h-[75vh] overflow-y-auto overflow-x-hidden px-1 text-left"
           scrollToFirstError={{
             behavior: 'instant',
             focus: true,
@@ -824,8 +959,7 @@ const CoursesPage = () => {
                           className="!mb-0"
                           rules={[
                             {
-                              pattern:
-                                /^https?:\/\/(www\.)?(youtube\.com\/watch\?|youtu\.be\/|youtube\.com\/embed\/)/,
+                              required: true,
                               message: t(getKey('youtube_url_invalid')),
                             },
                           ]}
@@ -886,7 +1020,7 @@ const CoursesPage = () => {
         centered
         open={questionModal?.open}
         onCancel={handleCancelQuestionModal}
-        destroyOnHidden
+        destroyOnClose
         maskClosable={false}
         width={896}
         footer={
@@ -894,18 +1028,18 @@ const CoursesPage = () => {
             <Button
               type="primary"
               onClick={handleCancelQuestionModal}
-              className="!h-10 !px-4 !rounded-lg !text-base !font-medium"
+              className="!h-10 !px-4 !rounded-lg !text-base !font-medium font-semibold bg-[#2563EB] text-white border-0"
             >
               {t(getKey('close_btn'))}
             </Button>
           </Flex>
         }
       >
-        <h2 className="text-[18px] font-semibold leading-[18px] tracking-[-0.45px] text-blackSoft mb-1">
+        <h2 className="text-[18px] font-semibold leading-[18px] tracking-[-0.45px] text-navyDark mb-1 text-left">
           {t(getKey('question_list_title'))}
         </h2>
-        <p className="mb-4 text-sm leading-5 text-grayMedium">
-          {questionModal?.lesson?.name}
+        <p className="mb-4 text-sm leading-5 text-grayMedium text-left">
+          Bản sao: {questionModal?.lesson?.name}
         </p>
         <Table
           columns={questionColumns}
@@ -921,6 +1055,7 @@ const CoursesPage = () => {
           }}
           scroll={{ y: 360 }}
           size="middle"
+          className="custom-table"
         />
       </Modal>
 
@@ -929,19 +1064,19 @@ const CoursesPage = () => {
         centered
         open={importModal?.open}
         onCancel={handleCancelImport}
-        destroyOnHidden
+        destroyOnClose
         maskClosable={false}
         footer={null}
         width={512}
       >
-        <h2 className="text-[18px] font-semibold leading-[18px] tracking-[-0.45px] text-blackSoft mb-1">
+        <h2 className="text-[18px] font-semibold leading-[18px] tracking-[-0.45px] text-navyDark mb-1 text-left">
           {t(getKey('import_questions_title'))}
         </h2>
-        <p className="mb-6 text-sm leading-5 text-grayMedium">
-          {importModal?.lesson?.name}
+        <p className="mb-6 text-sm leading-5 text-grayMedium text-left">
+          Bản sao: {importModal?.lesson?.name}
         </p>
 
-        <div className="flex flex-col gap-2 mb-6">
+        <div className="flex flex-col gap-2 mb-6 text-left">
           <Text className="!text-sm !font-medium">
             {t(getKey('import_questions_file_label'))}
           </Text>
