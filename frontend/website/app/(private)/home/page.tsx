@@ -17,11 +17,10 @@ import {
 import { getCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
 import type { IDetailUser } from '@shared/types/UserType';
-import { useMockBorrowedBooks } from '@/lib/mock/useMockBorrowedBooks';
+import { useBorrowing } from '@/features/borrowing/hooks/useBorrowing';
 import { useMockReadingList } from '@/lib/mock/useMockReadingList';
 import { useMockReservations } from '@/lib/mock/useMockReservations';
 import { READER_BORROW_LIMIT, READER_CATEGORIES } from '@/lib/mock/mockData';
-import { getDaysUntil } from '@/lib/utils/date';
 import { APP_ROUTE } from '@/constants/routes';
 import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
 import type { IHomeBook } from '@/features/books/api/bookApi';
@@ -128,16 +127,16 @@ export default function HomePage() {
   const user = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
   const userName = user?.name ?? "Độc giả";
 
-  const { data: borrowedData } = useMockBorrowedBooks();
+  const { data: borrowingData } = useBorrowing();
   const { data: reservationsData } = useMockReservations();
   const { data: readingListData } = useMockReadingList();
 
-  const borrowedBooks = borrowedData?.rows ?? [];
+  const borrowedBooks = borrowingData?.data ?? [];
   const reservationsList = reservationsData?.rows ?? [];
   const readingList = readingListData?.rows ?? [];
 
   const borrowedCount = borrowedBooks.length;
-  const overdueCount = borrowedBooks.filter((b) => getDaysUntil(b.dueDate) < 0).length;
+  const overdueCount = borrowedBooks.filter((b) => b.days_remaining < 0).length;
   const activeReservationsCount = reservationsList.filter(
     (r) => r.status === 'waiting' || r.status === 'ready',
   ).length;
