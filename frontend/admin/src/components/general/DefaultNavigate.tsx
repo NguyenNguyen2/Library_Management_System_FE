@@ -63,11 +63,11 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       key: 'books',
       label: 'Quản lý Sách',
       icon: <BookOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.COURSES,
+      to: ROUTES.BOOKS,
       children: [
-        { label: 'Danh sách sách', to: ROUTES.COURSES },
-        { label: 'Tác giả & Thể loại', to: ROUTES.COURSES + '?tab=authors' },
-        { label: 'Sách nổi bật', to: ROUTES.COURSES + '?tab=featured' },
+        { label: 'Danh sách sách', to: ROUTES.BOOKS },
+        { label: 'Tác giả & Thể loại', to: ROUTES.BOOKS + '?tab=authors' },
+        { label: 'Sách nổi bật', to: ROUTES.BOOKS + '?tab=featured' },
       ],
     },
     {

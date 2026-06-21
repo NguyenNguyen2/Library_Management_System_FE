@@ -35,11 +35,11 @@ const AchievementsPage = () => {
   const totalCount = allAchievements.length;
   
   const minRequired = allAchievements.length > 0
-    ? Math.min(...allAchievements.map((a) => a.requiredCourses))
+    ? Math.min(...allAchievements.map((a: any) => a.requiredCourses))
     : 0;
     
   const maxRequired = allAchievements.length > 0
-    ? Math.max(...allAchievements.map((a) => a.requiredCourses))
+    ? Math.max(...allAchievements.map((a: any) => a.requiredCourses))
     : 0;
 
   const createMutation = achievementHooks.useCreateAchievement();
