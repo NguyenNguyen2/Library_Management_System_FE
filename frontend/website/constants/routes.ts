@@ -15,4 +15,12 @@ export enum APP_ROUTE {
   courseDetails = '/courses/[courseId]',
   /** User profile */
   profile = '/profile',
+  /** Books currently borrowed by the reader */
+  borrowed = '/borrowed',
+  /** Reader's personal reading list */
+  readingList = '/reading-list',
+  /** Reader's book reservations */
+  reservations = '/reservations',
+  /** Borrow/return history */
+  history = '/history',
 }

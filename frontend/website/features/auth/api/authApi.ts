@@ -9,4 +9,16 @@ export const authApi = {
   signOut: async () => {
     return await axiosInstance.post('/v1/auth/logout');
   },
+  signUp: async (body: { full_name: string; email: string; password: string; password_confirmation: string }) => {
+    const response = await axiosInstance.post('/v1/auth/register', body);
+    return response?.data?.results?.object;
+  },
+  forgotPassword: async (body: { email: string }): Promise<{ message: string }> => {
+    const response = await axiosInstance.post('/v1/auth/forgot-password', body);
+    return response?.data;
+  },
+  resetPassword: async (body: { token: string; email: string; password: string; password_confirmation: string }): Promise<{ message: string }> => {
+    const response = await axiosInstance.post('/v1/auth/reset-password', body);
+    return response?.data;
+  },
 };

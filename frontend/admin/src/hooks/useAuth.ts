@@ -61,7 +61,7 @@ export const useLogout = () => {
     mutationFn: authApi.signOut,
     // Always clear client-side state, even if the API call fails
     // (e.g. expired token) so the user is not stuck on a dead session.
-    onSuccess: () => {
+    onSettled: () => {
       handleLogoutFunction();
       setUser(undefined);
       queryClient.clear();

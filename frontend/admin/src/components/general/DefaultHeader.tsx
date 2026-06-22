@@ -32,7 +32,7 @@ const DefaultHeader = () => {
         <Flex align="center" gap={13}>
           {/* <LanguageSelect className='min-w-[200px]' /> */}
           <Flex vertical align="start" className="max-w-[150px] text-base">
-            <p className="font-bold mb-0">CMS Admin</p>
+            <p className="font-bold mb-0">Quản trị viên</p>
             <p className="text-gray-500">{user?.name || NotAvailable}</p>
           </Flex>
         </Flex>

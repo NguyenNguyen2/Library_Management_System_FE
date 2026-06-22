@@ -1,4 +1,5 @@
 import { Button, Flex } from 'antd';
+import { Button, Flex } from 'antd';
 import {
   BarChartOutlined,
   CrownOutlined,
@@ -7,6 +8,11 @@ import {
   SettingOutlined,
   UserOutlined,
   BookOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  DownOutlined,
+  UpOutlined,
+  DeploymentUnitOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   DownOutlined,
@@ -21,10 +27,18 @@ import { cn } from '@shared/constants/commonConst';
 import { getKey } from '@shared/types/I18nKeyType';
 import { useLogout } from '../../hooks/useAuth';
 import { useGlobalVariable } from '../../hooks/GlobalVariableProvider';
+import { useGlobalVariable } from '../../hooks/GlobalVariableProvider';
 
 type NavChild = { label: string; to: string };
 type NavItem = {
+type NavChild = { label: string; to: string };
+type NavItem = {
   key: string;
+  label: string;
+  icon: React.ReactNode;
+  to: string;
+  badge?: number;
+  children?: NavChild[];
   label: string;
   icon: React.ReactNode;
   to: string;
@@ -39,6 +53,7 @@ interface IDefaultNavigate {
 
 const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
   const [selectItem, setSelectItem] = useState<string>('');
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const navigate = useNavigate();
   const pathname = useLocation();
@@ -150,12 +165,44 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
   return (
     <div className={cn('flex h-full flex-col bg-[#1E2A3B] text-[#8FA3BF]')}>
       {/* Header / Logo */}
+    <div className={cn('flex h-full flex-col bg-[#1E2A3B] text-[#8FA3BF]')}>
+      {/* Header / Logo */}
       <Flex
+        gap={12}
         gap={12}
         align="center"
         justify={collapsed ? 'center' : 'space-between'}
         className={cn('relative px-4 border-b border-[#2D3F52] h-16 shrink-0')}
+        justify={collapsed ? 'center' : 'space-between'}
+        className={cn('relative px-4 border-b border-[#2D3F52] h-16 shrink-0')}
       >
+        {!collapsed ? (
+          <>
+            <Flex align="center" gap={12} className="min-w-0">
+              <BookOutlined style={{ fontSize: 24, color: '#60A5FA' }} className="shrink-0" />
+              <span style={{ fontSize: '16px', fontWeight: 600 }} className="text-white truncate">
+                Thư Viện ABC
+              </span>
+            </Flex>
+            <Button
+              type="text"
+              onClick={onToggle}
+              icon={<MenuFoldOutlined className="text-[#8FA3BF]" />}
+              className={cn(
+                'h-8 w-8 px-2 flex items-center justify-center rounded-lg hover:!bg-[#263A50] border-0 cursor-pointer bg-transparent'
+              )}
+            />
+          </>
+        ) : (
+          <Button
+            type="text"
+            onClick={onToggle}
+            icon={<MenuUnfoldOutlined className="text-white" />}
+            className={cn(
+              'h-8 w-8 px-2 flex items-center justify-center rounded-lg hover:!bg-[#263A50] border-0 cursor-pointer bg-transparent'
+            )}
+          />
+        )}
         {!collapsed ? (
           <>
             <Flex align="center" gap={12} className="min-w-0">
@@ -252,8 +299,102 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
             </div>
           );
         })}
+      <div className={cn('flex-1 overflow-y-auto p-2 space-y-0.5')}>
+        {menuConfig.map((item) => {
+          const isParentActive = isActive(item);
+          const isOpen = openMenu === item.key;
+
+          return (
+            <div key={item.key}>
+              <button
+                onClick={() => handleMenuClick(item)}
+                title={collapsed ? item.label : undefined}
+                className={cn(
+                  'w-full flex items-center rounded-md text-sm transition-all duration-200 relative h-11 border-0 cursor-pointer',
+                  collapsed ? 'justify-center px-0' : 'justify-start gap-2.5 px-3',
+                  isParentActive
+                    ? 'bg-[#2563EB] text-white'
+                    : 'text-[#8FA3BF] bg-transparent hover:bg-[#263A50] hover:text-white'
+                )}
+              >
+                {isParentActive && (
+                  <span className="absolute left-0 top-1 bottom-1 w-[3px] bg-[#60A5FA] rounded-r" />
+                )}
+                <span className="shrink-0 flex items-center justify-center">
+                  {item.icon}
+                </span>
+                {!collapsed && (
+                  <>
+                    <span className="text-sm truncate flex-1 text-left">{item.label}</span>
+                    {item.badge && (
+                      <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full mr-1">
+                        {item.badge}
+                      </span>
+                    )}
+                    {item.children && (
+                      <span className="text-xs shrink-0 ml-1">
+                        {isOpen ? <UpOutlined /> : <DownOutlined />}
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
+
+              {/* Sub-menu rendering */}
+              {item.children && isOpen && !collapsed && (
+                <div className="mt-0.5 pl-3 space-y-0.5">
+                  {item.children.map((c) => {
+                    const isChildActive = selectItem === c.to;
+                    return (
+                      <button
+                        key={c.label}
+                        onClick={() => navigate(c.to)}
+                        className={cn(
+                          'w-full text-left pl-7 pr-3 h-9 flex items-center rounded-md text-[13px] border-0 cursor-pointer transition-all duration-200',
+                          isChildActive
+                            ? 'text-white bg-[#263A50]'
+                            : 'text-[#8FA3BF] hover:text-white hover:bg-[#263A50]'
+                        )}
+                      >
+                        {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
+      {/* Bottom user card */}
+      <div className="border-t border-[#2D3F52] p-4 flex items-center gap-2 shrink-0">
+        {collapsed ? (
+          <button
+            onClick={handleLogout}
+            className="text-[#8FA3BF] hover:text-red-400 p-1 mx-auto flex items-center justify-center bg-transparent border-0 cursor-pointer"
+            title={t(getKey('logout'))}
+          >
+            <LogoutOutlined style={{ fontSize: 18 }} />
+          </button>
+        ) : (
+          <>
+            <div className="w-8 h-8 rounded-full bg-[#2563EB] flex items-center justify-center text-white font-bold shrink-0 text-sm">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-[13px] text-white truncate font-medium m-0 leading-none">{user?.name ?? 'Admin'}</p>
+              <p className="text-[11px] text-[#8FA3BF] m-0 mt-1.5 leading-none">Quản trị viên</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="text-[#8FA3BF] hover:text-red-400 p-1 shrink-0 bg-transparent border-0 cursor-pointer flex items-center justify-center"
+              title={t(getKey('logout'))}
+            >
+              <LogoutOutlined style={{ fontSize: 16 }} />
+            </button>
+          </>
+        )}
       {/* Bottom user card */}
       <div className="border-t border-[#2D3F52] p-4 flex items-center gap-2 shrink-0">
         {collapsed ? (

@@ -9,6 +9,7 @@ export interface IBaseUser {
   name: string;
   role: string;
   phone?: string;
+  address?: string;
   avatar?: string;
   achievement?: IValueLabel;
 }
