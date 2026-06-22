@@ -23,4 +23,6 @@ export enum APP_ROUTE {
   reservations = '/reservations',
   /** Borrow/return history */
   history = '/history',
+  /** Fine payment history */
+  fines = '/fines',
 }
