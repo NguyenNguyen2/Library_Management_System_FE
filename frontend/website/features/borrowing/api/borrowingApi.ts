@@ -16,9 +16,27 @@ export interface IBorrowingResponse {
   data: IBorrowedBook[];
 }
 
+export interface IRenewResult {
+  borrowId: number;
+  renewCount: number;
+  newDueDate: string;
+}
+
+export interface IRenewResponse {
+  results: {
+    object: IRenewResult;
+  };
+  message: string;
+}
+
 export const borrowingApi = {
   getCurrentBorrowing: async (): Promise<IBorrowingResponse> => {
     const response = await axiosInstance.get('/v1/me/borrowing');
+    return response.data;
+  },
+
+  renewBorrowing: async (borrowId: number): Promise<IRenewResponse> => {
+    const response = await axiosInstance.post(`/v1/me/borrowing/${borrowId}/renew`);
     return response.data;
   },
 };
