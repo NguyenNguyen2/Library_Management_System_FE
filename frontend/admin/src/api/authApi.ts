@@ -8,6 +8,10 @@ export const authApi = {
   signOut: async () => {
     return await axiosInstance.post('/v1/auth/logout');
   },
+  verify2FA: async (body: { code: string }) => {
+    const response = await axiosInstance.post('/v1/auth/verify-2fa', body);
+    return response?.data?.results?.object;
+  },
   refreshToken(data: { refreshToken: string }) {
     return axiosInstance.post('/v1/auth/refresh-token', data);
   },

@@ -16,10 +16,10 @@ import {
 const CODE_STATUS = { USED: 'used', UNUSED: 'unused' } as const;
 import { cn, DATE_DISPLAY_FORMAT } from '@shared/constants/commonConst';
 import { getKey } from '@shared/types/I18nKeyType';
-import ModalCreateCode from './components/ModalCreateCode';
+import ModalCreateTransaction from './components/ModalCreateTransaction';
 import { IValueLabel } from '@shared/types/UserType';
 
-const CodesPage = () => {
+const TransactionsPage = () => {
   const { t } = useTranslation();
 
   // Fetch all codes for statistics
@@ -229,7 +229,7 @@ const CodesPage = () => {
         createInfo={{
           type: 'modal',
           modalInfo: {
-            modalContent: <ModalCreateCode />,
+            modalContent: <ModalCreateTransaction />,
             modalProps: {},
             modalFunc: createMutation,
           },
@@ -239,4 +239,4 @@ const CodesPage = () => {
   );
 };
 
-export default CodesPage;
+export default TransactionsPage;

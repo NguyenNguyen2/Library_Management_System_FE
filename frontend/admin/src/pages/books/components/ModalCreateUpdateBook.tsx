@@ -21,7 +21,7 @@ const urlToFileList = (url: unknown): { value: IFileUpload[] } => {
 /** Convert IFileUpload[] from CustomUpload onChange → string URL for form */
 const fileListToUrl = (files: IFileUpload[]) => files[0]?.fileUrl ?? '';
 
-const ModalCreateUpdateCourse = ({ isEdit = false }: { isEdit?: boolean }) => {
+const ModalCreateUpdateBook = ({ isEdit = false }: { isEdit?: boolean }) => {
   const { t } = useTranslation();
 
   return (
@@ -73,4 +73,4 @@ const ModalCreateUpdateCourse = ({ isEdit = false }: { isEdit?: boolean }) => {
   );
 };
 
-export default ModalCreateUpdateCourse;
+export default ModalCreateUpdateBook;

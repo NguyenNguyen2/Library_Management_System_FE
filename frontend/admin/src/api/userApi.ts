@@ -61,4 +61,39 @@ export const userApi = {
     );
     return response.data?.results?.object ?? response.data;
   },
+
+  getReaderBorrowHistory: async (id: string) => {
+    const response = await axiosInstance.get(`/private/v1/readers/${id}/borrow-history`);
+    return response.data?.results?.objects || [];
+  },
+
+  getLibrarians: async (params: { keyword?: string; page?: number; limit?: number }) => {
+    const response = await axiosInstance.get('/private/v1/librarians', { params });
+    return response.data;
+  },
+
+  createLibrarian: async (body: { name: string; email: string; librarian_level: string; phone?: string; address?: string }) => {
+    const response = await axiosInstance.post('/private/v1/librarians', body);
+    return response.data?.results?.object;
+  },
+
+  updateLibrarian: async ({ id, body }: { id: string; body: { name?: string; email?: string; librarian_level?: string; phone?: string; address?: string; status?: number } }) => {
+    const response = await axiosInstance.patch(`/private/v1/librarians/${id}`, body);
+    return response.data?.results?.object;
+  },
+
+  deleteLibrarian: async (id: string) => {
+    const response = await axiosInstance.delete(`/private/v1/librarians/${id}`);
+    return response.data;
+  },
+
+  resetLibrarianPassword: async (id: string) => {
+    const response = await axiosInstance.post(`/private/v1/librarians/${id}/reset-password`);
+    return response.data?.results?.object;
+  },
+
+  getLoginLogs: async (params: { keyword?: string; status?: string; page?: number; limit?: number }) => {
+    const response = await axiosInstance.get('/private/v1/login-logs', { params });
+    return response.data;
+  },
 };

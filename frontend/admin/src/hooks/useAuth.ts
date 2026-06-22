@@ -15,11 +15,34 @@ export const useLogin = () => {
   const navigate = useNavigate();
   const { setUser } = useGlobalVariable();
   return useMutation<
-    IResponseLogin,
+    IResponseLogin & { requires_2fa?: boolean; is_setup?: boolean; secret?: string; qr_code_url?: string; tempToken?: string },
     AxiosError<GeneralErrorType>,
     { email: string; password: string }
   >({
     mutationFn: authApi.signIn,
+    onSuccess: (data) => {
+      if (data?.requires_2fa) {
+        setCookie(STORAGES.ACCESS_TOKEN, data.tempToken);
+        return; // Stay on login page to verify OTP
+      }
+      const userClone = _.cloneDeep(data?.user);
+      setUser(userClone);
+      setCookie(STORAGES.USER_LOGIN, userClone);
+      setCookie(STORAGES.ACCESS_TOKEN, data?.accessToken);
+      navigate(ROUTES.USERS);
+    },
+  });
+};
+
+export const useVerify2FA = () => {
+  const navigate = useNavigate();
+  const { setUser } = useGlobalVariable();
+  return useMutation<
+    IResponseLogin,
+    AxiosError<GeneralErrorType>,
+    { code: string }
+  >({
+    mutationFn: authApi.verify2FA,
     onSuccess: (data) => {
       const userClone = _.cloneDeep(data?.user);
       setUser(userClone);

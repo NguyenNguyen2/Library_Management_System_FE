@@ -7,7 +7,7 @@ import { courseHooks } from '../../../hooks/useCourses';
 import { userHooks } from '../../../hooks/useUsers';
 import CustomInput from '@shared/components/input/CustomInput';
 
-const ModalCreateCode = () => {
+const ModalCreateTransaction = () => {
   const { t } = useTranslation();
   const form = Form.useFormInstance();
 
@@ -92,4 +92,4 @@ const ModalCreateCode = () => {
   );
 };
 
-export default ModalCreateCode;
+export default ModalCreateTransaction;

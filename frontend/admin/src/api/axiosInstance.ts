@@ -40,7 +40,9 @@ axiosInstance.interceptors.request.use(
   (config) => {
     const token = getCookie(STORAGES.ACCESS_TOKEN);
     const publicUrl =
-      config?.url?.includes('/auth') && !config?.url?.includes('/logout');
+      config?.url?.includes('/auth') && 
+      !config?.url?.includes('/logout') && 
+      !config?.url?.includes('/verify-2fa');
     if (token && !publicUrl) {
       config.headers.Authorization = `Bearer ${token}`;
     }
