@@ -19,7 +19,7 @@ import { STORAGES } from '@shared/constants/storage';
 import type { IDetailUser } from '@shared/types/UserType';
 import { useBorrowing } from '@/features/borrowing/hooks/useBorrowing';
 import { useMockReadingList } from '@/lib/mock/useMockReadingList';
-import { useMockReservations } from '@/lib/mock/useMockReservations';
+import { useReservations } from '@/features/reservations/hooks/useReservations';
 import { READER_BORROW_LIMIT, READER_CATEGORIES } from '@/lib/mock/mockData';
 import { APP_ROUTE } from '@/constants/routes';
 import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
@@ -128,11 +128,11 @@ export default function HomePage() {
   const userName = user?.name ?? "Độc giả";
 
   const { data: borrowingData } = useBorrowing();
-  const { data: reservationsData } = useMockReservations();
+  const { data: reservationsData } = useReservations();
   const { data: readingListData } = useMockReadingList();
 
   const borrowedBooks = borrowingData?.data ?? [];
-  const reservationsList = reservationsData?.rows ?? [];
+  const reservationsList = reservationsData?.data ?? [];
   const readingList = readingListData?.rows ?? [];
 
   const borrowedCount = borrowedBooks.length;
