@@ -1,0 +1,304 @@
+import { Button, Flex } from 'antd';
+import {
+  BarChartOutlined,
+  LogoutOutlined,
+  UserOutlined,
+  BookOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  DownOutlined,
+  UpOutlined,
+  DeploymentUnitOutlined,
+  LockOutlined,
+  CreditCardOutlined,
+  LineChartOutlined,
+} from '@ant-design/icons';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ROUTES } from '../../constants/routers';
+import { cn } from '@shared/constants/commonConst';
+import { getKey } from '@shared/types/I18nKeyType';
+import { useLogout } from '../../hooks/useAuth';
+import { useGlobalVariable } from '../../hooks/GlobalVariableProvider';
+
+type NavChild = { label: string; to: string };
+type NavItem = {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  to: string;
+  badge?: number;
+  children?: NavChild[];
+};
+
+interface ILibrarianNavigate {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
+  const [selectItem, setSelectItem] = useState<string>('');
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const pathname = useLocation();
+  const { t } = useTranslation();
+  const logoutMutation = useLogout();
+  const { user } = useGlobalVariable();
+
+  // Librarian menu config (excludes Achievements and System Settings)
+  const menuConfig: NavItem[] = [
+    {
+      key: 'dashboard',
+      label: 'Dashboard',
+      icon: <BarChartOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.DASHBOARD,
+    },
+    {
+      key: 'users',
+      label: 'Quản lý độc giả',
+      icon: <UserOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.USERS,
+    },
+    {
+      key: 'books',
+      label: 'Quản lý Sách',
+      icon: <BookOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.BOOKS,
+      children: [
+        { label: 'Danh sách sách', to: ROUTES.BOOKS },
+        { label: 'Tác giả & Thể loại', to: ROUTES.BOOKS + '?tab=authors' },
+        { label: 'Sách nổi bật', to: ROUTES.BOOKS + '?tab=featured' },
+      ],
+    },
+    {
+      key: 'inventory',
+      label: 'Quản lý Kho',
+      icon: <DeploymentUnitOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.COURSES + '?tab=copies',
+      children: [
+        { label: 'Danh sách bản sao', to: ROUTES.COURSES + '?tab=copies' },
+        { label: 'Thêm bản sao & In QR', to: ROUTES.COURSES + '?tab=add-copy' },
+        { label: 'Import & Thanh lý', to: ROUTES.COURSES + '?tab=import' },
+        { label: 'Báo cáo kho', to: ROUTES.COURSES + '?tab=report' },
+      ],
+    },
+    {
+      key: 'transactions',
+      label: 'Giao dịch mượn trả',
+      icon: <LockOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.CODES,
+      badge: 12,
+      children: [
+        { label: 'Mượn / Trả sách', to: ROUTES.CODES },
+        { label: 'Gia hạn & Đặt trước', to: ROUTES.CODES + '?tab=reservations' },
+        { label: 'Lịch sử giao dịch', to: ROUTES.DASHBOARD },
+      ],
+    },
+    {
+      key: 'fees',
+      label: 'Quản lý phí',
+      icon: <CreditCardOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.FEES,
+      children: [
+        { label: 'Danh sách & Thanh toán', to: ROUTES.FEES },
+        { label: 'Lịch sử thu phí', to: ROUTES.FEES },
+        { label: 'Báo cáo doanh thu', to: ROUTES.FEES },
+      ],
+    },
+    {
+      key: 'reports',
+      label: 'Báo cáo & Thống kê',
+      icon: <LineChartOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.REPORTS,
+      children: [
+        { label: 'Báo cáo mượn trả', to: ROUTES.REPORTS },
+        { label: 'Sách trễ hạn', to: ROUTES.REPORTS },
+        { label: 'AI Analytics', to: ROUTES.REPORTS },
+      ],
+    },
+    {
+      key: 'aianalytics',
+      label: 'AI Analytics',
+      icon: <BarChartOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.REPORTS,
+    },
+  ];
+
+  const isActive = (item: NavItem) => {
+    const path = pathname.pathname + pathname.search;
+    if (item.children) {
+      return false;
+    }
+    return path === item.to;
+  };
+
+  useEffect(() => {
+    if (!pathname) return;
+    const path = pathname.pathname + pathname.search;
+    setSelectItem(path);
+  }, [pathname]);
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
+  const handleMenuClick = (item: NavItem) => {
+    if (item.children) {
+      if (collapsed) {
+        onToggle();
+        setOpenMenu(item.key);
+      } else {
+        setOpenMenu(openMenu === item.key ? null : item.key);
+      }
+    } else {
+      navigate(item.to);
+    }
+  };
+
+  const initials = (user?.name ?? 'T').slice(0, 1).toUpperCase();
+
+  return (
+    <div className={cn('flex h-full flex-col bg-[#1E2A3B] text-[#8FA3BF]')}>
+      {/* Header / Logo */}
+      <Flex
+        gap={12}
+        align="center"
+        justify={collapsed ? 'center' : 'space-between'}
+        className={cn('relative px-4 border-b border-[#2D3F52] h-16 shrink-0')}
+      >
+        {!collapsed ? (
+          <>
+            <Flex align="center" gap={12} className="min-w-0">
+              <BookOutlined style={{ fontSize: 24, color: '#60A5FA' }} className="shrink-0" />
+              <div>
+                <span style={{ fontSize: '15px', fontWeight: 600 }} className="text-white truncate block leading-none">
+                  Thư Viện ABC
+                </span>
+                <span className="text-[10px] text-[#60A5FA] mt-1.5 block leading-none">Thủ Thư</span>
+              </div>
+            </Flex>
+            <Button
+              type="text"
+              onClick={onToggle}
+              icon={<MenuFoldOutlined className="text-[#8FA3BF]" />}
+              className={cn(
+                'h-8 w-8 px-2 flex items-center justify-center rounded-lg hover:!bg-[#263A50] border-0 cursor-pointer bg-transparent'
+              )}
+            />
+          </>
+        ) : (
+          <Button
+            type="text"
+            onClick={onToggle}
+            icon={<MenuUnfoldOutlined className="text-white" />}
+            className={cn(
+              'h-8 w-8 px-2 flex items-center justify-center rounded-lg hover:!bg-[#263A50] border-0 cursor-pointer bg-transparent'
+            )}
+          />
+        )}
+      </Flex>
+
+      {/* Navigation */}
+      <div className={cn('flex-1 overflow-y-auto p-2 space-y-0.5')}>
+        {menuConfig.map((item) => {
+          const isParentActive = isActive(item);
+          const isOpen = openMenu === item.key;
+
+          return (
+            <div key={item.key}>
+              <button
+                onClick={() => handleMenuClick(item)}
+                title={collapsed ? item.label : undefined}
+                className={cn(
+                  'w-full flex items-center rounded-md text-sm transition-all duration-200 relative h-11 border-0 cursor-pointer',
+                  collapsed ? 'justify-center px-0' : 'justify-start gap-2.5 px-3',
+                  isParentActive
+                    ? 'bg-[#2563EB] text-white'
+                    : 'text-[#8FA3BF] bg-transparent hover:bg-[#263A50] hover:text-white'
+                )}
+              >
+                {isParentActive && (
+                  <span className="absolute left-0 top-1 bottom-1 w-[3px] bg-[#60A5FA] rounded-r" />
+                )}
+                <span className="shrink-0 flex items-center justify-center">
+                  {item.icon}
+                </span>
+                {!collapsed && (
+                  <>
+                    <span className="text-sm truncate flex-1 text-left">{item.label}</span>
+                    {item.badge && (
+                      <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full mr-1">
+                        {item.badge}
+                      </span>
+                    )}
+                    {item.children && (
+                      <span className="text-xs shrink-0 ml-1">
+                        {isOpen ? <UpOutlined /> : <DownOutlined />}
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
+
+              {/* Sub-menu rendering */}
+              {item.children && isOpen && !collapsed && (
+                <div className="mt-0.5 pl-3 space-y-0.5">
+                  {item.children.map((c) => {
+                    const isChildActive = selectItem === c.to;
+                    return (
+                      <button
+                        key={c.label}
+                        onClick={() => navigate(c.to)}
+                        className={cn(
+                          'w-full text-left pl-7 pr-3 h-9 flex items-center rounded-md text-[13px] border-0 cursor-pointer transition-all duration-200',
+                          isChildActive
+                            ? 'text-white bg-[#263A50]'
+                            : 'text-[#8FA3BF] hover:text-white hover:bg-[#263A50]'
+                        )}
+                      >
+                        {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Bottom user card */}
+      <div className="border-t border-[#2D3F52] p-4 flex items-center gap-2 shrink-0">
+        {collapsed ? (
+          <button
+            onClick={handleLogout}
+            className="text-[#8FA3BF] hover:text-red-400 p-1 mx-auto flex items-center justify-center bg-transparent border-0 cursor-pointer"
+            title={t(getKey('logout'))}
+          >
+            <LogoutOutlined style={{ fontSize: 18 }} />
+          </button>
+        ) : (
+          <>
+            <div className="w-8 h-8 rounded-full bg-[#2563EB] flex items-center justify-center text-white font-bold shrink-0 text-sm">
+              {initials}
+            </div>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-[13px] text-white truncate font-medium m-0 leading-none">{user?.name ?? 'Thủ thư'}</p>
+              <p className="text-[11px] text-[#8FA3BF] m-0 mt-1.5 leading-none">Thủ thư</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="text-[#8FA3BF] hover:text-red-400 p-1 shrink-0 bg-transparent border-0 cursor-pointer flex items-center justify-center"
+              title={t(getKey('logout'))}
+            >
+              <LogoutOutlined style={{ fontSize: 16 }} />
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default React.memo(LibrarianNavigate);
