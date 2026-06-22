@@ -1,10 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { borrowingApi, type IBorrowingResponse, type IRenewResponse } from '../api/borrowingApi';
+import { borrowingApi, type IBorrowingResponse, type IRenewResponse, type IBorrowHistoryResponse } from '../api/borrowingApi';
 
 export const useBorrowing = () => {
   return useQuery<IBorrowingResponse>({
     queryKey: ['my-borrowing'],
     queryFn: () => borrowingApi.getCurrentBorrowing(),
+    staleTime: 60_000,
+  });
+};
+
+export const useBorrowHistory = () => {
+  return useQuery<IBorrowHistoryResponse>({
+    queryKey: ['my-borrow-history'],
+    queryFn: () => borrowingApi.getHistory(),
     staleTime: 60_000,
   });
 };
