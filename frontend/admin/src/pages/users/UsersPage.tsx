@@ -120,7 +120,7 @@ const UsersPage = () => {
         key: 'status',
         width: 140,
         render: (status: { label: string; value: string } | undefined) => {
-          const isActive = status?.value === 'active' || status?.value === 'ACTIVE';
+          const isActive = status?.value === 'active' || status?.value === 'ACTIVE' || status?.value === '1';
           return (
             <Tag
               color={isActive ? 'success' : 'error'}
