@@ -1,3 +1,6 @@
+
+
+
 import { Button, Flex } from 'antd';
 import {
   BarChartOutlined,
@@ -75,23 +78,23 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
       key: 'inventory',
       label: 'Quản lý Kho',
       icon: <DeploymentUnitOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.COURSES + '?tab=copies',
+      to: ROUTES.BOOKS + '?tab=copies',
       children: [
-        { label: 'Danh sách bản sao', to: ROUTES.COURSES + '?tab=copies' },
-        { label: 'Thêm bản sao & In QR', to: ROUTES.COURSES + '?tab=add-copy' },
-        { label: 'Import & Thanh lý', to: ROUTES.COURSES + '?tab=import' },
-        { label: 'Báo cáo kho', to: ROUTES.COURSES + '?tab=report' },
+        { label: 'Danh sách bản sao', to: ROUTES.BOOKS + '?tab=copies' },
+        { label: 'Thêm bản sao & In QR', to: ROUTES.BOOKS + '?tab=add-copy' },
+        { label: 'Import & Thanh lý', to: ROUTES.BOOKS + '?tab=import' },
+        { label: 'Báo cáo kho', to: ROUTES.BOOKS + '?tab=report' },
       ],
     },
     {
       key: 'transactions',
       label: 'Giao dịch mượn trả',
       icon: <LockOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.CODES,
+      to: ROUTES.TRANSACTIONS,
       badge: 12,
       children: [
-        { label: 'Mượn / Trả sách', to: ROUTES.CODES },
-        { label: 'Gia hạn & Đặt trước', to: ROUTES.CODES + '?tab=reservations' },
+        { label: 'Mượn / Trả sách', to: ROUTES.TRANSACTIONS },
+        { label: 'Gia hạn & Đặt trước', to: ROUTES.TRANSACTIONS + '?tab=reservations' },
         { label: 'Lịch sử giao dịch', to: ROUTES.DASHBOARD },
       ],
     },
