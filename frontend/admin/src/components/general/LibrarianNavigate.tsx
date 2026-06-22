@@ -1,10 +1,7 @@
 import { Button, Flex } from 'antd';
 import {
   BarChartOutlined,
-  CrownOutlined,
-  LockOutlined,
   LogoutOutlined,
-  SettingOutlined,
   UserOutlined,
   BookOutlined,
   MenuFoldOutlined,
@@ -12,6 +9,9 @@ import {
   DownOutlined,
   UpOutlined,
   DeploymentUnitOutlined,
+  LockOutlined,
+  CreditCardOutlined,
+  LineChartOutlined,
 } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,12 +32,12 @@ type NavItem = {
   children?: NavChild[];
 };
 
-interface IDefaultNavigate {
+interface ILibrarianNavigate {
   collapsed: boolean;
   onToggle: () => void;
 }
 
-const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
+const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
   const [selectItem, setSelectItem] = useState<string>('');
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -46,6 +46,7 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
   const logoutMutation = useLogout();
   const { user } = useGlobalVariable();
 
+  // Librarian menu config (excludes Achievements and System Settings)
   const menuConfig: NavItem[] = [
     {
       key: 'dashboard',
@@ -84,39 +85,50 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
     },
     {
       key: 'transactions',
-      label: 'Giao dịch',
+      label: 'Giao dịch mượn trả',
       icon: <LockOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.CODES,
-      badge: 47,
+      badge: 12,
       children: [
         { label: 'Mượn / Trả sách', to: ROUTES.CODES },
         { label: 'Gia hạn & Đặt trước', to: ROUTES.CODES + '?tab=reservations' },
         { label: 'Lịch sử giao dịch', to: ROUTES.DASHBOARD },
-        { label: 'Quản lý độc giả', to: ROUTES.USERS },
       ],
     },
     {
-      key: 'achievements',
-      label: 'Quản lý Danh hiệu',
-      icon: <CrownOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.ACHIEVEMENTS,
-    },
-    {
-      key: 'settings',
-      label: 'Cấu hình hệ thống',
-      icon: <SettingOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.SETTINGS,
+      key: 'fees',
+      label: 'Quản lý phí',
+      icon: <CreditCardOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.FEES,
       children: [
-        { label: 'Tất cả cấu hình', to: ROUTES.SETTINGS },
-        { label: 'Thủ thư & phân quyền', to: ROUTES.USERS + '?tab=librarians' },
+        { label: 'Danh sách & Thanh toán', to: ROUTES.FEES },
+        { label: 'Lịch sử thu phí', to: ROUTES.FEES },
+        { label: 'Báo cáo doanh thu', to: ROUTES.FEES },
       ],
+    },
+    {
+      key: 'reports',
+      label: 'Báo cáo & Thống kê',
+      icon: <LineChartOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.REPORTS,
+      children: [
+        { label: 'Báo cáo mượn trả', to: ROUTES.REPORTS },
+        { label: 'Sách trễ hạn', to: ROUTES.REPORTS },
+        { label: 'AI Analytics', to: ROUTES.REPORTS },
+      ],
+    },
+    {
+      key: 'aianalytics',
+      label: 'AI Analytics',
+      icon: <BarChartOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.REPORTS,
     },
   ];
 
   const isActive = (item: NavItem) => {
     const path = pathname.pathname + pathname.search;
     if (item.children) {
-      return false; // Parent directories never get highlighted in solid blue
+      return false;
     }
     return path === item.to;
   };
@@ -134,7 +146,7 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
   const handleMenuClick = (item: NavItem) => {
     if (item.children) {
       if (collapsed) {
-        onToggle(); // expand Sider if collapsed
+        onToggle();
         setOpenMenu(item.key);
       } else {
         setOpenMenu(openMenu === item.key ? null : item.key);
@@ -144,7 +156,7 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
     }
   };
 
-  const initials = (user?.name ?? 'A').slice(0, 1).toUpperCase();
+  const initials = (user?.name ?? 'T').slice(0, 1).toUpperCase();
 
   return (
     <div className={cn('flex h-full flex-col bg-[#1E2A3B] text-[#8FA3BF]')}>
@@ -159,9 +171,12 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
           <>
             <Flex align="center" gap={12} className="min-w-0">
               <BookOutlined style={{ fontSize: 24, color: '#60A5FA' }} className="shrink-0" />
-              <span style={{ fontSize: '16px', fontWeight: 600 }} className="text-white truncate">
-                Thư Viện ABC
-              </span>
+              <div>
+                <span style={{ fontSize: '15px', fontWeight: 600 }} className="text-white truncate block leading-none">
+                  Thư Viện ABC
+                </span>
+                <span className="text-[10px] text-[#60A5FA] mt-1.5 block leading-none">Thủ Thư</span>
+              </div>
             </Flex>
             <Button
               type="text"
@@ -269,8 +284,8 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
               {initials}
             </div>
             <div className="flex-1 min-w-0 text-left">
-              <p className="text-[13px] text-white truncate font-medium m-0 leading-none">{user?.name ?? 'Admin'}</p>
-              <p className="text-[11px] text-[#8FA3BF] m-0 mt-1.5 leading-none">Quản trị viên</p>
+              <p className="text-[13px] text-white truncate font-medium m-0 leading-none">{user?.name ?? 'Thủ thư'}</p>
+              <p className="text-[11px] text-[#8FA3BF] m-0 mt-1.5 leading-none">Thủ thư</p>
             </div>
             <button
               onClick={handleLogout}
@@ -286,4 +301,4 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
   );
 };
 
-export default React.memo(DefaultNavigate);
+export default React.memo(LibrarianNavigate);

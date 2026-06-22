@@ -6,7 +6,7 @@ import { useGlobalVariable } from '../../hooks/GlobalVariableProvider';
 import { getKey } from '@shared/types/I18nKeyType';
 import { NotAvailable } from '@shared/constants/commonConst';
 
-const DefaultHeader = () => {
+const LibrarianHeader = () => {
   const { user } = useGlobalVariable();
   const pathname = useLocation();
   const { t } = useTranslation();
@@ -30,9 +30,8 @@ const DefaultHeader = () => {
         </Flex>
 
         <Flex align="center" gap={13}>
-          {/* <LanguageSelect className='min-w-[200px]' /> */}
           <Flex vertical align="start" className="max-w-[150px] text-base">
-            <p className="font-bold mb-0">Quản trị viên</p>
+            <p className="font-bold mb-0">Thủ thư</p>
             <p className="text-gray-500">{user?.name || NotAvailable}</p>
           </Flex>
         </Flex>
@@ -41,4 +40,4 @@ const DefaultHeader = () => {
   );
 };
 
-export default DefaultHeader;
+export default LibrarianHeader;

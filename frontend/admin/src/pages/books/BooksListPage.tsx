@@ -1,0 +1,1497 @@
+import { Link, useSearchParams } from 'react-router-dom';
+import {
+  Card,
+  Input,
+  Button,
+  Tag,
+  Table,
+  Space,
+  Modal,
+  Form,
+  Select,
+  InputNumber,
+  Switch,
+  message,
+  Popconfirm,
+  Image,
+  Tooltip,
+  Tabs,
+  Drawer,
+  List,
+  Descriptions
+} from 'antd';
+import {
+  Plus,
+  Search,
+  BookOpen,
+  Hash,
+  Award,
+  BookMarked,
+  Edit,
+  Trash2,
+  RefreshCw,
+  Info,
+  History,
+  User,
+  Tags,
+  Globe,
+  Calendar,
+  Eye,
+  CheckCircle2,
+  XCircle
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  getBooks,
+  createBook,
+  updateBook,
+  deleteBook,
+  getBookByISBN,
+  getFilterOptions,
+  getBookDetail
+} from '../../services/bookService';
+import {
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory
+} from '../../services/categoryService';
+import {
+  getAuthors,
+  createAuthor,
+  updateAuthor,
+  deleteAuthor,
+  getAuthorDetail
+} from '../../services/authorService';
+
+type Author = {
+  author_id: number;
+  author_name: string;
+  name?: string;
+  bio?: string;
+  birth_date?: string;
+  nationality?: string;
+  is_active?: number | boolean;
+};
+
+type Category = {
+  category_id: number;
+  category_name: string;
+  description?: string;
+  parent_id?: number;
+  status?: number;
+};
+
+type Publisher = {
+  publisher_id: number;
+  name: string;
+};
+
+type Book = {
+  book_id: number;
+  title: string;
+  isbn: string;
+  cover_image?: string;
+  publish_date?: string;
+  publish_year?: number;
+  edition?: string;
+  language?: string;
+  pages?: number;
+  dimensions?: string;
+  cover_type?: string;
+  description?: string;
+  replacement_cost?: number;
+  is_featured?: number | boolean;
+  authors?: Author[];
+  categories?: Category[];
+  publisher?: Publisher;
+};
+
+export function BooksListPage() {
+  console.log("BooksListPage loaded");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'list';
+
+  const [books, setBooks] = useState<Book[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Search and Pagination
+  const [searchText, setSearchText] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalBooks, setTotalBooks] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+
+  // Quick ISBN Import
+  const [isbnImportText, setIsbnImportText] = useState('');
+  const [importingIsbn, setImportingIsbn] = useState(false);
+
+  // Modals
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState<Book | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Edit history modal state
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyList, setHistoryList] = useState<any[]>([]);
+  const [historyBookTitle, setHistoryBookTitle] = useState('');
+
+  // Category state
+  const [categoriesList, setCategoriesList] = useState<Category[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryForm] = Form.useForm();
+
+  // Author state
+  const [authorsList, setAuthorsList] = useState<Author[]>([]);
+  const [authorsLoading, setAuthorsLoading] = useState(false);
+  const [authorsTotal, setAuthorsTotal] = useState(0);
+  const [authorsPage, setAuthorsPage] = useState(1);
+  const [isAuthorModalOpen, setIsAuthorModalOpen] = useState(false);
+  const [editingAuthor, setEditingAuthor] = useState<Author | null>(null);
+  const [authorForm] = Form.useForm();
+
+  // Author profile Drawer state
+  const [isAuthorProfileOpen, setIsAuthorProfileOpen] = useState(false);
+  const [profileAuthor, setProfileAuthor] = useState<any>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  // Filter dropdown data
+  const [filterData, setFilterData] = useState<{
+    categories: Category[];
+    authors: Author[];
+    publishers: Publisher[];
+    languages: string[];
+  }>({
+    categories: [],
+    authors: [],
+    publishers: [],
+    languages: []
+  });
+
+  const [form] = Form.useForm();
+
+  const translateFieldName = (field: string) => {
+    const map: Record<string, string> = {
+      title: 'Tên sách',
+      isbn: 'Mã ISBN',
+      publisher_id: 'Nhà xuất bản',
+      author_id: 'Tác giả chính',
+      publish_date: 'Ngày xuất bản',
+      publish_year: 'Năm xuất bản',
+      edition: 'Phiên bản',
+      language: 'Ngôn ngữ',
+      pages: 'Số trang',
+      dimensions: 'Kích thước',
+      cover_type: 'Loại bìa',
+      description: 'Mô tả tóm tắt',
+      cover_image: 'Ảnh bìa',
+      replacement_cost: 'Giá đền bù',
+      is_featured: 'Trạng thái nổi bật',
+      authors: 'Danh sách tác giả',
+      categories: 'Danh sách thể loại',
+    };
+    return map[field] || field;
+  };
+
+  // Load books
+  const loadBooks = async (page = 1, query = '') => {
+    setLoading(true);
+    try {
+      const res = await getBooks(page, query);
+      if (res && res.data) {
+        setBooks(res.data);
+        setTotalBooks(res.total || res.data.length);
+        setPageSize(res.per_page || 20);
+        setCurrentPage(res.current_page || 1);
+      } else {
+        setBooks(res || []);
+      }
+    } catch (err: any) {
+      console.error(err);
+      message.error("Lỗi khi tải danh sách sách!");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load dropdown options
+  const loadFilterOptions = async () => {
+    try {
+      const res = await getFilterOptions();
+      if (res) {
+        setFilterData({
+          categories: res.categories || [],
+          authors: res.authors || [],
+          publishers: res.publishers || [],
+          languages: res.languages || []
+        });
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải filter options:", err);
+    }
+  };
+
+  // Trigger search with 300ms debounce (only for main book list tab)
+  useEffect(() => {
+    if (activeTab === 'list') {
+      const delayDebounceFn = setTimeout(() => {
+        loadBooks(1, searchText);
+      }, 300);
+
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [searchText, activeTab]);
+
+  useEffect(() => {
+    loadFilterOptions();
+  }, []);
+
+  // Category and Author tab loaders
+  const loadCategoriesData = async () => {
+    setCategoriesLoading(true);
+    try {
+      const res = await getCategories();
+      setCategoriesList(res || []);
+    } catch (err) {
+      console.error(err);
+      message.error("Lỗi khi tải danh sách thể loại!");
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
+  const loadAuthorsData = async (page = 1) => {
+    setAuthorsLoading(true);
+    try {
+      const res = await getAuthors(page);
+      if (res && res.data) {
+        setAuthorsList(res.data);
+        setAuthorsTotal(res.total || res.data.length);
+        setAuthorsPage(res.current_page || 1);
+      } else {
+        setAuthorsList(res || []);
+      }
+    } catch (err) {
+      console.error(err);
+      message.error("Lỗi khi tải danh sách tác giả!");
+    } finally {
+      setAuthorsLoading(false);
+    }
+  };
+
+  // Trigger loading Category & Author data
+  useEffect(() => {
+    if (activeTab === 'authors') {
+      loadCategoriesData();
+      loadAuthorsData(1);
+    }
+  }, [activeTab]);
+
+  // View Author Profile Page (Drawer)
+  const viewAuthorProfile = async (id: number) => {
+    setIsAuthorProfileOpen(true);
+    setProfileLoading(true);
+    try {
+      const res = await getAuthorDetail(id);
+      setProfileAuthor(res);
+    } catch (err) {
+      console.error(err);
+      message.error("Lỗi khi tải hồ sơ tác giả!");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  // Category CRUD logic
+  const openCategoryModal = (cat: Category | null = null) => {
+    setEditingCategory(cat);
+    setIsCategoryModalOpen(true);
+    if (cat) {
+      categoryForm.setFieldsValue({
+        category_name: cat.category_name,
+        description: cat.description,
+        parent_id: cat.parent_id,
+        status: cat.status
+      });
+    } else {
+      categoryForm.resetFields();
+      categoryForm.setFieldsValue({ status: 1 });
+    }
+  };
+
+  const handleSaveCategory = async (values: any) => {
+    try {
+      if (editingCategory) {
+        await updateCategory(editingCategory.category_id, values);
+        message.success("Cập nhật thể loại thành công!");
+      } else {
+        await createCategory(values);
+        message.success("Thêm mới thể loại thành công!");
+      }
+      setIsCategoryModalOpen(false);
+      loadCategoriesData();
+      loadFilterOptions();
+    } catch (err: any) {
+      console.error(err);
+      message.error(err?.response?.data?.message || "Lỗi khi lưu thể loại!");
+    }
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    try {
+      await deleteCategory(id);
+      message.success("Xóa thể loại thành công!");
+      loadCategoriesData();
+      loadFilterOptions();
+    } catch (err: any) {
+      console.error(err);
+      message.error(err?.response?.data?.message || "Lỗi khi xóa thể loại!");
+    }
+  };
+
+  const toggleCategoryStatus = async (record: Category) => {
+    try {
+      const newStatus = record.status === 1 ? 0 : 1;
+      await updateCategory(record.category_id, {
+        category_name: record.category_name,
+        description: record.description,
+        parent_id: record.parent_id,
+        status: newStatus
+      });
+      message.success(newStatus === 1 ? "Đã hiển thị thể loại trên tìm kiếm!" : "Đã ẩn thể loại khỏi tìm kiếm thành công!");
+      loadCategoriesData();
+      loadFilterOptions();
+    } catch (err) {
+      console.error(err);
+      message.error("Lỗi khi cập nhật trạng thái thể loại!");
+    }
+  };
+
+  // Author CRUD logic
+  const openAuthorModal = (auth: Author | null = null) => {
+    setEditingAuthor(auth);
+    setIsAuthorModalOpen(true);
+    if (auth) {
+      authorForm.setFieldsValue({
+        name: auth.name || auth.author_name,
+        bio: auth.bio,
+        birth_date: auth.birth_date,
+        nationality: auth.nationality,
+        is_active: auth.is_active === undefined ? true : !!auth.is_active
+      });
+    } else {
+      authorForm.resetFields();
+      authorForm.setFieldsValue({ is_active: true });
+    }
+  };
+
+  const handleSaveAuthor = async (values: any) => {
+    try {
+      const data = {
+        ...values,
+        is_active: values.is_active ? 1 : 0
+      };
+      if (editingAuthor) {
+        await updateAuthor(editingAuthor.author_id, data);
+        message.success("Cập nhật tác giả thành công!");
+      } else {
+        await createAuthor(data);
+        message.success("Thêm mới tác giả thành công!");
+      }
+      setIsAuthorModalOpen(false);
+      loadAuthorsData(authorsPage);
+      loadFilterOptions();
+    } catch (err: any) {
+      console.error(err);
+      message.error(err?.response?.data?.message || "Lỗi khi lưu tác giả!");
+    }
+  };
+
+  const handleDeleteAuthor = async (id: number) => {
+    try {
+      await deleteAuthor(id);
+      message.success("Đã ẩn tác giả khỏi danh sách!");
+      loadAuthorsData(authorsPage);
+      loadFilterOptions();
+    } catch (err: any) {
+      console.error(err);
+      message.error(err?.response?.data?.message || "Lỗi khi xóa tác giả!");
+    }
+  };
+
+  // Load book edit history
+  const showEditHistory = async (record: Book) => {
+    setHistoryBookTitle(record.title);
+    setIsHistoryModalOpen(true);
+    setHistoryLoading(true);
+    try {
+      const res = await getBookDetail(record.book_id);
+      if (res && res.book_edit_histories) {
+        // Sort history by date descending
+        const sortedHistory = [...res.book_edit_histories].sort(
+          (a, b) => new Date(b.edited_at).getTime() - new Date(a.edited_at).getTime()
+        );
+        setHistoryList(sortedHistory);
+      } else {
+        setHistoryList([]);
+      }
+    } catch (err) {
+      console.error(err);
+      message.error("Lỗi khi tải lịch sử chỉnh sửa!");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  // Quick ISBN Import execution
+  const handleIsbnImport = async () => {
+    if (!isbnImportText.trim()) {
+      message.warning("Vui lòng nhập mã ISBN để import!");
+      return;
+    }
+    setImportingIsbn(true);
+    try {
+      message.loading({ content: "Đang tìm và import sách từ Google Books...", key: "isbnImport" });
+      const newBook = await getBookByISBN(isbnImportText.trim());
+      if (newBook) {
+        message.success({ content: `Đã import thành công sách: "${newBook.title}"!`, key: "isbnImport", duration: 3 });
+        setIsbnImportText('');
+        loadBooks(1, searchText);
+        loadFilterOptions(); // Refresh options in case new author/publisher got created
+      }
+    } catch (err: any) {
+      console.error(err);
+      const errMsg = err?.response?.data?.message || "Không tìm thấy hoặc không import được sách từ ISBN này!";
+      message.error({ content: errMsg, key: "isbnImport", duration: 4 });
+    } finally {
+      setImportingIsbn(false);
+    }
+  };
+
+  // Open Modal for Create or Edit Book
+  const openEditModal = (book: Book | null = null) => {
+    setEditingBook(book);
+    setIsModalOpen(true);
+    if (book) {
+      // Map structure to form values
+      form.setFieldsValue({
+        title: book.title,
+        isbn: book.isbn,
+        publisher_id: book.publisher?.publisher_id,
+        authors: book.authors?.map(a => a.author_id) || [],
+        categories: book.categories?.map(c => c.category_id) || [],
+        publish_date: book.publish_date,
+        publish_year: book.publish_year,
+        edition: book.edition,
+        language: book.language,
+        pages: book.pages,
+        dimensions: book.dimensions,
+        cover_type: book.cover_type,
+        description: book.description,
+        replacement_cost: book.replacement_cost,
+        is_featured: !!book.is_featured,
+      });
+    } else {
+      form.resetFields();
+      form.setFieldsValue({
+        language: 'vi',
+        cover_type: 'Bìa mềm',
+        is_featured: false,
+      });
+    }
+  };
+
+  // Save Book (Create or Update)
+  const handleSaveBook = async (values: any) => {
+    setSaving(true);
+    try {
+      const dataToSave = {
+        ...values,
+        is_featured: values.is_featured ? 1 : 0,
+      };
+
+      if (editingBook) {
+        await updateBook(editingBook.book_id, dataToSave);
+        message.success("Cập nhật sách thành công!");
+      } else {
+        await createBook(dataToSave);
+        message.success("Thêm mới sách thành công!");
+      }
+      setIsModalOpen(false);
+      loadBooks(currentPage, searchText);
+      loadFilterOptions();
+    } catch (err: any) {
+      console.error(err);
+      const errorMsg = err?.response?.data?.message || "Lỗi khi lưu sách! Vui lòng kiểm tra lại thông tin.";
+      message.error(errorMsg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Delete Book
+  const handleDeleteBook = async (id: number) => {
+    try {
+      const res = await deleteBook(id);
+      message.success(res?.message || "Xóa sách thành công!");
+      loadBooks(currentPage, searchText);
+    } catch (err: any) {
+      console.error(err);
+      const errMsg = err?.response?.data?.message || "Không thể xóa sách này!";
+      message.error(errMsg);
+    }
+  };
+
+  // Since we search on backend, filteredBooks is just books directly
+  const filteredBooks = books;
+
+  // Table Columns config
+  const columns = [
+    {
+      title: 'Ảnh bìa',
+      dataIndex: 'cover_image',
+      key: 'cover_image',
+      width: 80,
+      render: (coverUrl: string, record: Book) => {
+        // Resolve cover image path
+        let finalUrl = coverUrl;
+        if (coverUrl && !coverUrl.startsWith('http')) {
+          // If stored locally in backend storage
+          finalUrl = `http://127.0.0.1:8000/storage/${coverUrl}`;
+        }
+        return (
+          <div className="w-[50px] h-[75px] rounded overflow-hidden shadow-sm hover:scale-105 transition-transform duration-200 bg-gray-100 flex items-center justify-center">
+            {finalUrl ? (
+              <Image
+                src={finalUrl}
+                alt={record.title}
+                fallback="https://placehold.co/100x150/e2e8f0/64748b?text=Book"
+                className="w-full h-full object-cover"
+                preview={{ mask: 'Xem' }}
+              />
+            ) : (
+              <BookOpen size={20} className="text-gray-400" />
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      title: 'Tên sách & ISBN',
+      dataIndex: 'title',
+      key: 'title',
+      render: (title: string, record: Book) => (
+        <div>
+          <div className="font-semibold text-navyDark text-sm hover:text-blue-600 cursor-pointer transition-colors duration-150">
+            {title}
+          </div>
+          <div className="text-[11px] text-gray-500 font-mono flex items-center gap-1 mt-1">
+            <Hash size={12} className="text-gray-400" />
+            {record.isbn}
+          </div>
+        </div>
+      )
+    },
+    {
+      title: 'Tác giả',
+      dataIndex: 'authors',
+      key: 'authors',
+      render: (authors: Author[]) => (
+        <div className="flex flex-wrap gap-1 max-w-[200px]">
+          {authors && authors.length > 0 ? (
+            authors.map((a) => (
+              <Tag key={a.author_id} color="blue" className="!rounded-md border-0 font-medium text-xs">
+                {a.author_name}
+              </Tag>
+            ))
+          ) : (
+            <span className="text-gray-400">—</span>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'Thể loại',
+      dataIndex: 'categories',
+      key: 'categories',
+      render: (categories: Category[]) => (
+        <div className="flex flex-wrap gap-1 max-w-[200px]">
+          {categories && categories.length > 0 ? (
+            categories.map((c) => (
+              <Tag key={c.category_id} color="purple" className="!rounded-md border-0 font-medium text-xs">
+                {c.category_name}
+              </Tag>
+            ))
+          ) : (
+            <span className="text-gray-400">—</span>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'Nhà xuất bản',
+      dataIndex: 'publisher',
+      key: 'publisher',
+      render: (publisher: Publisher) => (
+        <span className="font-medium text-gray-700">
+          {publisher?.name || <span className="text-gray-400">—</span>}
+        </span>
+      )
+    },
+    {
+      title: 'Đặc điểm',
+      key: 'details',
+      render: (_: any, record: Book) => (
+        <div className="text-xs text-gray-500 space-y-0.5">
+          {record.pages && <div>{record.pages} trang</div>}
+          {record.language && <div>Ngôn ngữ: {record.language.toUpperCase()}</div>}
+          {record.is_featured ? <Tag color="gold" className="!rounded-full border-0 text-[10px] px-2">Nổi bật</Tag> : null}
+        </div>
+      )
+    },
+    {
+      title: 'Thao tác',
+      key: 'action',
+      width: 140,
+      render: (_: any, record: Book) => (
+        <Space size="middle">
+          <Tooltip title="Sửa thông tin">
+            <Button
+              type="text"
+              icon={<Edit size={16} className="text-blue-500 hover:text-blue-700" />}
+              onClick={() => openEditModal(record)}
+              className="flex items-center justify-center p-1 rounded hover:bg-blue-50 border-0"
+            />
+          </Tooltip>
+          <Tooltip title="Lịch sử chỉnh sửa">
+            <Button
+              type="text"
+              icon={<History size={16} className="text-amber-500 hover:text-amber-700" />}
+              onClick={() => showEditHistory(record)}
+              className="flex items-center justify-center p-1 rounded hover:bg-amber-50 border-0"
+            />
+          </Tooltip>
+          <Tooltip title="Xóa sách">
+            <Popconfirm
+              title="Bạn có chắc chắn muốn xóa sách này?"
+              onConfirm={() => handleDeleteBook(record.book_id)}
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true }}
+            >
+              <Button
+                type="text"
+                icon={<Trash2 size={16} className="text-red-500 hover:text-red-700" />}
+                className="flex items-center justify-center p-1 rounded hover:bg-red-50 border-0"
+              />
+            </Popconfirm>
+          </Tooltip>
+        </Space>
+      )
+    }
+  ];
+
+  // Tab change handlers mapped to SearchParams URL sync
+  const handleTabChange = (key: string) => {
+    setSearchParams({ tab: key });
+  };
+
+  const totalDistinctBooks = totalBooks;
+  const featuredBooksCount = books.filter(b => b.is_featured).length;
+
+  return (
+    <div className="max-w-[1400px] mx-auto flex flex-col gap-4 animate-fade-in text-left">
+      
+      {/* Tab Navigation header */}
+      <Tabs activeKey={activeTab} onChange={handleTabChange} type="card" className="book-tabs font-semibold">
+        
+        {/* TAB 1: BOOK LIST */}
+        <Tabs.TabPane tab={<span><BookOpen size={14} className="inline mr-1" /> Danh sách sách</span>} key="list">
+          <div className="flex flex-col gap-6">
+            {/* STATS OVERVIEW CARDS */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-blue-50/20" bodyStyle={{ padding: '16px' }}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-50 p-2.5 rounded-xl shrink-0 flex items-center justify-center">
+                    <BookOpen size={20} className="text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 m-0 font-medium">Tổng đầu sách</p>
+                    <p className="m-0 text-[20px] font-bold text-navyDark mt-0.5">{totalDistinctBooks}</p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-amber-50/20" bodyStyle={{ padding: '16px' }}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-amber-50 p-2.5 rounded-xl shrink-0 flex items-center justify-center">
+                    <Award size={20} className="text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 m-0 font-medium">Sách nổi bật</p>
+                    <p className="m-0 text-[20px] font-bold text-amber-500 mt-0.5">{featuredBooksCount}</p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-purple-50/20" bodyStyle={{ padding: '16px' }}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-purple-50 p-2.5 rounded-xl shrink-0 flex items-center justify-center">
+                    <BookMarked size={20} className="text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 m-0 font-medium">Tác giả trong hệ thống</p>
+                    <p className="m-0 text-[20px] font-bold text-purple-600 mt-0.5">{filterData.authors.length}</p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-teal-50/20" bodyStyle={{ padding: '16px' }}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-teal-50 p-2.5 rounded-xl shrink-0 flex items-center justify-center">
+                    <Info size={20} className="text-teal-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 m-0 font-medium">Thể loại</p>
+                    <p className="m-0 text-[20px] font-bold text-teal-600 mt-0.5">{filterData.categories.length}</p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* SEARCH AND IMPORT PANEL */}
+            <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-white" bodyStyle={{ padding: '20px' }}>
+              <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+                <div className="w-full lg:w-1/3">
+                  <Input
+                    placeholder="Tìm kiếm sách theo tên, tác giả, NXB, ISBN..."
+                    prefix={<Search size={16} className="text-gray-400" />}
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    allowClear
+                    className="h-10 rounded-lg"
+                  />
+                </div>
+
+                <div className="w-full lg:w-auto flex flex-col sm:flex-row gap-3 items-center">
+                  <div className="w-full sm:w-auto flex gap-2 border border-blue-100 p-1 rounded-lg bg-blue-50/30">
+                    <Input
+                      placeholder="Nhập ISBN Google Books..."
+                      value={isbnImportText}
+                      onChange={(e) => setIsbnImportText(e.target.value)}
+                      onPressEnter={handleIsbnImport}
+                      disabled={importingIsbn}
+                      className="w-full sm:w-48 h-8 rounded border-gray-200 bg-white"
+                    />
+                    <Button
+                      type="primary"
+                      ghost
+                      icon={<RefreshCw size={14} className={importingIsbn ? "animate-spin" : ""} />}
+                      onClick={handleIsbnImport}
+                      loading={importingIsbn}
+                      className="h-8 rounded flex items-center justify-center font-medium"
+                    >
+                      Auto Import
+                    </Button>
+                  </div>
+
+                  <Button
+                    type="primary"
+                    icon={<Plus size={16} />}
+                    onClick={() => openEditModal(null)}
+                    className="w-full sm:w-auto h-10 rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center font-semibold shadow-md shadow-blue-500/10"
+                  >
+                    Thêm sách thủ công
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* BOOKS LIST TABLE */}
+            <Card className="!rounded-[12px] border border-gray-100 shadow-sm overflow-hidden" bodyStyle={{ padding: 0 }}>
+              <Table
+                columns={columns}
+                dataSource={filteredBooks.map((b) => ({ ...b, key: b.book_id }))}
+                loading={loading}
+                pagination={{
+                  current: currentPage,
+                  pageSize: pageSize,
+                  total: totalBooks,
+                  onChange: (page) => {
+                    setCurrentPage(page);
+                    loadBooks(page, searchText);
+                  },
+                  showTotal: (total) => `Tổng số ${total} đầu sách`,
+                  className: "px-6 py-4 border-t border-gray-50",
+                }}
+                className="book-table"
+              />
+            </Card>
+          </div>
+        </Tabs.TabPane>
+
+        {/* TAB 2: CATEGORY & AUTHOR MANAGEMENT */}
+        <Tabs.TabPane tab={<span><User size={14} className="inline mr-1" /> Tác giả & Thể loại</span>} key="authors">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* LEFT COLUMN: CATEGORIES LIST */}
+            <Card
+              className="!rounded-[12px] border border-gray-100 shadow-sm"
+              title={
+                <div className="flex items-center justify-between pb-1">
+                  <span className="flex items-center gap-2 font-bold text-navyDark text-sm">
+                    <Tags size={16} className="text-purple-500" />
+                    <span>Quản lý thể loại</span>
+                  </span>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<Plus size={14} />}
+                    onClick={() => openCategoryModal(null)}
+                    className="bg-purple-600 hover:bg-purple-700 rounded-md text-xs flex items-center justify-center h-7"
+                  >
+                    Thêm thể loại
+                  </Button>
+                </div>
+              }
+            >
+              <Table
+                dataSource={categoriesList.map(c => ({ ...c, key: c.category_id }))}
+                loading={categoriesLoading}
+                pagination={{ pageSize: 6 }}
+                columns={[
+                  {
+                    title: 'Tên thể loại',
+                    dataIndex: 'category_name',
+                    key: 'category_name',
+                    className: 'font-semibold text-gray-800'
+                  },
+                  {
+                    title: 'Mô tả',
+                    dataIndex: 'description',
+                    key: 'description',
+                    ellipsis: true,
+                    render: (text) => text || <span className="text-gray-400 font-italic">Không có mô tả</span>
+                  },
+                  {
+                    title: 'Ẩn / Hiện',
+                    key: 'status',
+                    width: 100,
+                    render: (_, record) => (
+                      <Switch
+                        checked={record.status === 1}
+                        checkedChildren="Hiện"
+                        unCheckedChildren="Ẩn"
+                        onChange={() => toggleCategoryStatus(record)}
+                      />
+                    )
+                  },
+                  {
+                    title: 'Thao tác',
+                    key: 'action',
+                    width: 90,
+                    render: (_, record) => (
+                      <Space>
+                        <Button
+                          type="text"
+                          icon={<Edit size={14} className="text-blue-500" />}
+                          onClick={() => openCategoryModal(record)}
+                          className="p-1"
+                        />
+                        <Popconfirm
+                          title="Xóa thể loại này sẽ không làm mất dữ liệu sách của bạn. Bạn chắc chắn?"
+                          onConfirm={() => handleDeleteCategory(record.category_id)}
+                          okText="Xóa"
+                          cancelText="Hủy"
+                          okButtonProps={{ danger: true }}
+                        >
+                          <Button
+                            type="text"
+                            icon={<Trash2 size={14} className="text-red-500" />}
+                            className="p-1"
+                          />
+                        </Popconfirm>
+                      </Space>
+                    )
+                  }
+                ]}
+              />
+            </Card>
+
+            {/* RIGHT COLUMN: AUTHORS LIST */}
+            <Card
+              className="!rounded-[12px] border border-gray-100 shadow-sm"
+              title={
+                <div className="flex items-center justify-between pb-1">
+                  <span className="flex items-center gap-2 font-bold text-navyDark text-sm">
+                    <User size={16} className="text-blue-500" />
+                    <span>Quản lý tác giả</span>
+                  </span>
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<Plus size={14} />}
+                    onClick={() => openAuthorModal(null)}
+                    className="bg-blue-600 hover:bg-blue-700 rounded-md text-xs flex items-center justify-center h-7"
+                  >
+                    Thêm tác giả
+                  </Button>
+                </div>
+              }
+            >
+              <Table
+                dataSource={authorsList.map(a => ({ ...a, key: a.author_id }))}
+                loading={authorsLoading}
+                pagination={{
+                  current: authorsPage,
+                  pageSize: 10,
+                  total: authorsTotal,
+                  onChange: (page) => loadAuthorsData(page),
+                  showTotal: (total) => `Tổng số ${total} tác giả`
+                }}
+                columns={[
+                  {
+                    title: 'Tên tác giả',
+                    dataIndex: 'author_name',
+                    key: 'author_name',
+                    className: 'font-semibold text-gray-800'
+                  },
+                  {
+                    title: 'Quốc tịch',
+                    dataIndex: 'nationality',
+                    key: 'nationality',
+                    render: (text) => text || '—'
+                  },
+                  {
+                    title: 'Năm sinh',
+                    dataIndex: 'birth_date',
+                    key: 'birth_date',
+                    render: (date) => date ? new Date(date).toLocaleDateString('vi-VN') : '—'
+                  },
+                  {
+                    title: 'Thao tác',
+                    key: 'action',
+                    width: 120,
+                    render: (_, record) => (
+                      <Space>
+                        <Tooltip title="Xem hồ sơ & sách viết">
+                          <Button
+                            type="text"
+                            icon={<Eye size={14} className="text-gray-500 hover:text-blue-500" />}
+                            onClick={() => viewAuthorProfile(record.author_id)}
+                            className="p-1"
+                          />
+                        </Tooltip>
+                        <Button
+                          type="text"
+                          icon={<Edit size={14} className="text-blue-500" />}
+                          onClick={() => openAuthorModal(record)}
+                          className="p-1"
+                        />
+                        <Popconfirm
+                          title="Ẩn tác giả này?"
+                          onConfirm={() => handleDeleteAuthor(record.author_id)}
+                        >
+                          <Button
+                            type="text"
+                            icon={<Trash2 size={14} className="text-red-500" />}
+                            className="p-1"
+                          />
+                        </Popconfirm>
+                      </Space>
+                    )
+                  }
+                ]}
+              />
+            </Card>
+
+          </div>
+        </Tabs.TabPane>
+
+        {/* TAB 3: FEATURED BOOKS */}
+        <Tabs.TabPane tab={<span><Award size={14} className="inline mr-1" /> Sách nổi bật</span>} key="featured">
+          <Card className="!rounded-[12px] border border-gray-100 shadow-sm overflow-hidden" bodyStyle={{ padding: 0 }}>
+            <Table
+              columns={columns}
+              dataSource={books.filter(b => b.is_featured).map((b) => ({ ...b, key: b.book_id }))}
+              loading={loading}
+              pagination={{ pageSize: 10 }}
+              locale={{ emptyText: 'Chưa có sách nào được đánh dấu là nổi bật.' }}
+            />
+          </Card>
+        </Tabs.TabPane>
+
+      </Tabs>
+
+      {/* CREATE & EDIT BOOK MODAL */}
+      <Modal
+        title={
+          <div className="border-b border-gray-100 pb-3 flex items-center gap-2 text-base font-bold text-navyDark">
+            <BookOpen size={18} className="text-blue-500" />
+            {editingBook ? "Chỉnh sửa thông tin sách" : "Thêm mới sách thủ công"}
+          </div>
+        }
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        width={750}
+        footer={[
+          <Button key="cancel" onClick={() => setIsModalOpen(false)} className="rounded-lg h-9">
+            Hủy bỏ
+          </Button>,
+          <Button
+            key="submit"
+            type="primary"
+            loading={saving}
+            onClick={() => form.submit()}
+            className="rounded-lg h-9 bg-blue-600 hover:bg-blue-700"
+          >
+            {editingBook ? "Lưu thay đổi" : "Tạo sách"}
+          </Button>
+        ]}
+        centered
+        className="custom-modal"
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSaveBook}
+          className="py-4 grid grid-cols-1 md:grid-cols-2 gap-x-6"
+        >
+          <Form.Item
+            name="title"
+            label={<span className="font-semibold text-gray-700">Tên sách</span>}
+            rules={[{ required: true, message: 'Vui lòng nhập tên sách!' }]}
+            className="col-span-1 md:col-span-2"
+          >
+            <Input placeholder="Nhập tên sách..." className="h-9 rounded-lg" />
+          </Form.Item>
+
+          <Form.Item
+            name="isbn"
+            label={<span className="font-semibold text-gray-700">Mã ISBN</span>}
+            rules={[{ required: true, message: 'Vui lòng nhập mã ISBN!' }]}
+          >
+            <Input placeholder="Nhập mã ISBN..." className="h-9 rounded-lg" />
+          </Form.Item>
+
+          <Form.Item
+            name="publisher_id"
+            label={<span className="font-semibold text-gray-700">Nhà xuất bản</span>}
+            rules={[{ required: true, message: 'Vui lòng chọn nhà xuất bản!' }]}
+          >
+            <Select
+              placeholder="Chọn nhà xuất bản..."
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={filterData.publishers.map(p => ({ value: p.publisher_id, label: p.name }))}
+              className="w-full custom-select"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="authors"
+            label={<span className="font-semibold text-gray-700">Tác giả</span>}
+            rules={[{ required: true, message: 'Vui lòng chọn ít nhất một tác giả!' }]}
+            className="col-span-1 md:col-span-2"
+          >
+            <Select
+              mode="multiple"
+              placeholder="Chọn các tác giả..."
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={filterData.authors.map(a => ({ value: a.author_id, label: a.author_name }))}
+              className="w-full"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="categories"
+            label={<span className="font-semibold text-gray-700">Thể loại</span>}
+            className="col-span-1 md:col-span-2"
+          >
+            <Select
+              mode="multiple"
+              placeholder="Chọn các thể loại..."
+              showSearch
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              options={filterData.categories.map(c => ({ value: c.category_id, label: c.category_name }))}
+              className="w-full"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="publish_date"
+            label={<span className="font-semibold text-gray-700">Ngày xuất bản</span>}
+          >
+            <Input type="date" className="h-9 rounded-lg" />
+          </Form.Item>
+
+          <Form.Item
+            name="publish_year"
+            label={<span className="font-semibold text-gray-700">Năm xuất bản</span>}
+          >
+            <InputNumber placeholder="Ví dụ: 2024" className="w-full h-9 rounded-lg pt-1" min={1000} max={3000} />
+          </Form.Item>
+
+          <Form.Item
+            name="pages"
+            label={<span className="font-semibold text-gray-700">Số trang</span>}
+          >
+            <InputNumber placeholder="Nhập số trang..." className="w-full h-9 rounded-lg pt-1" min={0} />
+          </Form.Item>
+
+          <Form.Item
+            name="replacement_cost"
+            label={<span className="font-semibold text-gray-700">Giá đền bù (VND)</span>}
+          >
+            <InputNumber
+              placeholder="Nhập giá đền bù..."
+              formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              parser={(value) => (value ? value.replace(/\$\s?|(,*)/g, '') : '') as any}
+              className="w-full h-9 rounded-lg pt-1"
+              min={0}
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="language"
+            label={<span className="font-semibold text-gray-700">Ngôn ngữ</span>}
+          >
+            <Select placeholder="Chọn ngôn ngữ..." className="h-9 rounded-lg">
+              <Select.Option value="vi">Tiếng Việt (VI)</Select.Option>
+              <Select.Option value="en">Tiếng Anh (EN)</Select.Option>
+              <Select.Option value="fr">Tiếng Pháp (FR)</Select.Option>
+              <Select.Option value="jp">Tiếng Nhật (JP)</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="cover_type"
+            label={<span className="font-semibold text-gray-700">Loại bìa</span>}
+          >
+            <Select placeholder="Chọn loại bìa..." className="h-9 rounded-lg">
+              <Select.Option value="Bìa mềm">Bìa mềm</Select.Option>
+              <Select.Option value="Bìa cứng">Bìa cứng</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="dimensions"
+            label={<span className="font-semibold text-gray-700">Kích thước (cm)</span>}
+          >
+            <Input placeholder="Ví dụ: 13x20cm" className="h-9 rounded-lg" />
+          </Form.Item>
+
+          <Form.Item
+            name="edition"
+            label={<span className="font-semibold text-gray-700">Phiên bản xuất bản</span>}
+          >
+            <Input placeholder="Ví dụ: Tái bản lần 1" className="h-9 rounded-lg" />
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label={<span className="font-semibold text-gray-700">Mô tả tóm tắt sách</span>}
+            className="col-span-1 md:col-span-2"
+          >
+            <Input.TextArea placeholder="Nhập mô tả tóm tắt sách..." rows={3} className="rounded-lg" />
+          </Form.Item>
+
+          <Form.Item
+            name="is_featured"
+            valuePropName="checked"
+            label={<span className="font-semibold text-gray-700">Sách nổi bật?</span>}
+          >
+            <Switch checkedChildren="Có" unCheckedChildren="Không" />
+          </Form.Item>
+
+          {editingBook && (
+            <Form.Item
+              name="edit_reason"
+              label={<span className="font-semibold text-gray-700 text-amber-600">Lý do chỉnh sửa</span>}
+              rules={[{ required: true, message: 'Vui lòng cung cấp lý do chỉnh sửa để lưu lịch sử!' }]}
+              className="col-span-1 md:col-span-2 border-t border-dashed border-gray-100 pt-4 mt-2"
+            >
+              <Input.TextArea placeholder="Nhập lý do thay đổi thông tin..." rows={2} className="rounded-lg" />
+            </Form.Item>
+          )}
+
+        </Form>
+      </Modal>
+
+      {/* EDIT HISTORY MODAL */}
+      <Modal
+        title={
+          <div className="border-b border-gray-100 pb-3 flex items-center gap-2 text-base font-bold text-navyDark">
+            <History size={18} className="text-amber-500" />
+            <span>Lịch sử chỉnh sửa: <span className="text-blue-600 font-semibold">{historyBookTitle}</span></span>
+          </div>
+        }
+        open={isHistoryModalOpen}
+        onCancel={() => setIsHistoryModalOpen(false)}
+        width={800}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setIsHistoryModalOpen(false)} className="rounded-lg h-9 bg-blue-600 hover:bg-blue-700">
+            Đóng
+          </Button>
+        ]}
+        centered
+      >
+        <div className="py-4">
+          <Table
+            loading={historyLoading}
+            dataSource={historyList.map((h, index) => ({ ...h, key: h.history_id || index }))}
+            columns={[
+              {
+                title: 'Thời gian',
+                dataIndex: 'edited_at',
+                key: 'edited_at',
+                width: 150,
+                render: (date: string) => date ? new Date(date).toLocaleString('vi-VN') : '—',
+              },
+              {
+                title: 'Người thực hiện',
+                dataIndex: 'user',
+                key: 'user',
+                width: 150,
+                render: (user: any) => (
+                  <div>
+                    <div className="font-semibold text-gray-800">{user?.full_name || 'Hệ thống'}</div>
+                    <div className="text-[10px] text-gray-500">{user?.email || ''}</div>
+                  </div>
+                ),
+              },
+              {
+                title: 'Trường thay đổi',
+                dataIndex: 'field_name',
+                key: 'field_name',
+                width: 150,
+                render: (field: string) => (
+                  <Tag color="cyan" className="!rounded-md border-0 font-medium">
+                    {translateFieldName(field)}
+                  </Tag>
+                ),
+              },
+              {
+                title: 'Giá trị cũ',
+                dataIndex: 'old_value',
+                key: 'old_value',
+                ellipsis: true,
+                render: (val: string) => val === null || val === '' ? <span className="text-gray-400 font-italic">Rỗng</span> : val,
+              },
+              {
+                title: 'Giá trị mới',
+                dataIndex: 'new_value',
+                key: 'new_value',
+                ellipsis: true,
+                render: (val: string) => val === null || val === '' ? <span className="text-gray-400 font-italic">Rỗng</span> : <span className="text-green-600 font-semibold">{val}</span>,
+              },
+              {
+                title: 'Lý do',
+                dataIndex: 'edit_reason',
+                key: 'edit_reason',
+                render: (val: string) => val || <span className="text-gray-400">—</span>,
+              },
+            ]}
+            pagination={{ pageSize: 5 }}
+            locale={{ emptyText: 'Chưa có lịch sử chỉnh sửa nào cho cuốn sách này.' }}
+          />
+        </div>
+      </Modal>
+
+      {/* CREATE & EDIT CATEGORY MODAL */}
+      <Modal
+        title={
+          <div className="border-b border-gray-100 pb-3 flex items-center gap-2 text-base font-bold text-navyDark">
+            <Tags size={18} className="text-purple-500" />
+            {editingCategory ? "Chỉnh sửa thể loại" : "Thêm mới thể loại"}
+          </div>
+        }
+        open={isCategoryModalOpen}
+        onCancel={() => setIsCategoryModalOpen(false)}
+        onOk={() => categoryForm.submit()}
+        okText={editingCategory ? "Cập nhật" : "Tạo mới"}
+        cancelText="Hủy"
+        centered
+      >
+        <Form
+          form={categoryForm}
+          layout="vertical"
+          onFinish={handleSaveCategory}
+          className="py-3"
+        >
+          <Form.Item
+            name="category_name"
+            label="Tên thể loại"
+            rules={[{ required: true, message: 'Vui lòng nhập tên thể loại!' }]}
+          >
+            <Input placeholder="Ví dụ: Văn học, Khoa học..." />
+          </Form.Item>
+          <Form.Item
+            name="description"
+            label="Mô tả"
+          >
+            <Input.TextArea placeholder="Mô tả tóm tắt thể loại..." rows={3} />
+          </Form.Item>
+          <Form.Item
+            name="status"
+            label="Trạng thái"
+            valuePropName="checked"
+            getValueProps={(val) => ({ checked: val === 1 })}
+            normalize={(val) => (val ? 1 : 0)}
+          >
+            <Switch checkedChildren="Hiện trên tìm kiếm" unCheckedChildren="Ẩn khỏi tìm kiếm" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* CREATE & EDIT AUTHOR MODAL */}
+      <Modal
+        title={
+          <div className="border-b border-gray-100 pb-3 flex items-center gap-2 text-base font-bold text-navyDark">
+            <User size={18} className="text-blue-500" />
+            {editingAuthor ? "Chỉnh sửa tác giả" : "Thêm mới tác giả"}
+          </div>
+        }
+        open={isAuthorModalOpen}
+        onCancel={() => setIsAuthorModalOpen(false)}
+        onOk={() => authorForm.submit()}
+        okText={editingAuthor ? "Cập nhật" : "Tạo mới"}
+        cancelText="Hủy"
+        centered
+      >
+        <Form
+          form={authorForm}
+          layout="vertical"
+          onFinish={handleSaveAuthor}
+          className="py-3"
+        >
+          <Form.Item
+            name="name"
+            label="Tên tác giả"
+            rules={[{ required: true, message: 'Vui lòng nhập tên tác giả!' }]}
+          >
+            <Input placeholder="Ví dụ: Nguyễn Nhật Ánh, Nam Cao..." />
+          </Form.Item>
+          <Form.Item
+            name="nationality"
+            label="Quốc tịch"
+          >
+            <Input placeholder="Ví dụ: Việt Nam, Anh, Mỹ..." />
+          </Form.Item>
+          <Form.Item
+            name="birth_date"
+            label="Ngày sinh"
+          >
+            <Input type="date" />
+          </Form.Item>
+          <Form.Item
+            name="bio"
+            label="Tiểu sử"
+          >
+            <Input.TextArea placeholder="Tiểu sử tóm tắt tác giả..." rows={4} />
+          </Form.Item>
+          <Form.Item
+            name="is_active"
+            valuePropName="checked"
+            label="Hoạt động?"
+          >
+            <Switch checkedChildren="Có" unCheckedChildren="Không" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* AUTHOR PROFILE DRAWER */}
+      <Drawer
+        title={
+          <div className="flex items-center gap-2 font-bold text-navyDark text-base">
+            <User size={18} className="text-blue-600" />
+            <span>Hồ sơ tác giả: {profileAuthor?.author_name}</span>
+          </div>
+        }
+        open={isAuthorProfileOpen}
+        onClose={() => setIsAuthorProfileOpen(false)}
+        width={550}
+        loading={profileLoading}
+      >
+        {profileAuthor && (
+          <div className="space-y-6">
+            {/* Bio Card */}
+            <Descriptions column={1} bordered className="custom-descriptions">
+              <Descriptions.Item label="Họ tên">
+                <span className="font-bold text-gray-800">{profileAuthor.author_name}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Quốc tịch">
+                <Tag color="blue" className="!rounded-md border-0">{profileAuthor.nationality || 'Chưa cập nhật'}</Tag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngày sinh">
+                <span className="flex items-center gap-1.5 text-gray-700">
+                  <Calendar size={14} className="text-gray-400" />
+                  {profileAuthor.birth_date ? new Date(profileAuthor.birth_date).toLocaleDateString('vi-VN') : 'Chưa cập nhật'}
+                </span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Trạng thái">
+                {profileAuthor.is_active ? (
+                  <Tag color="success" icon={<CheckCircle2 size={12} className="inline mr-1" />} className="!rounded-full border-0">Đang hoạt động</Tag>
+                ) : (
+                  <Tag color="error" icon={<XCircle size={12} className="inline mr-1" />} className="!rounded-full border-0">Ngưng hoạt động</Tag>
+                )}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div className="space-y-2">
+              <h4 className="font-bold text-gray-800 text-sm">Tiểu sử</h4>
+              <p className="text-sm text-gray-600 leading-relaxed bg-gray-50/50 p-4 rounded-xl border border-gray-100 whitespace-pre-line">
+                {profileAuthor.bio || 'Chưa có thông tin tiểu sử chi tiết.'}
+              </p>
+            </div>
+
+            {/* List of Books written by this Author */}
+            <div className="space-y-3">
+              <h4 className="font-bold text-gray-800 text-sm flex items-center gap-2 border-b border-gray-100 pb-2">
+                <BookOpen size={16} className="text-blue-500" />
+                <span>Danh sách tác phẩm ({profileAuthor.books?.length || 0})</span>
+              </h4>
+              <List
+                dataSource={profileAuthor.books || []}
+                locale={{ emptyText: 'Chưa có đầu sách nào của tác giả này trong thư viện.' }}
+                renderItem={(book: any) => {
+                  let imgUrl = book.cover_image;
+                  if (imgUrl && !imgUrl.startsWith('http')) {
+                    imgUrl = `http://127.0.0.1:8000/storage/${imgUrl}`;
+                  }
+                  return (
+                    <List.Item className="!py-3 border-b border-gray-100/50">
+                      <List.Item.Meta
+                        avatar={
+                          <div className="w-[40px] h-[60px] rounded overflow-hidden shadow bg-gray-50">
+                            {imgUrl ? (
+                              <img src={imgUrl} className="w-full h-full object-cover" alt="" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gray-100"><BookOpen size={14} className="text-gray-400" /></div>
+                            )}
+                          </div>
+                        }
+                        title={<span className="font-semibold text-gray-800 text-xs">{book.title}</span>}
+                        description={<span className="text-[10px] text-gray-400 font-mono">ISBN: {book.isbn || '—'}</span>}
+                      />
+                    </List.Item>
+                  );
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+    </div>
+  );
+}

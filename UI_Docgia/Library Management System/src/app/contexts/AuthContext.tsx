@@ -55,9 +55,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const login = async (email: string, password: string): Promise<{ success: boolean; requires2FA?: boolean }> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
+      if (response.ok) {
+        const data = await response.json();
+        const userData = data.results?.object?.user;
+        const accessToken = data.results?.object?.accessToken;
+
+        if (userData && accessToken) {
+          const authenticatedUser: User = {
+            id: userData.id,
+            name: userData.name,
+            email: userData.email,
+            role: userData.role, // 'admin' | 'librarian' | 'reader'
+            phone: userData.phone || '',
+            avatar: userData.avatar || undefined,
+            createdAt: userData.createdAt ? new Date(userData.createdAt) : new Date(),
+          };
+
+          setUser(authenticatedUser);
+          localStorage.setItem('library_user', JSON.stringify(authenticatedUser));
+          localStorage.setItem('library_token', accessToken);
+          createAuditLog(authenticatedUser, 'login_success', true, 'Đăng nhập thành công qua API Backend');
+          return { success: true, requires2FA: false };
+        }
+      }
+    } catch (error) {
+      console.warn('Backend connection failed, falling back to Mock Data...', error);
+    }
+
+    // --- FALLBACK MOCK DATA ---
     // Check all user types
     const allUsers: User[] = [
       ...mockReaders,
@@ -72,18 +107,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (foundUser.role === 'admin' && (foundUser as Admin).twoFactorEnabled) {
         setPendingUser(foundUser);
         setRequires2FA(true);
-        createAuditLog(foundUser, 'login_success', true, 'Đăng nhập thành công, chờ xác thực 2FA');
+        createAuditLog(foundUser, 'login_success', true, 'Đăng nhập thành công, chờ xác thực 2FA (Mock)');
         return { success: true, requires2FA: true };
       }
 
       // Regular login for non-admin or admin without 2FA
       setUser(foundUser);
       localStorage.setItem('library_user', JSON.stringify(foundUser));
-      createAuditLog(foundUser, 'login_success', true, 'Đăng nhập thành công');
+      createAuditLog(foundUser, 'login_success', true, 'Đăng nhập thành công (Mock)');
       return { success: true, requires2FA: false };
     }
 
-    createAuditLog(null, 'login_failed', false, `Đăng nhập thất bại - email: ${email}`);
+    createAuditLog(null, 'login_failed', false, `Đăng nhập thất bại - email: ${email} (Mock)`);
     return { success: false };
   };
 
@@ -119,17 +154,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    const token = localStorage.getItem('library_token');
+    if (token) {
+      fetch('http://127.0.0.1:8000/api/v1/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        }
+      }).catch(err => console.warn('Logout API error:', err));
+    }
     createAuditLog(user, 'logout', true, 'Đăng xuất');
     setUser(null);
     setPendingUser(null);
     setRequires2FA(false);
     localStorage.removeItem('library_user');
+    localStorage.removeItem('library_token');
   };
 
   const register = async (email: string, password: string, name: string): Promise<boolean> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/v1/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          full_name: name,
+          email,
+          password,
+          password_confirmation: password,
+        }),
+      });
 
+      if (response.ok) {
+        const data = await response.json();
+        const userData = data.results?.object?.user;
+        if (userData) {
+          const newReader: User = {
+            id: userData.id,
+            name: userData.name,
+            email: userData.email,
+            role: userData.role || 'reader',
+            phone: userData.phone || '',
+            avatar: userData.avatar || undefined,
+            createdAt: userData.createdAt ? new Date(userData.createdAt) : new Date(),
+          };
+          setUser(newReader);
+          localStorage.setItem('library_user', JSON.stringify(newReader));
+          createAuditLog(newReader, 'create_user', true, `Đăng ký tài khoản mới qua Backend: ${email}`);
+          return true;
+        }
+      }
+    } catch (error) {
+      console.warn('Backend connection failed for register, falling back to Mock Data...', error);
+    }
+
+    // --- FALLBACK MOCK DATA ---
     // Check if email already exists
     const allUsers: User[] = [
       ...mockReaders,
@@ -162,7 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     mockReaders.push(newReader);
     setUser(newReader);
     localStorage.setItem('library_user', JSON.stringify(newReader));
-    createAuditLog(newReader, 'create_user', true, `Đăng ký tài khoản mới: ${email}`);
+    createAuditLog(newReader, 'create_user', true, `Đăng ký tài khoản mới: ${email} (Mock)`);
     return true;
   };
 
