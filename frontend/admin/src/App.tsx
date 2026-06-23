@@ -22,7 +22,7 @@ const NotFound = lazy(() => import('./components/general/PageNotFound'));
 const Dashboard = lazy(() => import('./pages/dashboard/DashboardPage'));
 const Users = lazy(() => import('./pages/users/UsersPage'));
 const Books = lazy(() => import('./pages/books/BooksListPage').then(module => ({ default: module.BooksListPage })));
-const Transactions = lazy(() => import('./pages/transactions/TransactionsPage'));
+const Checkout = lazy(() => import('./pages/checkout/CheckoutPage'));
 const ForgotPassword = lazy(() => import('./pages/login/components/ForgotPassword'));
 const Achievements = lazy(() => import('./pages/achievements/AchievementsPage'));
 const Settings = lazy(() => import('./pages/settings/SettingsPage'));
@@ -86,7 +86,7 @@ function App() {
                 <Route path={ROUTES.BOOKS} element={<Books />} />
                 <Route path={ROUTES.FEES} element={<Fees />} />
                 <Route path={ROUTES.REPORTS} element={<Reports />} />
-                <Route path={ROUTES.TRANSACTIONS} element={<Transactions />} />
+                <Route path={ROUTES.TRANSACTIONS} element={<Checkout />} />
                 <Route path={ROUTES.ACHIEVEMENTS} element={<Achievements />} />
                 <Route path={ROUTES.SETTINGS} element={<Settings />} />
               </Route>

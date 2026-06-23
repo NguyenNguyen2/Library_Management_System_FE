@@ -22,7 +22,6 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import { useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { ReaderInfo, BookCopyInfo } from '../../api/checkoutApi';
 import { checkoutHooks } from '../../hooks/useCheckout';
 import { cn } from '@shared/constants/commonConst';
@@ -35,10 +34,7 @@ interface SelectedBook {
   condition: string;
 }
 
-const TransactionsPage = () => {
-  const [searchParams] = useSearchParams();
-  const currentTab = searchParams.get('tab') || 'borrow';
-
+const CheckoutPage = () => {
   const [keyword, setKeyword] = useState('');
   const [readerResults, setReaderResults] = useState<ReaderInfo[]>([]);
   const [selectedReader, setSelectedReader] = useState<ReaderInfo | null>(null);
@@ -61,9 +57,7 @@ const TransactionsPage = () => {
         setReaderResults(data);
         setSelectedReader(null);
         setSelectedBooks([]);
-        if (data.length === 0) {
-          message.info('Không tìm thấy độc giả nào.');
-        }
+        if (data.length === 0) message.info('Không tìm thấy độc giả nào.');
       },
       onError: (err) => {
         const msg = (err.response?.data as { message?: string })?.message;
@@ -117,22 +111,21 @@ const TransactionsPage = () => {
     setSelectedBooks((prev) => prev.filter((b) => b.copy_id !== copyId));
   };
 
+  const totalAfterCheckout = (selectedReader?.borrowing_count ?? 0) + selectedBooks.length;
+  const exceedsLimit =
+    selectedReader !== null &&
+    selectedReader.borrow_limit > 0 &&
+    totalAfterCheckout > selectedReader.borrow_limit;
+
   const canCheckout =
     selectedReader !== null &&
     selectedReader.can_borrow &&
     selectedBooks.length > 0 &&
+    !exceedsLimit &&
     !checkoutMutation.isPending;
 
   const handleCheckout = () => {
     if (!selectedReader) return;
-
-    const totalAfter = selectedReader.borrowing_count + selectedBooks.length;
-    if (totalAfter > selectedReader.borrow_limit) {
-      message.error(
-        `Vượt hạn mức: đang mượn ${selectedReader.borrowing_count}, thêm ${selectedBooks.length}, giới hạn ${selectedReader.borrow_limit}.`
-      );
-      return;
-    }
 
     checkoutMutation.mutate(
       {
@@ -152,8 +145,7 @@ const TransactionsPage = () => {
                   <strong>Độc giả:</strong> {result.reader.full_name}
                 </p>
                 <p className="m-0">
-                  <strong>Hạn trả:</strong>{' '}
-                  {dayjs(result.due_date).format('DD/MM/YYYY')}
+                  <strong>Hạn trả:</strong> {dayjs(result.due_date).format('DD/MM/YYYY')}
                 </p>
                 <p className="m-0">
                   <strong>Số sách:</strong> {result.books.length} cuốn
@@ -226,26 +218,10 @@ const TransactionsPage = () => {
     },
   ];
 
-  // Render reservations tab if specified in query params
-  if (currentTab === 'reservations') {
-    return (
-      <div className="max-w-[1300px] mx-auto flex flex-col gap-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="m-0 text-xl font-bold text-navyDark">Gia hạn & Đặt trước</h1>
-          <p className="m-0 text-gray-500 text-sm">Quản lý gia hạn sách và danh sách đặt trước của độc giả</p>
-        </div>
-        <Card className="!rounded-[10px] border border-gray-200 shadow-sm text-center py-12">
-          <p className="text-gray-500 m-0 text-base">Chức năng Gia hạn & Đặt trước đang được cập nhật...</p>
-        </Card>
-      </div>
-    );
-  }
-
-  // Default layout: Checkout/Borrowing
   return (
     <div className="max-w-[1300px] mx-auto flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="m-0 text-xl font-bold text-navyDark">Mượn trả sách</h1>
+        <h1 className="m-0 text-xl font-bold text-navyDark">Mượn sách</h1>
         <p className="m-0 text-gray-500 text-sm">Tạo phiếu mượn sách cho độc giả</p>
       </div>
 
@@ -287,7 +263,7 @@ const TransactionsPage = () => {
               </Button>
             </div>
 
-            {/* Search results */}
+            {/* Search results dropdown */}
             {readerResults.length > 0 && (
               <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
                 {readerResults.map((r) => (
@@ -304,7 +280,7 @@ const TransactionsPage = () => {
                         {r.library_card?.card_number ?? 'Chưa có thẻ'} · {r.email}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="shrink-0">
                       {r.can_borrow ? (
                         <Tag color="green">Có thể mượn</Tag>
                       ) : (
@@ -316,7 +292,7 @@ const TransactionsPage = () => {
               </div>
             )}
 
-            {/* Selected reader card */}
+            {/* Selected reader info */}
             {selectedReader && (
               <div className="mt-3">
                 <div
@@ -360,7 +336,13 @@ const TransactionsPage = () => {
                   {selectedReader.warnings.length > 0 && (
                     <div className="mt-3 space-y-1">
                       {selectedReader.warnings.map((w, i) => (
-                        <Alert key={i} message={w} type="warning" showIcon className="!py-1 !px-3 text-xs" />
+                        <Alert
+                          key={i}
+                          message={w}
+                          type="warning"
+                          showIcon
+                          className="!py-1 !px-3 text-xs"
+                        />
                       ))}
                     </div>
                   )}
@@ -402,7 +384,9 @@ const TransactionsPage = () => {
             </div>
 
             {!selectedReader && (
-              <p className="mt-2 text-xs text-gray-400">Tìm và chọn độc giả trước khi quét sách.</p>
+              <p className="mt-2 text-xs text-gray-400">
+                Tìm và chọn độc giả trước khi quét sách.
+              </p>
             )}
 
             {selectedBooks.length > 0 && (
@@ -421,7 +405,7 @@ const TransactionsPage = () => {
           </Card>
         </div>
 
-        {/* Right column — Summary */}
+        {/* Right column — Summary + Checkout */}
         <div className="lg:col-span-1">
           <Card
             title={
@@ -433,7 +417,6 @@ const TransactionsPage = () => {
             className="!rounded-[10px] border border-gray-200 shadow-sm lg:sticky lg:top-6"
           >
             <div className="space-y-4">
-              {/* Reader summary */}
               <div>
                 <p className="text-xs text-gray-400 uppercase font-medium mb-2">Độc giả</p>
                 {selectedReader ? (
@@ -450,12 +433,11 @@ const TransactionsPage = () => {
 
               <Divider className="!my-3" />
 
-              {/* Borrow info */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Đang mượn</span>
                   <span className="font-medium">
-                    {selectedReader ? selectedReader.borrowing_count : '—'}
+                    {selectedReader ? `${selectedReader.borrowing_count} quyển` : '—'}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -465,14 +447,13 @@ const TransactionsPage = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Giới hạn</span>
                   <span className="font-medium">
-                    {selectedReader ? selectedReader.borrow_limit : '—'}
+                    {selectedReader ? `${selectedReader.borrow_limit} quyển` : '—'}
                   </span>
                 </div>
               </div>
 
               <Divider className="!my-3" />
 
-              {/* Selected books list */}
               <div>
                 <p className="text-xs text-gray-400 uppercase font-medium mb-2">
                   Sách được chọn ({selectedBooks.length})
@@ -499,7 +480,6 @@ const TransactionsPage = () => {
 
               <Divider className="!my-3" />
 
-              {/* Checkout button */}
               <Button
                 type="primary"
                 size="large"
@@ -521,23 +501,19 @@ const TransactionsPage = () => {
                 />
               )}
 
-              {selectedReader &&
-                selectedReader.can_borrow &&
-                selectedReader.borrowing_count + selectedBooks.length >
-                  selectedReader.borrow_limit && (
-                  <Alert
-                    message={`Vượt hạn mức: tổng ${selectedReader.borrowing_count + selectedBooks.length}/${selectedReader.borrow_limit} quyển`}
-                    type="error"
-                    showIcon
-                    className="!text-xs"
-                  />
-                )}
+              {exceedsLimit && (
+                <Alert
+                  message={`Vượt hạn mức: tổng ${totalAfterCheckout}/${selectedReader?.borrow_limit} quyển`}
+                  type="error"
+                  showIcon
+                  className="!text-xs"
+                />
+              )}
             </div>
           </Card>
         </div>
       </div>
 
-      {/* Loading overlay for validateCopy */}
       {validateCopyMutation.isPending && (
         <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
           <Spin size="large" />
@@ -547,4 +523,4 @@ const TransactionsPage = () => {
   );
 };
 
-export default TransactionsPage;
+export default CheckoutPage;

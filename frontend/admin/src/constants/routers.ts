@@ -20,7 +20,7 @@ export const HEADER_TITLES: Record<RoutePath, keyof I18nKey> = {
   [ROUTES.LOGIN]: 'login',
   [ROUTES.USERS]: 'user_management',
   [ROUTES.BOOKS]: 'course_management',
-  [ROUTES.TRANSACTIONS]: 'code_management',
+  [ROUTES.TRANSACTIONS]: 'checkout_title',
   [ROUTES.FEES]: 'fee_management',
   [ROUTES.REPORTS]: 'report_management',
   [ROUTES.FORGOTPW]: 'forgot_password_title',

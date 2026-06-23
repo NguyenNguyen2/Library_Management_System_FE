@@ -140,6 +140,14 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
     if (!pathname) return;
     const path = pathname.pathname + pathname.search;
     setSelectItem(path);
+
+    // Auto-expand parent menu if a child is active
+    const activeParent = menuConfig.find((item) =>
+      item.children?.some((child) => child.to === path)
+    );
+    if (activeParent) {
+      setOpenMenu(activeParent.key);
+    }
   }, [pathname]);
 
   const handleLogout = () => {
