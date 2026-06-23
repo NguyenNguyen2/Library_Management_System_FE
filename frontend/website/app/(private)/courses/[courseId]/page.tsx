@@ -1,7 +1,7 @@
 'use client';
 
-import { Button, Card, Input, Pagination, Rate, Spin, Tag, message } from 'antd';
-import { ArrowLeftOutlined, BookOutlined } from '@ant-design/icons';
+import { Button, Card, Dropdown, Input, Pagination, Rate, Spin, Tag, message } from 'antd';
+import { ArrowLeftOutlined, BookOutlined, CheckOutlined, DownOutlined, HeartFilled, HeartOutlined } from '@ant-design/icons';
 import { use, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -14,6 +14,13 @@ import {
 } from '@/features/books/hooks/useBooks';
 import type { IRelatedBook } from '@/features/books/api/bookApi';
 import { APP_ROUTE } from '@/constants/routes';
+import type { IReadingListStatus } from '@/features/reading-list/api/readingListApi';
+import {
+  useReadingList,
+  useAddToReadingList,
+  useUpdateReadingList,
+  useRemoveFromReadingList,
+} from '@/features/reading-list/hooks/useReadingList';
 
 function formatDate(dt: string) {
   const d = new Date(dt.replace(' ', 'T'));
@@ -42,6 +49,84 @@ export default function BookDetailPage({
   const { data: reviewsData, isLoading: isReviewsLoading, refetch: refetchReviews } = useBookReviews(bookId, reviewPage);
   const { data: permissionData } = useReviewPermission(bookId, userId);
   const submitReviewMutation = useSubmitReview();
+
+  const { data: readingListData } = useReadingList();
+  const addItem = useAddToReadingList();
+  const updateItem = useUpdateReadingList();
+  const removeItem = useRemoveFromReadingList();
+
+  const currentWishlistItem = readingListData?.data.find(
+    (item) => item.book_id === bookId
+  ) ?? null;
+
+  const handleAddToList = () => {
+    addItem.mutate(
+      { book_id: bookId, status: 'want_to_read' },
+      {
+        onSuccess: () => message.success('Đã thêm vào danh sách đọc.'),
+        onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+      }
+    );
+  };
+
+  const handleMarkFinished = () => {
+    if (!currentWishlistItem) return;
+    updateItem.mutate(
+      { wishlistId: currentWishlistItem.wishlist_id, status: 'finished' },
+      {
+        onSuccess: () => message.success('Đã đánh dấu hoàn thành.'),
+        onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+      }
+    );
+  };
+
+  const isFavorite = currentWishlistItem?.status.value === 'favorite';
+
+  const handleToggleFavorite = () => {
+    if (!currentWishlistItem) {
+      addItem.mutate(
+        { book_id: bookId, status: 'favorite' },
+        {
+          onSuccess: () => message.success('Đã thêm vào yêu thích.'),
+          onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+        }
+      );
+    } else {
+      updateItem.mutate(
+        { wishlistId: currentWishlistItem.wishlist_id, status: 'favorite' },
+        {
+          onSuccess: () => message.success('Đã thêm vào yêu thích.'),
+          onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+        }
+      );
+    }
+  };
+
+  const handleRemoveFavorite = () => {
+    if (!currentWishlistItem) return;
+    removeItem.mutate(currentWishlistItem.wishlist_id, {
+      onSuccess: () => message.success('Đã xóa khỏi yêu thích.'),
+      onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+    });
+  };
+
+  const handleMenuClick = ({ key }: { key: string }) => {
+    if (!currentWishlistItem) return;
+    if (key === 'remove') {
+      removeItem.mutate(currentWishlistItem.wishlist_id, {
+        onSuccess: () => message.success('Đã xóa khỏi danh sách đọc.'),
+        onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+      });
+      return;
+    }
+    updateItem.mutate(
+      { wishlistId: currentWishlistItem.wishlist_id, status: key as IReadingListStatus },
+      {
+        onSuccess: () => message.success('Đã cập nhật trạng thái.'),
+        onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+      }
+    );
+  };
 
   const handleSubmitReview = async () => {
     if (!reviewRating) {
@@ -168,6 +253,84 @@ export default function BookDetailPage({
               </span>
             </div>
           )}
+
+          {/* Yêu thích */}
+          <div className="mb-3">
+            {isFavorite ? (
+              <Button
+                icon={<HeartFilled className="text-red-500" />}
+                onClick={handleRemoveFavorite}
+                loading={removeItem.isPending}
+                className="w-full border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+              >
+                Đã yêu thích
+              </Button>
+            ) : (
+              <Button
+                icon={<HeartOutlined className="text-red-400" />}
+                onClick={handleToggleFavorite}
+                loading={addItem.isPending || updateItem.isPending}
+                className="w-full border-red-100 text-red-500 hover:border-red-200 hover:bg-red-50"
+              >
+                Thêm vào yêu thích
+              </Button>
+            )}
+          </div>
+
+          {/* Reading list widget */}
+          <div className="mb-4">
+            {!currentWishlistItem ? (
+              <Button
+                icon={<HeartOutlined />}
+                onClick={handleAddToList}
+                loading={addItem.isPending}
+                className="w-full"
+              >
+                Thêm vào danh sách đọc
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Tag
+                  color={
+                    currentWishlistItem.status.value === 'want_to_read'
+                      ? 'blue'
+                      : currentWishlistItem.status.value === 'reading'
+                        ? 'orange'
+                        : 'green'
+                  }
+                  className="text-sm px-3 py-1 m-0"
+                >
+                  {currentWishlistItem.status.label}
+                </Tag>
+                {currentWishlistItem.status.value === 'reading' && (
+                  <Button
+                    size="small"
+                    icon={<CheckOutlined />}
+                    onClick={handleMarkFinished}
+                    loading={updateItem.isPending}
+                  >
+                    Hoàn thành
+                  </Button>
+                )}
+                <Dropdown
+                  menu={{
+                    items: [
+                      { key: 'want_to_read', label: 'Đọc sau' },
+                      { key: 'reading', label: 'Đang đọc' },
+                      { key: 'finished', label: 'Đã đọc' },
+                      { type: 'divider' as const },
+                      { key: 'remove', label: 'Xóa khỏi danh sách', danger: true },
+                    ],
+                    onClick: handleMenuClick,
+                  }}
+                >
+                  <Button size="small">
+                    Quản lý <DownOutlined />
+                  </Button>
+                </Dropdown>
+              </div>
+            )}
+          </div>
 
           {metaRows.length > 0 && (
             <div className="border-t border-(--blackBorder) pt-4">

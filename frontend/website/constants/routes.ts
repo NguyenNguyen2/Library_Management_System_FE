@@ -19,6 +19,8 @@ export enum APP_ROUTE {
   borrowed = '/borrowed',
   /** Reader's personal reading list */
   readingList = '/reading-list',
+  /** Reader's favorite books */
+  favorites = '/favorites',
   /** Reader's book reservations */
   reservations = '/reservations',
   /** Borrow/return history */

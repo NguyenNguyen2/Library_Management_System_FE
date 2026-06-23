@@ -19,18 +19,27 @@ import {
   FacebookFilled,
   XOutlined,
 } from '@ant-design/icons';
-import { useMockReadingList } from '@/lib/mock/useMockReadingList';
-import { useCourses } from '@/features/courses/hooks/useCourses';
+import {
+  useReadingList,
+  useUpdateReadingList,
+  useRemoveFromReadingList,
+} from '@/features/reading-list/hooks/useReadingList';
 import { APP_ROUTE } from '@/constants/routes';
-import type { MockCourse, MockReadingListItem } from '@/lib/mock/mockData';
+import type { IReadingListItem, IReadingListStatus } from '@/features/reading-list/api/readingListApi';
 
-type TabKey = MockReadingListItem['status'];
+type TabKey = Exclude<IReadingListStatus, 'favorite'>;
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode; color: string; bg: string; border: string }[] = [
-  { key: 'want_to_read', label: 'Muốn đọc', icon: <BookOutlined />, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-500' },
-  { key: 'reading', label: 'Đang đọc', icon: <ClockCircleOutlined />, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-500' },
-  { key: 'finished', label: 'Đã đọc', icon: <CheckCircleOutlined />, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-500' },
+  { key: 'want_to_read', label: 'Đọc sau',   icon: <BookOutlined />,         color: 'text-blue-600',  bg: 'bg-blue-50',  border: 'border-blue-500'  },
+  { key: 'reading',      label: 'Đang đọc',  icon: <ClockCircleOutlined />,  color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-500' },
+  { key: 'finished',     label: 'Đã đọc',    icon: <CheckCircleOutlined />,  color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-500' },
 ];
+
+const TAB_LABELS: Record<TabKey, string> = {
+  want_to_read: 'Đọc sau',
+  reading:      'Đang đọc',
+  finished:     'Đã đọc',
+};
 
 function NoteModal({
   open,
@@ -82,12 +91,10 @@ function NoteModal({
 function ShareModal({
   open,
   items,
-  books,
   onClose,
 }: {
   open: boolean;
-  items: MockReadingListItem[];
-  books: MockCourse[];
+  items: IReadingListItem[];
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -96,10 +103,7 @@ function ShareModal({
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const shareUrl = `${origin}/reading-list/shared?tab=${shareTab}`;
 
-  const tabBooks = items
-    .filter((item) => item.status === shareTab)
-    .map((item) => books.find((b) => b.id === item.bookId))
-    .filter((b): b is MockCourse => !!b);
+  const tabItems = items.filter((item) => item.status.value === shareTab);
 
   const handleCopy = async () => {
     try {
@@ -141,30 +145,45 @@ function ShareModal({
               >
                 {tab.label}
                 <span className={`ml-1 text-[10px] ${shareTab === tab.key ? 'text-blue-100' : 'text-gray-400'}`}>
-                  ({items.filter((i) => i.status === tab.key).length})
+                  ({items.filter((i) => i.status.value === tab.key).length})
                 </span>
               </button>
             ))}
           </div>
         </div>
 
-        {tabBooks.length > 0 ? (
+        {tabItems.length > 0 ? (
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-            <p className="text-xs text-gray-500 mb-2">Xem trước ({tabBooks.length} sách):</p>
+            <p className="text-xs text-gray-500 mb-2">Xem trước ({tabItems.length} sách):</p>
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {tabBooks.slice(0, 6).map((b) => (
-                <img key={b.id} src={b.coverImage} alt={b.name} className="w-10 h-14 object-cover rounded flex-shrink-0" title={b.name} />
-              ))}
-              {tabBooks.length > 6 && (
+              {tabItems.slice(0, 6).map((item) =>
+                item.cover_image ? (
+                  <img
+                    key={item.wishlist_id}
+                    src={item.cover_image}
+                    alt={item.title}
+                    className="w-10 h-14 object-cover rounded flex-shrink-0"
+                    title={item.title}
+                  />
+                ) : (
+                  <div
+                    key={item.wishlist_id}
+                    className="w-10 h-14 bg-gray-200 rounded flex-shrink-0 flex items-center justify-center text-gray-400 text-xs"
+                  >
+                    <BookOutlined />
+                  </div>
+                )
+              )}
+              {tabItems.length > 6 && (
                 <div className="w-10 h-14 bg-gray-200 rounded flex-shrink-0 flex items-center justify-center text-xs text-gray-500 font-semibold">
-                  +{tabBooks.length - 6}
+                  +{tabItems.length - 6}
                 </div>
               )}
             </div>
           </div>
         ) : (
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center text-sm text-gray-400">
-            Danh sách &quot;{TABS.find((t) => t.key === shareTab)?.label}&quot; trống
+            Danh sách &quot;{TAB_LABELS[shareTab]}&quot; trống
           </div>
         )}
 
@@ -217,22 +236,16 @@ function ShareModal({
 export default function ReadingListPage() {
   const router = useRouter();
   const { message } = App.useApp();
-  const { data, isLoading } = useMockReadingList();
-  const { data: coursesData } = useCourses({ page: 1, limit: 100 });
-  const books = (coursesData?.rows ?? []) as MockCourse[];
+  const { data, isLoading } = useReadingList();
+  const { mutate: updateItem } = useUpdateReadingList();
+  const { mutate: removeItem } = useRemoveFromReadingList();
 
-  const [items, setItems] = useState<MockReadingListItem[] | null>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>('want_to_read');
-  const [search, setSearch] = useState('');
-  const [notes, setNotes] = useState<Record<string, string>>({});
-  const [noteTarget, setNoteTarget] = useState<MockReadingListItem | null>(null);
-  const [showShare, setShowShare] = useState(false);
+  const [activeTab, setActiveTab]   = useState<TabKey>('want_to_read');
+  const [search, setSearch]         = useState('');
+  const [noteTarget, setNoteTarget] = useState<IReadingListItem | null>(null);
+  const [showShare, setShowShare]   = useState(false);
 
-  useEffect(() => {
-    if (data?.rows) setItems(data.rows);
-  }, [data]);
-
-  if (isLoading || !items) {
+  if (isLoading) {
     return (
       <div className="flex justify-center py-24">
         <Spin size="large" />
@@ -240,53 +253,64 @@ export default function ReadingListPage() {
     );
   }
 
+  const items = data?.data ?? [];
+
   const counts: Record<TabKey, number> = {
-    want_to_read: items.filter((i) => i.status === 'want_to_read').length,
-    reading: items.filter((i) => i.status === 'reading').length,
-    finished: items.filter((i) => i.status === 'finished').length,
+    want_to_read: items.filter((i) => i.status.value === 'want_to_read').length,
+    reading:      items.filter((i) => i.status.value === 'reading').length,
+    finished:     items.filter((i) => i.status.value === 'finished').length,
   };
 
-  const tabList = items.filter((i) => i.status === activeTab);
+  const tabList = items.filter((i) => i.status.value === activeTab);
   const filtered = tabList.filter((item) => {
-    const book = books.find((b) => b.id === item.bookId);
-    if (!book) return false;
     if (!search) return true;
     const q = search.toLowerCase();
     return (
-      book.name.toLowerCase().includes(q) ||
-      book.instructorName?.toLowerCase().includes(q)
+      item.title.toLowerCase().includes(q) ||
+      (item.author_name?.toLowerCase().includes(q) ?? false)
     );
   });
 
   const activeTabMeta = TABS.find((t) => t.key === activeTab)!;
 
-  const handleMove = (id: string, status: TabKey) => {
-    setItems((prev) => prev!.map((i) => (i.id === id ? { ...i, status } : i)));
-    const labels: Record<TabKey, string> = { want_to_read: 'Muốn đọc', reading: 'Đang đọc', finished: 'Đã đọc' };
-    message.success(`Đã chuyển sang "${labels[status]}"`);
+  const handleMove = (wishlistId: number, status: TabKey) => {
+    updateItem(
+      { wishlistId, status },
+      {
+        onSuccess: () => message.success(`Đã chuyển sang "${TAB_LABELS[status]}"`),
+        onError: ()   => message.error('Cập nhật thất bại. Vui lòng thử lại.'),
+      }
+    );
   };
 
-  const handleRemove = (id: string, title: string) => {
-    setItems((prev) => prev!.filter((i) => i.id !== id));
-    message.success(`Đã xóa "${title}" khỏi danh sách`);
+  const handleRemove = (wishlistId: number, title: string) => {
+    removeItem(wishlistId, {
+      onSuccess: () => message.success(`Đã xóa "${title}" khỏi danh sách`),
+      onError: ()   => message.error('Xóa thất bại. Vui lòng thử lại.'),
+    });
   };
 
-  const handleSaveNote = (id: string, note: string) => {
-    setNotes((prev) => ({ ...prev, [id]: note }));
-    message.success('Đã lưu ghi chú');
+  const handleSaveNote = (wishlistId: number, note: string) => {
+    updateItem(
+      { wishlistId, note },
+      {
+        onSuccess: () => message.success('Đã lưu ghi chú'),
+        onError: ()   => message.error('Lưu ghi chú thất bại.'),
+      }
+    );
   };
 
   return (
     <div className="max-w-4xl mx-auto">
       <NoteModal
         open={!!noteTarget}
-        initialNote={noteTarget ? notes[noteTarget.id] ?? noteTarget.notes ?? '' : ''}
+        initialNote={noteTarget?.note ?? ''}
         onSave={(note) => {
-          if (noteTarget) handleSaveNote(noteTarget.id, note);
+          if (noteTarget) handleSaveNote(noteTarget.wishlist_id, note);
         }}
         onClose={() => setNoteTarget(null)}
       />
-      <ShareModal open={showShare} items={items} books={books} onClose={() => setShowShare(false)} />
+      <ShareModal open={showShare} items={items} onClose={() => setShowShare(false)} />
 
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
@@ -382,22 +406,20 @@ export default function ReadingListPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((item) => {
-            const book = books.find((b) => b.id === item.bookId);
-            if (!book) return null;
-            const otherTabs = TABS.filter((tab) => tab.key !== activeTab);
-            const currentNote = notes[item.id] ?? item.notes ?? '';
+            const otherTabs  = TABS.filter((tab) => tab.key !== activeTab);
+            const currentNote = item.note ?? '';
 
             return (
-              <div key={item.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-sm transition-shadow">
+              <div key={item.wishlist_id} className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-sm transition-shadow">
                 <div className="flex gap-4 p-4">
                   <div
                     className="flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden cursor-pointer bg-gray-100 flex items-center justify-center"
-                    onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
+                    onClick={() => router.push(`${APP_ROUTE.courses}/${item.book_id}`)}
                   >
-                    {book.coverImage ? (
+                    {item.cover_image ? (
                       <img
-                        src={book.coverImage}
-                        alt={book.name}
+                        src={item.cover_image}
+                        alt={item.title}
                         className="w-full h-full object-cover hover:scale-105 transition-transform"
                       />
                     ) : (
@@ -410,22 +432,24 @@ export default function ReadingListPage() {
                       <div className="min-w-0">
                         <h3
                           className="text-gray-900 font-semibold hover:text-blue-600 cursor-pointer truncate transition-colors"
-                          onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
+                          onClick={() => router.push(`${APP_ROUTE.courses}/${item.book_id}`)}
                         >
-                          {book.name}
+                          {item.title}
                         </h3>
-                        <p className="text-sm text-gray-500">{book.instructorName}</p>
+                        {item.author_name && (
+                          <p className="text-sm text-gray-500">{item.author_name}</p>
+                        )}
                         <div className="flex items-center gap-2 mt-1 flex-wrap text-xs">
-                          {book.category && (
-                            <span className="px-2 py-0.5 rounded-full border border-gray-200 text-gray-500">{book.category}</span>
-                          )}
                           <span className="flex items-center gap-0.5">
                             {[1, 2, 3, 4, 5].map((i) => (
-                              <StarFilled key={i} className={i <= Math.round(book.rating ?? 0) ? 'text-yellow-400' : 'text-gray-200'} />
+                              <StarFilled
+                                key={i}
+                                className={i <= Math.round(item.avg_rating ?? 0) ? 'text-yellow-400' : 'text-gray-200'}
+                              />
                             ))}
-                            <span className="text-gray-400 ml-0.5">{(book.rating ?? 0).toFixed(1)}</span>
+                            <span className="text-gray-400 ml-0.5">{(item.avg_rating ?? 0).toFixed(1)}</span>
                           </span>
-                          {(book.availableCopies ?? 0) > 0 ? (
+                          {(item.available_copies ?? 0) > 0 ? (
                             <span className="text-green-600">● Có sẵn</span>
                           ) : (
                             <span className="text-orange-500">● Đặt trước</span>
@@ -442,7 +466,7 @@ export default function ReadingListPage() {
                           <EditOutlined />
                         </button>
                         <button
-                          onClick={() => handleRemove(item.id, book.name)}
+                          onClick={() => handleRemove(item.wishlist_id, item.title)}
                           className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
                           title="Xóa khỏi danh sách"
                         >
@@ -462,7 +486,7 @@ export default function ReadingListPage() {
                       {otherTabs.map((tab) => (
                         <button
                           key={tab.key}
-                          onClick={() => handleMove(item.id, tab.key)}
+                          onClick={() => handleMove(item.wishlist_id, tab.key)}
                           className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-current/20 transition-colors hover:opacity-80 ${tab.bg} ${tab.color}`}
                         >
                           {tab.icon}
@@ -470,7 +494,7 @@ export default function ReadingListPage() {
                         </button>
                       ))}
                       <button
-                        onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
+                        onClick={() => router.push(`${APP_ROUTE.courses}/${item.book_id}`)}
                         className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 transition-colors ml-auto"
                       >
                         Xem chi tiết <RightOutlined className="text-[10px]" />
