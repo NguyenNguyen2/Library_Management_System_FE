@@ -52,8 +52,10 @@ function CoursesPageContent() {
   const { data: readingListData } = useReadingList();
   const { mutate: addItem } = useAddToReadingList();
   const { mutate: removeItem } = useRemoveFromReadingList();
-  const wishlistMap = new Map(
-    (readingListData?.data ?? []).map((item) => [item.book_id, item])
+  const favoriteItemMap = new Map(
+    (readingListData?.data ?? [])
+      .filter((item) => item.status.value === 'favorite')
+      .map((item) => [item.book_id, item])
   );
 
   const filtered = books ?? [];
@@ -185,8 +187,8 @@ function CoursesPageContent() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {filtered.map((book) => {
-            const wishlistItem = wishlistMap.get(book.book_id) ?? null;
-            const isFav = wishlistItem?.status.value === 'favorite';
+            const favItem = favoriteItemMap.get(book.book_id) ?? null;
+            const isFav = !!favItem;
             return (
             <div
               key={book.book_id}
@@ -213,12 +215,12 @@ function CoursesPageContent() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (isFav && wishlistItem) {
-                      removeItem(wishlistItem.wishlist_id, {
+                    if (isFav && favItem) {
+                      removeItem(favItem.wishlist_id, {
                         onSuccess: () => message.success('Đã xóa khỏi yêu thích'),
                         onError: () => message.error('Có lỗi xảy ra'),
                       });
-                    } else if (!wishlistItem) {
+                    } else {
                       addItem({ book_id: book.book_id, status: 'favorite' }, {
                         onSuccess: () => message.success('Đã thêm vào yêu thích'),
                         onError: () => message.error('Có lỗi xảy ra'),

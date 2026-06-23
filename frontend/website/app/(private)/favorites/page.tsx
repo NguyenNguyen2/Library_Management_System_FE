@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons';
 import {
   useReadingList,
-  useUpdateReadingList,
+  useAddToReadingList,
   useRemoveFromReadingList,
 } from '@/features/reading-list/hooks/useReadingList';
 import { APP_ROUTE } from '@/constants/routes';
@@ -24,7 +24,7 @@ export default function FavoritesPage() {
   const router = useRouter();
   const { message } = App.useApp();
   const { data, isLoading } = useReadingList();
-  const { mutate: updateItem } = useUpdateReadingList();
+  const { mutate: addItem } = useAddToReadingList();
   const { mutate: removeItem } = useRemoveFromReadingList();
 
   const [search, setSearch] = useState('');
@@ -49,22 +49,22 @@ export default function FavoritesPage() {
     );
   });
 
-  const handleMoveToReading = (wishlistId: number, title: string) => {
-    updateItem(
-      { wishlistId, status: 'reading' },
+  const handleMoveToReading = (bookId: number, title: string) => {
+    addItem(
+      { book_id: bookId, status: 'reading' },
       {
-        onSuccess: () => message.success(`Đã chuyển "${title}" sang Đang đọc`),
-        onError: () => message.error('Cập nhật thất bại. Vui lòng thử lại.'),
+        onSuccess: () => message.success(`Đã thêm "${title}" vào Đang đọc`),
+        onError: () => message.error('Thao tác thất bại. Vui lòng thử lại.'),
       }
     );
   };
 
-  const handleMoveToFinished = (wishlistId: number, title: string) => {
-    updateItem(
-      { wishlistId, status: 'finished' },
+  const handleMoveToFinished = (bookId: number, title: string) => {
+    addItem(
+      { book_id: bookId, status: 'finished' },
       {
-        onSuccess: () => message.success(`Đã chuyển "${title}" sang Đã đọc`),
-        onError: () => message.error('Cập nhật thất bại. Vui lòng thử lại.'),
+        onSuccess: () => message.success(`Đã thêm "${title}" vào Đã đọc`),
+        onError: () => message.error('Thao tác thất bại. Vui lòng thử lại.'),
       }
     );
   };
@@ -191,14 +191,14 @@ export default function FavoritesPage() {
                       <div className="flex items-center gap-2 mt-3 flex-wrap">
                         <span className="text-xs text-gray-400">Chuyển sang:</span>
                         <button
-                          onClick={() => handleMoveToReading(item.wishlist_id, item.title)}
+                          onClick={() => handleMoveToReading(item.book_id, item.title)}
                           className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-amber-200 bg-amber-50 text-amber-600 hover:opacity-80 transition-colors"
                         >
                           <ClockCircleOutlined />
                           Đang đọc
                         </button>
                         <button
-                          onClick={() => handleMoveToFinished(item.wishlist_id, item.title)}
+                          onClick={() => handleMoveToFinished(item.book_id, item.title)}
                           className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-green-200 bg-green-50 text-green-600 hover:opacity-80 transition-colors"
                         >
                           <CheckCircleOutlined />

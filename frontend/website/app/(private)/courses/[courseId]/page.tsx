@@ -55,9 +55,33 @@ export default function BookDetailPage({
   const updateItem = useUpdateReadingList();
   const removeItem = useRemoveFromReadingList();
 
-  const currentWishlistItem = readingListData?.data.find(
-    (item) => item.book_id === bookId
+  const allItems = readingListData?.data ?? [];
+  const favoriteItem = allItems.find(
+    (item) => item.book_id === bookId && item.status.value === 'favorite'
   ) ?? null;
+  const readingItem = allItems.find(
+    (item) => item.book_id === bookId && item.status.value !== 'favorite'
+  ) ?? null;
+
+  const isFavorite = !!favoriteItem;
+
+  const handleToggleFavorite = () => {
+    addItem.mutate(
+      { book_id: bookId, status: 'favorite' },
+      {
+        onSuccess: () => message.success('Đã thêm vào yêu thích.'),
+        onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+      }
+    );
+  };
+
+  const handleRemoveFavorite = () => {
+    if (!favoriteItem) return;
+    removeItem.mutate(favoriteItem.wishlist_id, {
+      onSuccess: () => message.success('Đã xóa khỏi yêu thích.'),
+      onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+    });
+  };
 
   const handleAddToList = () => {
     addItem.mutate(
@@ -70,9 +94,9 @@ export default function BookDetailPage({
   };
 
   const handleMarkFinished = () => {
-    if (!currentWishlistItem) return;
+    if (!readingItem) return;
     updateItem.mutate(
-      { wishlistId: currentWishlistItem.wishlist_id, status: 'finished' },
+      { wishlistId: readingItem.wishlist_id, status: 'finished' },
       {
         onSuccess: () => message.success('Đã đánh dấu hoàn thành.'),
         onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
@@ -80,47 +104,17 @@ export default function BookDetailPage({
     );
   };
 
-  const isFavorite = currentWishlistItem?.status.value === 'favorite';
-
-  const handleToggleFavorite = () => {
-    if (!currentWishlistItem) {
-      addItem.mutate(
-        { book_id: bookId, status: 'favorite' },
-        {
-          onSuccess: () => message.success('Đã thêm vào yêu thích.'),
-          onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
-        }
-      );
-    } else {
-      updateItem.mutate(
-        { wishlistId: currentWishlistItem.wishlist_id, status: 'favorite' },
-        {
-          onSuccess: () => message.success('Đã thêm vào yêu thích.'),
-          onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
-        }
-      );
-    }
-  };
-
-  const handleRemoveFavorite = () => {
-    if (!currentWishlistItem) return;
-    removeItem.mutate(currentWishlistItem.wishlist_id, {
-      onSuccess: () => message.success('Đã xóa khỏi yêu thích.'),
-      onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
-    });
-  };
-
   const handleMenuClick = ({ key }: { key: string }) => {
-    if (!currentWishlistItem) return;
+    if (!readingItem) return;
     if (key === 'remove') {
-      removeItem.mutate(currentWishlistItem.wishlist_id, {
+      removeItem.mutate(readingItem.wishlist_id, {
         onSuccess: () => message.success('Đã xóa khỏi danh sách đọc.'),
         onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
       });
       return;
     }
     updateItem.mutate(
-      { wishlistId: currentWishlistItem.wishlist_id, status: key as IReadingListStatus },
+      { wishlistId: readingItem.wishlist_id, status: key as IReadingListStatus },
       {
         onSuccess: () => message.success('Đã cập nhật trạng thái.'),
         onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
@@ -279,7 +273,7 @@ export default function BookDetailPage({
 
           {/* Reading list widget */}
           <div className="mb-4">
-            {!currentWishlistItem ? (
+            {!readingItem ? (
               <Button
                 icon={<HeartOutlined />}
                 onClick={handleAddToList}
@@ -292,17 +286,17 @@ export default function BookDetailPage({
               <div className="flex items-center gap-2 flex-wrap">
                 <Tag
                   color={
-                    currentWishlistItem.status.value === 'want_to_read'
+                    readingItem.status.value === 'want_to_read'
                       ? 'blue'
-                      : currentWishlistItem.status.value === 'reading'
+                      : readingItem.status.value === 'reading'
                         ? 'orange'
                         : 'green'
                   }
                   className="text-sm px-3 py-1 m-0"
                 >
-                  {currentWishlistItem.status.label}
+                  {readingItem.status.label}
                 </Tag>
-                {currentWishlistItem.status.value === 'reading' && (
+                {readingItem.status.value === 'reading' && (
                   <Button
                     size="small"
                     icon={<CheckOutlined />}

@@ -176,26 +176,30 @@ export default function HomePage() {
   const activeReservationsCount = reservationsList.filter(
     (r) => r.status === 'waiting' || r.status === 'ready',
   ).length;
-  const readingListCount = readingListData?.data.length ?? 0;
+  const readingListCount = (readingListData?.data ?? []).filter(
+    (i) => i.status.value !== 'favorite'
+  ).length;
 
   const { mutate: addItem } = useAddToReadingList();
   const { mutate: removeItem } = useRemoveFromReadingList();
 
-  const wishlistMap = new Map(
-    (readingListData?.data ?? []).map((item) => [item.book_id, item])
+  const favoriteItemMap = new Map(
+    (readingListData?.data ?? [])
+      .filter((item) => item.status.value === 'favorite')
+      .map((item) => [item.book_id, item])
   );
 
   const makeHeartProps = (bookId: number) => {
-    const wishlistItem = wishlistMap.get(bookId) ?? null;
-    const isFavorite = wishlistItem?.status.value === 'favorite';
+    const favItem = favoriteItemMap.get(bookId) ?? null;
+    const isFavorite = !!favItem;
     const onHeartClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      if (isFavorite && wishlistItem) {
-        removeItem(wishlistItem.wishlist_id, {
+      if (isFavorite && favItem) {
+        removeItem(favItem.wishlist_id, {
           onSuccess: () => message.success('Đã xóa khỏi yêu thích'),
           onError: () => message.error('Có lỗi xảy ra'),
         });
-      } else if (!wishlistItem) {
+      } else {
         addItem({ book_id: bookId, status: 'favorite' }, {
           onSuccess: () => message.success('Đã thêm vào yêu thích'),
           onError: () => message.error('Có lỗi xảy ra'),
