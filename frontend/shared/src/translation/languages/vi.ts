@@ -429,6 +429,7 @@ const ViTranslation = {
   menu_all_settings: 'Tất cả cấu hình',
   menu_librarian_permission: 'Thủ thư & phân quyền',
   menu_audit_log: 'Nhật ký truy cập',
+  checkout_title: 'Mượn sách',
 };
 
 export default ViTranslation;
