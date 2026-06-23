@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Empty, Input, Spin } from "antd";
+import { Button, Empty, Input, Spin, message } from "antd";
 import {
   SearchOutlined,
   BookOutlined,
+  HeartOutlined,
+  HeartFilled,
   ReadOutlined,
   WarningOutlined,
   ClockCircleOutlined,
@@ -18,14 +20,28 @@ import { getCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
 import type { IDetailUser } from '@shared/types/UserType';
 import { useBorrowing } from '@/features/borrowing/hooks/useBorrowing';
-import { useMockReadingList } from '@/lib/mock/useMockReadingList';
-import { useMockReservations } from '@/lib/mock/useMockReservations';
+import {
+  useReadingList,
+  useAddToReadingList,
+  useRemoveFromReadingList,
+} from '@/features/reading-list/hooks/useReadingList';
+import { useReservations } from '@/features/reservations/hooks/useReservations';
 import { READER_BORROW_LIMIT, READER_CATEGORIES } from '@/lib/mock/mockData';
 import { APP_ROUTE } from '@/constants/routes';
 import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
 import type { IHomeBook } from '@/features/books/api/bookApi';
 
-function HomeBookCard({ book, onClick }: { book: IHomeBook; onClick: () => void }) {
+function HomeBookCard({
+  book,
+  onClick,
+  isFavorite,
+  onHeartClick,
+}: {
+  book: IHomeBook;
+  onClick: () => void;
+  isFavorite: boolean;
+  onHeartClick: (e: React.MouseEvent) => void;
+}) {
   return (
     <div
       className="flex-shrink-0 w-40 snap-start group cursor-pointer"
@@ -49,6 +65,16 @@ function HomeBookCard({ book, onClick }: { book: IHomeBook; onClick: () => void 
           >
             {book.available_copies > 0 ? "Có sẵn" : "Đặt trước"}
           </span>
+          <button
+            onClick={onHeartClick}
+            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/85 hover:bg-white flex items-center justify-center shadow-sm transition-all"
+            title={isFavorite ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
+          >
+            {isFavorite
+              ? <HeartFilled className="text-red-500 text-xs" />
+              : <HeartOutlined className="text-gray-400 text-xs" />
+            }
+          </button>
         </div>
         <div className="p-3">
           <p className="text-xs text-gray-900 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors font-semibold">
@@ -92,11 +118,13 @@ function BookSection({
   icon,
   books,
   onBookClick,
+  makeHeartProps,
 }: {
   title: string;
   icon: React.ReactNode;
   books: IHomeBook[];
   onBookClick: (bookId: number) => void;
+  makeHeartProps: (bookId: number) => { isFavorite: boolean; onHeartClick: (e: React.MouseEvent) => void };
 }) {
   const router = useRouter();
   if (books.length === 0) return null;
@@ -112,9 +140,18 @@ function BookSection({
         </Button>
       </div>
       <div className="flex gap-4 overflow-x-auto pb-3 snap-x scrollbar-none -mx-1 px-1">
-        {books.map((b) => (
-          <HomeBookCard key={b.book_id} book={b} onClick={() => onBookClick(b.book_id)} />
-        ))}
+        {books.map((b) => {
+          const { isFavorite, onHeartClick } = makeHeartProps(b.book_id);
+          return (
+            <HomeBookCard
+              key={b.book_id}
+              book={b}
+              onClick={() => onBookClick(b.book_id)}
+              isFavorite={isFavorite}
+              onHeartClick={onHeartClick}
+            />
+          );
+        })}
       </div>
     </section>
   );
@@ -128,19 +165,45 @@ export default function HomePage() {
   const userName = user?.name ?? "Độc giả";
 
   const { data: borrowingData } = useBorrowing();
-  const { data: reservationsData } = useMockReservations();
-  const { data: readingListData } = useMockReadingList();
+  const { data: reservationsData } = useReservations();
+  const { data: readingListData } = useReadingList();
 
   const borrowedBooks = borrowingData?.data ?? [];
-  const reservationsList = reservationsData?.rows ?? [];
-  const readingList = readingListData?.rows ?? [];
+  const reservationsList = reservationsData?.data ?? [];
 
   const borrowedCount = borrowedBooks.length;
   const overdueCount = borrowedBooks.filter((b) => b.days_remaining < 0).length;
   const activeReservationsCount = reservationsList.filter(
     (r) => r.status === 'waiting' || r.status === 'ready',
   ).length;
-  const readingListCount = readingList.length;
+  const readingListCount = readingListData?.data.length ?? 0;
+
+  const { mutate: addItem } = useAddToReadingList();
+  const { mutate: removeItem } = useRemoveFromReadingList();
+
+  const wishlistMap = new Map(
+    (readingListData?.data ?? []).map((item) => [item.book_id, item])
+  );
+
+  const makeHeartProps = (bookId: number) => {
+    const wishlistItem = wishlistMap.get(bookId) ?? null;
+    const isFavorite = wishlistItem?.status.value === 'favorite';
+    const onHeartClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isFavorite && wishlistItem) {
+        removeItem(wishlistItem.wishlist_id, {
+          onSuccess: () => message.success('Đã xóa khỏi yêu thích'),
+          onError: () => message.error('Có lỗi xảy ra'),
+        });
+      } else if (!wishlistItem) {
+        addItem({ book_id: bookId, status: 'favorite' }, {
+          onSuccess: () => message.success('Đã thêm vào yêu thích'),
+          onError: () => message.error('Có lỗi xảy ra'),
+        });
+      }
+    };
+    return { isFavorite, onHeartClick };
+  };
 
   const { data: homeBooks, isLoading: isHomeBooksLoading } = useHomeBooks();
 
@@ -301,7 +364,9 @@ export default function HomePage() {
                   Tìm thấy <span className="font-semibold text-gray-800">{searchResults.length}</span> kết quả
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {searchResults.map((book) => (
+                  {searchResults.map((book) => {
+                    const { isFavorite: isSrFav, onHeartClick: srHeartClick } = makeHeartProps(book.book_id);
+                    return (
                     <div
                       key={book.book_id}
                       onClick={() => router.push(`${APP_ROUTE.courses}/${book.book_id}`)}
@@ -325,6 +390,16 @@ export default function HomePage() {
                         >
                           {book.available_copies > 0 ? `Còn ${book.available_copies}` : "Hết"}
                         </span>
+                        <button
+                          onClick={srHeartClick}
+                          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-white/85 hover:bg-white flex items-center justify-center shadow-sm transition-all"
+                          title={isSrFav ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
+                        >
+                          {isSrFav
+                            ? <HeartFilled className="text-red-500 text-sm" />
+                            : <HeartOutlined className="text-gray-400 text-sm" />
+                          }
+                        </button>
                       </div>
                       {/* Info */}
                       <div className="p-3">
@@ -339,7 +414,8 @@ export default function HomePage() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -356,18 +432,21 @@ export default function HomePage() {
               icon={<TrophyOutlined className="text-yellow-500" />}
               books={homeBooks?.featured ?? []}
               onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
             />
             <BookSection
               title="Sách mới nhập"
               icon={<ThunderboltOutlined className="text-blue-500" />}
               books={homeBooks?.new_books ?? []}
               onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
             />
             <BookSection
               title="Sách được mượn nhiều nhất"
               icon={<FireOutlined className="text-rose-500" />}
               books={homeBooks?.most_borrowed ?? []}
               onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
             />
           </>
         )}

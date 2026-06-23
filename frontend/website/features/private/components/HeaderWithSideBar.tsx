@@ -18,9 +18,11 @@ const NAV_ITEMS = [
   { href: APP_ROUTE.home, label: 'Trang chủ' },
   { href: APP_ROUTE.courses, label: 'Danh mục' },
   { href: APP_ROUTE.borrowed, label: 'Đang mượn' },
+  { href: APP_ROUTE.favorites, label: 'Yêu thích' },
   { href: APP_ROUTE.readingList, label: 'Danh sách đọc' },
   { href: APP_ROUTE.reservations, label: 'Đặt trước' },
   { href: APP_ROUTE.history, label: 'Lịch sử' },
+  { href: APP_ROUTE.fines,   label: 'Lịch sử phí' },
 ];
 
 const HeaderWithSideBar = () => {

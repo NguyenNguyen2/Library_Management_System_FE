@@ -15,13 +15,12 @@ import {
   RightOutlined,
   StarFilled,
 } from '@ant-design/icons';
-import { useMockReservations } from '@/lib/mock/useMockReservations';
-import { useCourses } from '@/features/courses/hooks/useCourses';
+import { useReservations, useCancelReservation } from '@/features/reservations/hooks/useReservations';
 import { APP_ROUTE } from '@/constants/routes';
 import { formatDateVN } from '@/lib/utils/date';
-import type { MockCourse, MockReservation } from '@/lib/mock/mockData';
+import type { IReservation } from '@/features/reservations/api/reservationApi';
 
-const STATUS_CONFIG: Record<MockReservation['status'], { label: string; icon: React.ReactNode; bg: string; text: string; border: string }> = {
+const STATUS_CONFIG: Record<IReservation['status'], { label: string; icon: React.ReactNode; bg: string; text: string; border: string }> = {
   waiting: { label: 'Đang chờ', icon: <ClockCircleOutlined />, bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' },
   ready: { label: 'Sẵn sàng lấy', icon: <BellOutlined />, bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
   completed: { label: 'Đã lấy', icon: <CheckCircleOutlined />, bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
@@ -30,8 +29,8 @@ const STATUS_CONFIG: Record<MockReservation['status'], { label: string; icon: Re
 };
 
 const TABS = [
-  { key: 'active' as const, label: 'Đang chờ', statuses: ['waiting', 'ready'] as MockReservation['status'][] },
-  { key: 'history' as const, label: 'Lịch sử', statuses: ['completed', 'expired', 'cancelled'] as MockReservation['status'][] },
+  { key: 'active' as const, label: 'Đang chờ', statuses: ['waiting', 'ready'] as IReservation['status'][] },
+  { key: 'history' as const, label: 'Lịch sử', statuses: ['completed', 'expired', 'cancelled'] as IReservation['status'][] },
 ];
 
 function estimateWait(position: number) {
@@ -43,17 +42,15 @@ function estimateWait(position: number) {
 
 export default function ReservationsPage() {
   const router = useRouter();
-  const { message } = App.useApp();
-  const { data, isLoading } = useMockReservations();
-  const { data: coursesData } = useCourses({ page: 1, limit: 100 });
-  const books = (coursesData?.rows ?? []) as MockCourse[];
+  const { message, modal } = App.useApp();
+  const { data, isLoading } = useReservations();
+  const { mutateAsync, isPending, variables: pendingId } = useCancelReservation();
 
-  const [reservations, setReservations] = useState<MockReservation[] | null>(null);
+  const [reservations, setReservations] = useState<IReservation[] | null>(null);
   const [tab, setTab] = useState<'active' | 'history'>('active');
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (data?.rows) setReservations(data.rows);
+    if (data?.data) setReservations(data.data);
   }, [data]);
 
   if (isLoading || !reservations) {
@@ -68,16 +65,22 @@ export default function ReservationsPage() {
   const historyList = reservations.filter((r) => r.status === 'completed' || r.status === 'expired' || r.status === 'cancelled');
   const displayed = tab === 'active' ? activeList : historyList;
 
-  const getQueueLength = (bookId: string) =>
-    reservations.filter((r) => r.bookId === bookId && (r.status === 'waiting' || r.status === 'ready')).length;
-
-  const handleCancel = (id: string, title: string) => {
-    setCancellingId(id);
-    setTimeout(() => {
-      setReservations((prev) => prev!.map((r) => (r.id === id ? { ...r, status: 'cancelled' } : r)));
-      message.success(`Đã hủy đặt trước sách "${title}"`);
-      setCancellingId(null);
-    }, 500);
+  const handleCancel = (id: number, title: string) => {
+    modal.confirm({
+      title: 'Xác nhận hủy đặt trước',
+      content: `Bạn có chắc muốn hủy đặt trước sách "${title}"?`,
+      okText: 'Hủy đặt trước',
+      okType: 'danger',
+      cancelText: 'Đóng',
+      onOk: async () => {
+        try {
+          await mutateAsync(id);
+          message.success(`Đã hủy đặt trước sách "${title}"`);
+        } catch {
+          message.error('Hủy đặt trước thất bại. Vui lòng thử lại.');
+        }
+      },
+    });
   };
 
   return (
@@ -164,15 +167,12 @@ export default function ReservationsPage() {
       ) : (
         <div className="space-y-3">
           {displayed.map((reservation) => {
-            const book = books.find((b) => b.id === reservation.bookId);
-            if (!book) return null;
             const cfg = STATUS_CONFIG[reservation.status];
-            const queueLen = getQueueLength(book.id);
-            const isCancelling = cancellingId === reservation.id;
+            const isCancelling = isPending && pendingId === reservation.reservation_id;
 
             return (
               <div
-                key={reservation.id}
+                key={reservation.reservation_id}
                 className={`bg-white border rounded-xl overflow-hidden transition-all ${
                   reservation.status === 'ready' ? 'border-green-300 ring-1 ring-green-200' : 'border-gray-200'
                 }`}
@@ -182,7 +182,7 @@ export default function ReservationsPage() {
                     <BellOutlined />
                     <p>
                       Sách đã sẵn sàng — vui lòng đến lấy trước{' '}
-                      {reservation.expiryDate ? formatDateVN(reservation.expiryDate) : '2 ngày tới'}
+                      {reservation.expired_at ? formatDateVN(reservation.expired_at) : '2 ngày tới'}
                     </p>
                   </div>
                 )}
@@ -190,12 +190,12 @@ export default function ReservationsPage() {
                 <div className="flex gap-4 p-4">
                   <div
                     className="flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center cursor-pointer"
-                    onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
+                    onClick={() => router.push(`${APP_ROUTE.courses}/${reservation.book_id}`)}
                   >
-                    {book.coverImage ? (
+                    {reservation.cover_image ? (
                       <img
-                        src={book.coverImage}
-                        alt={book.name}
+                        src={reservation.cover_image}
+                        alt={reservation.title}
                         className="w-full h-full object-cover hover:scale-105 transition-transform"
                       />
                     ) : (
@@ -208,14 +208,16 @@ export default function ReservationsPage() {
                       <div className="min-w-0">
                         <h3
                           className="text-gray-900 font-semibold text-sm hover:text-blue-600 cursor-pointer transition-colors"
-                          onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
+                          onClick={() => router.push(`${APP_ROUTE.courses}/${reservation.book_id}`)}
                         >
-                          {book.name}
+                          {reservation.title}
                         </h3>
-                        <p className="text-xs text-gray-500 mt-0.5">{book.instructorName}</p>
+                        {reservation.author_name && (
+                          <p className="text-xs text-gray-500 mt-0.5">{reservation.author_name}</p>
+                        )}
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                          {book.category && (
-                            <span className="text-xs px-2 py-0.5 rounded-full border border-gray-200 text-gray-500">{book.category}</span>
+                          {reservation.category_name && (
+                            <span className="text-xs px-2 py-0.5 rounded-full border border-gray-200 text-gray-500">{reservation.category_name}</span>
                           )}
                           <div className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
                             {cfg.icon}
@@ -225,7 +227,7 @@ export default function ReservationsPage() {
                       </div>
                       <div className="flex items-center gap-0.5 flex-shrink-0">
                         {[1, 2, 3, 4, 5].map((i) => (
-                          <StarFilled key={i} className={i <= Math.round(book.rating ?? 0) ? 'text-yellow-400' : 'text-gray-200'} />
+                          <StarFilled key={i} className={i <= Math.round(reservation.avg_rating ?? 0) ? 'text-yellow-400' : 'text-gray-200'} />
                         ))}
                       </div>
                     </div>
@@ -236,40 +238,40 @@ export default function ReservationsPage() {
                           <div className="flex items-center gap-1.5 text-xs text-gray-600">
                             <TeamOutlined className="text-amber-500" />
                             <span>
-                              Vị trí hàng chờ: <span className="text-amber-700 font-bold">#{reservation.queuePosition}</span> / {queueLen}
+                              Vị trí hàng chờ: <span className="text-amber-700 font-bold">#{reservation.queue_position}</span> / {reservation.total_queue}
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5 text-xs text-gray-600">
                             <HourglassOutlined className="text-gray-400" />
                             <span>
-                              Ước tính: <span className="font-semibold">{estimateWait(reservation.queuePosition)}</span>
+                              Ước tính: <span className="font-semibold">{estimateWait(reservation.queue_position)}</span>
                             </span>
                           </div>
                         </>
                       )}
                       <div className="flex items-center gap-1.5 text-xs text-gray-500">
                         <CalendarOutlined className="text-gray-400" />
-                        <span>Đặt ngày: {formatDateVN(reservation.reservedDate)}</span>
+                        <span>Đặt ngày: {formatDateVN(reservation.reserved_at)}</span>
                       </div>
-                      {reservation.notifiedDate && (
+                      {reservation.notified_at && (
                         <div className="flex items-center gap-1.5 text-xs text-green-600">
                           <BellOutlined />
-                          <span>Thông báo: {formatDateVN(reservation.notifiedDate)}</span>
+                          <span>Thông báo: {formatDateVN(reservation.notified_at)}</span>
                         </div>
                       )}
                     </div>
 
-                    {(reservation.status === 'waiting' || reservation.status === 'ready') && (
+                    {reservation.status === 'waiting' && (
                       <div className="flex items-center gap-2 mt-3">
                         <button
-                          onClick={() => router.push(`${APP_ROUTE.courses}/${book.id}`)}
+                          onClick={() => router.push(`${APP_ROUTE.courses}/${reservation.book_id}`)}
                           className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
                         >
                           Xem sách <RightOutlined className="text-[10px]" />
                         </button>
                         <span className="text-gray-300">|</span>
                         <button
-                          onClick={() => handleCancel(reservation.id, book.name)}
+                          onClick={() => handleCancel(reservation.reservation_id, reservation.title)}
                           disabled={isCancelling}
                           className="text-xs text-red-500 hover:underline disabled:opacity-50"
                         >

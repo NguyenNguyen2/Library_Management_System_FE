@@ -2,11 +2,16 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Input, InputNumber, Select, Spin } from 'antd';
-import { SearchOutlined, BookOutlined } from '@ant-design/icons';
+import { Input, InputNumber, Select, Spin, message } from 'antd';
+import { SearchOutlined, BookOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons';
 import { useSearchBooks, useBookFilterOptions } from '@/features/books/hooks/useBooks';
 import { IBookSearchParams } from '@/features/books/api/bookApi';
 import { APP_ROUTE } from '@/constants/routes';
+import {
+  useReadingList,
+  useAddToReadingList,
+  useRemoveFromReadingList,
+} from '@/features/reading-list/hooks/useReadingList';
 
 function CoursesPageContent() {
   const router = useRouter();
@@ -43,6 +48,13 @@ function CoursesPageContent() {
   };
 
   const { data: books, isLoading, isFetching } = useSearchBooks(params);
+
+  const { data: readingListData } = useReadingList();
+  const { mutate: addItem } = useAddToReadingList();
+  const { mutate: removeItem } = useRemoveFromReadingList();
+  const wishlistMap = new Map(
+    (readingListData?.data ?? []).map((item) => [item.book_id, item])
+  );
 
   const filtered = books ?? [];
 
@@ -172,7 +184,10 @@ function CoursesPageContent() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {filtered.map((book) => (
+          {filtered.map((book) => {
+            const wishlistItem = wishlistMap.get(book.book_id) ?? null;
+            const isFav = wishlistItem?.status.value === 'favorite';
+            return (
             <div
               key={book.book_id}
               className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer group"
@@ -195,6 +210,29 @@ function CoursesPageContent() {
                 >
                   {book.available_copies > 0 ? 'Có sẵn' : 'Đặt trước'}
                 </span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isFav && wishlistItem) {
+                      removeItem(wishlistItem.wishlist_id, {
+                        onSuccess: () => message.success('Đã xóa khỏi yêu thích'),
+                        onError: () => message.error('Có lỗi xảy ra'),
+                      });
+                    } else if (!wishlistItem) {
+                      addItem({ book_id: book.book_id, status: 'favorite' }, {
+                        onSuccess: () => message.success('Đã thêm vào yêu thích'),
+                        onError: () => message.error('Có lỗi xảy ra'),
+                      });
+                    }
+                  }}
+                  className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-white/85 hover:bg-white flex items-center justify-center shadow-sm transition-all"
+                  title={isFav ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
+                >
+                  {isFav
+                    ? <HeartFilled className="text-red-500 text-sm" />
+                    : <HeartOutlined className="text-gray-400 text-sm" />
+                  }
+                </button>
               </div>
               <div className="p-3">
                 <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-snug min-h-[2.5rem] group-hover:text-blue-600 transition-colors">
@@ -208,7 +246,8 @@ function CoursesPageContent() {
                 )}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
     </div>

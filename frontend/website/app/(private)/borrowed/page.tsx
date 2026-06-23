@@ -1,14 +1,15 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Button, Spin } from 'antd';
+import { App, Button, Spin } from 'antd';
 import {
   WarningOutlined,
   ClockCircleOutlined,
   BookOutlined,
   RightOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons';
-import { useBorrowing } from '@/features/borrowing/hooks/useBorrowing';
+import { useBorrowing, useRenewBorrowing } from '@/features/borrowing/hooks/useBorrowing';
 import { APP_ROUTE } from '@/constants/routes';
 import { READER_BORROW_LIMIT } from '@/lib/mock/mockData';
 import { formatDateVN } from '@/lib/utils/date';
@@ -43,7 +44,13 @@ function getDayStatus(daysRemaining: number) {
   };
 }
 
-function BorrowedBookCard({ item }: { item: IBorrowedBook }) {
+function BorrowedBookCard({
+  item,
+  onRenew,
+}: {
+  item: IBorrowedBook;
+  onRenew: (item: IBorrowedBook) => void;
+}) {
   const router = useRouter();
   const status = getDayStatus(item.days_remaining);
   const isOverdue = item.days_remaining < 0;
@@ -115,7 +122,17 @@ function BorrowedBookCard({ item }: { item: IBorrowedBook }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mt-3">
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            <Button
+              size="small"
+              type="primary"
+              icon={<ReloadOutlined />}
+              disabled={isOverdue}
+              onClick={() => onRenew(item)}
+            >
+              Gia hạn
+            </Button>
+
             <button
               onClick={() => router.push(`${APP_ROUTE.courses}/${item.book_id}`)}
               className="flex items-center gap-1 text-xs text-blue-600 hover:underline h-8 px-2"
@@ -129,13 +146,33 @@ function BorrowedBookCard({ item }: { item: IBorrowedBook }) {
   );
 }
 
-export default function BorrowedBooksPage() {
+function BorrowedBooksContent() {
   const router = useRouter();
+  const { modal, message } = App.useApp();
   const { data, isLoading } = useBorrowing();
+  const renewMutation = useRenewBorrowing();
 
   const borrowed = data?.data ?? [];
   const overdueCount = borrowed.filter((b) => b.days_remaining < 0).length;
   const soonCount = borrowed.filter((b) => b.days_remaining >= 0 && b.days_remaining <= 3).length;
+
+  const handleRenew = (item: IBorrowedBook) => {
+    modal.confirm({
+      title: 'Gia hạn sách',
+      content: `Bạn có chắc muốn gia hạn "${item.title}" thêm 7 ngày không?`,
+      okText: 'Xác nhận gia hạn',
+      cancelText: 'Hủy',
+      okButtonProps: { type: 'primary' },
+      onOk: async () => {
+        const res = await renewMutation.mutateAsync(item.borrow_id).catch((err: any) => {
+          const msg = err?.response?.data?.message ?? 'Gia hạn thất bại. Vui lòng thử lại.';
+          message.error(msg);
+          throw err;
+        });
+        message.success(res.message ?? 'Gia hạn thành công.');
+      },
+    });
+  };
 
   if (isLoading) {
     return (
@@ -182,10 +219,22 @@ export default function BorrowedBooksPage() {
       ) : (
         <div className="space-y-4">
           {borrowed.map((item) => (
-            <BorrowedBookCard key={`${item.borrow_id}-${item.copy_id}`} item={item} />
+            <BorrowedBookCard
+              key={`${item.borrow_id}-${item.copy_id}`}
+              item={item}
+              onRenew={handleRenew}
+            />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+export default function BorrowedBooksPage() {
+  return (
+    <App>
+      <BorrowedBooksContent />
+    </App>
   );
 }
