@@ -15,6 +15,7 @@ import {
   FireOutlined,
   TrophyOutlined,
   RightOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 import { getCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
@@ -30,6 +31,7 @@ import { READER_BORROW_LIMIT, READER_CATEGORIES } from '@/lib/mock/mockData';
 import { APP_ROUTE } from '@/constants/routes';
 import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
 import type { IHomeBook } from '@/features/books/api/bookApi';
+import { useRecommendations } from '@/features/recommendations/hooks/useRecommendations';
 
 function HomeBookCard({
   book,
@@ -210,6 +212,13 @@ export default function HomePage() {
   };
 
   const { data: homeBooks, isLoading: isHomeBooksLoading } = useHomeBooks();
+  const { data: recommendationsData } = useRecommendations();
+  const recommendedBooks: IHomeBook[] = (recommendationsData?.data ?? []).map((r) => ({
+    book_id:          r.book_id,
+    title:            r.title,
+    cover_image:      r.cover_image,
+    available_copies: r.available_copies,
+  }));
 
   const handleBookClick = (bookId: number) => {
     router.push(`${APP_ROUTE.courses}/${bookId}`);
@@ -431,6 +440,13 @@ export default function HomePage() {
         ) : (
           /* ── Book collections ── */
           <>
+            <BookSection
+              title="Sách gợi ý cho bạn"
+              icon={<StarOutlined className="text-indigo-500" />}
+              books={recommendedBooks}
+              onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
+            />
             <BookSection
               title="Sách nổi bật"
               icon={<TrophyOutlined className="text-yellow-500" />}
