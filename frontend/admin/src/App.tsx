@@ -32,6 +32,7 @@ const Settings = lazy(() => import('./pages/settings/SettingsPage'));
 const Fees = lazy(() => import('./pages/fees/FeesPage'));
 const Reports = lazy(() => import('./pages/reports/ReportsPage'));
 const UserHistory = lazy(() => import('./pages/history/UserHistoryPage'));
+const TransactionHistory = lazy(() => import('./pages/history/TransactionHistoryPage'));
 
 import { useGlobalVariable } from './hooks/GlobalVariableProvider';
 
@@ -95,6 +96,7 @@ function App() {
                 <Route path={ROUTES.RENEW} element={<Renew />} />
                 <Route path={ROUTES.RESERVATION} element={<Reservation />} />
                 <Route path={ROUTES.USER_HISTORY} element={<UserHistory />} />
+                <Route path={ROUTES.TRANSACTION_LOG} element={<TransactionHistory />} />
                 <Route path={ROUTES.ACHIEVEMENTS} element={<Achievements />} />
                 <Route path={ROUTES.SETTINGS} element={<Settings />} />
               </Route>
