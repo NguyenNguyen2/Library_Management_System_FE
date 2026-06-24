@@ -46,6 +46,15 @@ export interface CheckoutResult {
   books: Array<{ copy_id: number; barcode: string; title: string }>;
 }
 
+export interface AvailableCopy {
+  copy_id: number;
+  barcode: string;
+  condition: string;
+  book_id: number;
+  title: string;
+  author: string;
+}
+
 export const checkoutApi = {
   findReader: async (keyword: string): Promise<ReaderInfo[]> => {
     const response = await axiosInstance.get('/private/v1/checkout/find-reader', {
@@ -54,8 +63,16 @@ export const checkoutApi = {
     return response.data?.results?.objects ?? [];
   },
 
+  searchAvailableCopies: async (q: string): Promise<AvailableCopy[]> => {
+    if (!q || q.trim().length === 0) return [];
+    const response = await axiosInstance.get('/private/v1/checkout/available-copies', {
+      params: { q: q.trim() },
+    });
+    return response.data?.results?.objects ?? [];
+  },
+
   validateCopy: async (barcode: string): Promise<BookCopyInfo> => {
-    const response = await axiosInstance.get(`/private/v1/checkout/copy/${barcode}`);
+    const response = await axiosInstance.get(`/private/v1/checkout/copy/${encodeURIComponent(barcode)}`);
     return response.data?.results?.object;
   },
 

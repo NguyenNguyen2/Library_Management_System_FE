@@ -93,9 +93,10 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
       to: ROUTES.TRANSACTIONS,
       badge: 12,
       children: [
-        { label: 'Mượn / Trả sách', to: ROUTES.TRANSACTIONS },
-        { label: 'Gia hạn & Đặt trước', to: ROUTES.TRANSACTIONS + '?tab=reservations' },
-        { label: 'Lịch sử giao dịch', to: ROUTES.DASHBOARD },
+        { label: 'Mượn sách', to: ROUTES.TRANSACTIONS },
+        { label: 'Trả sách', to: ROUTES.RETURN },
+        { label: 'Gia hạn sách', to: ROUTES.RENEW },
+        { label: 'Đặt trước', to: ROUTES.RESERVATION },
       ],
     },
     {

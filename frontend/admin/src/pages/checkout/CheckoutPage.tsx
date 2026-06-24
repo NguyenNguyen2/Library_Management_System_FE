@@ -1,29 +1,31 @@
 import {
   Alert,
+  AutoComplete,
   Button,
-  Card,
   Divider,
   Input,
-  InputRef,
+  type InputRef,
   Modal,
   Spin,
   Table,
-  TableColumnsType,
+  type TableColumnsType,
   Tag,
   message,
 } from 'antd';
 import {
   BookOutlined,
   DeleteOutlined,
-  SearchOutlined,
+  ExportOutlined,
+  PrinterOutlined,
   ScanOutlined,
+  SearchOutlined,
   CheckCircleOutlined,
-  UserOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
 import { useRef, useState } from 'react';
-import { ReaderInfo, BookCopyInfo } from '../../api/checkoutApi';
+import { ReaderInfo, BookCopyInfo, AvailableCopy } from '../../api/checkoutApi';
 import { checkoutHooks } from '../../hooks/useCheckout';
+import { receiptHooks } from '../../hooks/useReceipt';
 import { cn } from '@shared/constants/commonConst';
 import dayjs from 'dayjs';
 
@@ -40,11 +42,14 @@ const CheckoutPage = () => {
   const [selectedReader, setSelectedReader] = useState<ReaderInfo | null>(null);
   const [barcode, setBarcode] = useState('');
   const [selectedBooks, setSelectedBooks] = useState<SelectedBook[]>([]);
-  const barcodeRef = useRef<InputRef>(null);
+  const barcodeInputRef = useRef<InputRef>(null);
 
   const findReaderMutation = checkoutHooks.useFindReader();
+  const { data: availableCopies = [], isFetching: searchingCopies } =
+    checkoutHooks.useSearchAvailableCopies(selectedReader ? barcode : '');
   const validateCopyMutation = checkoutHooks.useValidateCopy();
   const checkoutMutation = checkoutHooks.useCheckout();
+  const checkoutReceiptMutation = receiptHooks.useCheckoutReceipt();
 
   const handleFindReader = () => {
     const trimmed = keyword.trim();
@@ -71,15 +76,22 @@ const CheckoutPage = () => {
     setReaderResults([]);
     setKeyword(reader.full_name);
     setSelectedBooks([]);
-    setTimeout(() => barcodeRef.current?.focus(), 100);
+    setTimeout(() => barcodeInputRef.current?.focus(), 100);
   };
 
-  const handleScanBarcode = () => {
-    const trimmed = barcode.trim();
+  const handleClearReader = () => {
+    setSelectedReader(null);
+    setReaderResults([]);
+    setKeyword('');
+    setSelectedBooks([]);
+  };
+
+  const addCopyByBarcode = (barcodeValue: string) => {
+    const trimmed = barcodeValue.trim();
     if (!trimmed) return;
 
     if (selectedBooks.some((b) => b.barcode === trimmed)) {
-      message.warning(`Barcode "${trimmed}" đã có trong danh sách.`);
+      message.warning(`"${trimmed}" đã có trong danh sách.`);
       setBarcode('');
       return;
     }
@@ -96,16 +108,37 @@ const CheckoutPage = () => {
           },
         ]);
         setBarcode('');
-        barcodeRef.current?.focus();
+        setTimeout(() => barcodeInputRef.current?.focus(), 50);
       },
       onError: (err) => {
         const msg = (err.response?.data as { message?: string })?.message;
-        message.error(msg ?? 'Barcode không hợp lệ hoặc không thể mượn.');
+        message.error(msg ?? 'Không tìm thấy sách hoặc sách không khả dụng.');
         setBarcode('');
-        barcodeRef.current?.focus();
+        setTimeout(() => barcodeInputRef.current?.focus(), 50);
       },
     });
   };
+
+  // Gợi ý từ search (khi chưa có kết quả search, vẫn cho dùng barcode cứng)
+  const autoOptions = (availableCopies as AvailableCopy[]).map((c) => ({
+    value: c.barcode,
+    label: (
+      <div className="flex items-center justify-between gap-2 py-0.5">
+        <div className="min-w-0">
+          <span className="font-mono text-xs text-blue-600 bg-blue-50 px-1 rounded mr-2">
+            {c.barcode}
+          </span>
+          <span className="text-sm text-gray-700">{c.title}</span>
+          {c.author && (
+            <span className="text-xs text-gray-400 ml-1">— {c.author}</span>
+          )}
+        </div>
+        <Tag color={c.condition === 'good' ? 'green' : c.condition === 'new' ? 'blue' : 'orange'} className="shrink-0 !text-xs">
+          {c.condition === 'good' ? 'Tốt' : c.condition === 'new' ? 'Mới' : c.condition}
+        </Tag>
+      </div>
+    ),
+  }));
 
   const handleRemoveBook = (copyId: number) => {
     setSelectedBooks((prev) => prev.filter((b) => b.copy_id !== copyId));
@@ -126,7 +159,6 @@ const CheckoutPage = () => {
 
   const handleCheckout = () => {
     if (!selectedReader) return;
-
     checkoutMutation.mutate(
       {
         user_id: selectedReader.user_id,
@@ -134,22 +166,41 @@ const CheckoutPage = () => {
       },
       {
         onSuccess: (result) => {
+          // Tự động mở PDF phiếu mượn trong tab mới
+          checkoutReceiptMutation.mutate(result.borrow_id, {
+            onError: () => message.warning('Không thể tạo PDF. Vui lòng thử lại sau.'),
+          });
+
           Modal.success({
             title: 'Tạo phiếu mượn thành công',
+            width: 420,
             content: (
-              <div className="space-y-1 mt-2">
-                <p className="m-0">
-                  <strong>Mã phiếu:</strong> #{result.borrow_id}
-                </p>
-                <p className="m-0">
-                  <strong>Độc giả:</strong> {result.reader.full_name}
-                </p>
-                <p className="m-0">
-                  <strong>Hạn trả:</strong> {dayjs(result.due_date).format('DD/MM/YYYY')}
-                </p>
-                <p className="m-0">
-                  <strong>Số sách:</strong> {result.books.length} cuốn
-                </p>
+              <div className="space-y-2 mt-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Mã phiếu</span>
+                  <span className="font-bold text-navyDark">#{result.borrow_id}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Độc giả</span>
+                  <span className="font-medium">{result.reader.full_name}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Mã thẻ</span>
+                  <span className="font-mono">{result.reader.card_number}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Hạn trả</span>
+                  <span className="font-semibold text-red-500">
+                    {dayjs(result.due_date).format('DD/MM/YYYY')}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Số sách</span>
+                  <span className="font-medium">{result.books.length} cuốn</span>
+                </div>
+                <div className="text-xs text-blue-500 mt-2">
+                  Phiếu mượn PDF đang mở trong tab mới...
+                </div>
               </div>
             ),
             okText: 'Đóng',
@@ -173,9 +224,11 @@ const CheckoutPage = () => {
       title: 'Barcode',
       dataIndex: 'barcode',
       key: 'barcode',
-      width: 140,
+      width: 130,
       render: (v: string) => (
-        <span className="font-mono font-semibold text-navyDark">{v}</span>
+        <span className="font-mono text-xs font-semibold text-navyDark bg-gray-100 px-2 py-0.5 rounded">
+          {v}
+        </span>
       ),
     },
     {
@@ -188,24 +241,17 @@ const CheckoutPage = () => {
       title: 'Tình trạng',
       dataIndex: 'condition',
       key: 'condition',
-      width: 110,
+      width: 100,
       render: (v: string) => {
-        const colorMap: Record<string, string> = {
-          good: 'green',
-          fair: 'orange',
-          poor: 'red',
-        };
-        return (
-          <Tag color={colorMap[v] ?? 'default'}>
-            {v === 'good' ? 'Tốt' : v === 'fair' ? 'Bình thường' : v === 'poor' ? 'Kém' : v}
-          </Tag>
-        );
+        const colorMap: Record<string, string> = { good: 'green', fair: 'orange', poor: 'red' };
+        const labelMap: Record<string, string> = { good: 'Tốt', fair: 'Bình thường', poor: 'Kém' };
+        return <Tag color={colorMap[v] ?? 'default'}>{labelMap[v] ?? v}</Tag>;
       },
     },
     {
       title: '',
-      key: 'action',
-      width: 48,
+      key: 'remove',
+      width: 44,
       render: (_: unknown, record: SelectedBook) => (
         <Button
           type="text"
@@ -219,306 +265,241 @@ const CheckoutPage = () => {
   ];
 
   return (
-    <div className="max-w-[1300px] mx-auto flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="m-0 text-xl font-bold text-navyDark">Mượn sách</h1>
-        <p className="m-0 text-gray-500 text-sm">Tạo phiếu mượn sách cho độc giả</p>
+    <div className="max-w-[860px] mx-auto flex flex-col gap-6">
+      {/* Page header */}
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+          <ExportOutlined className="text-blue-600" style={{ fontSize: 22 }} />
+        </div>
+        <div>
+          <h1 className="m-0 text-xl font-bold text-navyDark leading-tight">
+            Mượn sách (Check-out)
+          </h1>
+          <p className="m-0 text-sm text-gray-500 mt-0.5">Ghi nhận cho mượn tại quầy</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left column */}
-        <div className="lg:col-span-2 flex flex-col gap-5">
-          {/* Step 1: Find Reader */}
-          <Card
-            title={
-              <span className="flex items-center gap-2 font-semibold">
-                <UserOutlined className="text-blue-500" />
-                Bước 1 — Tìm độc giả
-              </span>
-            }
-            className="!rounded-[10px] border border-gray-200 shadow-sm"
-          >
-            <div className="flex gap-2">
-              <Input
-                placeholder="Tìm theo tên hoặc mã thẻ (ít nhất 2 ký tự)..."
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                onPressEnter={handleFindReader}
-                prefix={<SearchOutlined className="text-gray-400" />}
-                allowClear
-                onClear={() => {
-                  setKeyword('');
-                  setReaderResults([]);
-                  setSelectedReader(null);
-                  setSelectedBooks([]);
-                }}
-              />
-              <Button
-                type="primary"
-                onClick={handleFindReader}
-                loading={findReaderMutation.isPending}
-                icon={<SearchOutlined />}
-              >
-                Tìm
-              </Button>
-            </div>
+      {/* Main card */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        {/* Section 1 — Tìm độc giả */}
+        <div className="px-6 py-5">
+          <p className="m-0 mb-2 text-sm font-semibold text-gray-700">
+            Tìm độc giả (mã thẻ / tên)
+          </p>
 
-            {/* Search results dropdown */}
-            {readerResults.length > 0 && (
-              <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
-                {readerResults.map((r) => (
-                  <button
-                    key={r.user_id}
-                    onClick={() => handleSelectReader(r)}
-                    className={cn(
-                      'w-full text-left px-4 py-3 flex items-center justify-between bg-white hover:bg-blue-50 cursor-pointer border-0 transition-colors'
-                    )}
-                  >
-                    <div>
-                      <p className="m-0 font-semibold text-navyDark text-sm">{r.full_name}</p>
-                      <p className="m-0 text-xs text-gray-500">
-                        {r.library_card?.card_number ?? 'Chưa có thẻ'} · {r.email}
-                      </p>
-                    </div>
-                    <div className="shrink-0">
-                      {r.can_borrow ? (
-                        <Tag color="green">Có thể mượn</Tag>
-                      ) : (
-                        <Tag color="red">Không thể mượn</Tag>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="flex gap-2">
+            <Input
+              size="middle"
+              placeholder="VD: TV001 hoặc Nguyễn Văn A"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              onPressEnter={handleFindReader}
+              prefix={<SearchOutlined className="text-gray-400" />}
+              allowClear
+              onClear={handleClearReader}
+            />
+            <Button
+              type="primary"
+              onClick={handleFindReader}
+              loading={findReaderMutation.isPending}
+              style={{ minWidth: 72 }}
+            >
+              Tìm
+            </Button>
+          </div>
 
-            {/* Selected reader info */}
-            {selectedReader && (
-              <div className="mt-3">
-                <div
+          {/* Search results */}
+          {readerResults.length > 0 && (
+            <div className="mt-2 rounded-lg border border-gray-200 overflow-hidden divide-y divide-gray-100 shadow-sm">
+              {readerResults.map((r) => (
+                <button
+                  key={r.user_id}
+                  onClick={() => handleSelectReader(r)}
                   className={cn(
-                    'rounded-lg border p-4',
-                    selectedReader.can_borrow
-                      ? 'border-green-200 bg-green-50'
-                      : 'border-red-200 bg-red-50'
+                    'w-full text-left px-4 py-2.5 flex items-center justify-between',
+                    'bg-white hover:bg-blue-50 border-0 cursor-pointer transition-colors'
                   )}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
-                      <p className="m-0 font-bold text-navyDark">{selectedReader.full_name}</p>
-                      <p className="m-0 text-sm text-gray-600">
-                        Mã thẻ:{' '}
-                        <span className="font-mono font-semibold">
-                          {selectedReader.library_card?.card_number ?? '—'}
-                        </span>
-                      </p>
-                      <p className="m-0 text-sm text-gray-600">
-                        Đang mượn:{' '}
-                        <strong>
-                          {selectedReader.borrowing_count}/{selectedReader.borrow_limit}
-                        </strong>{' '}
-                        quyển
-                      </p>
-                      {selectedReader.unpaid_fines > 0 && (
-                        <p className="m-0 text-sm text-red-600 font-medium">
-                          Nợ phí:{' '}
-                          {new Intl.NumberFormat('vi-VN').format(selectedReader.unpaid_fines)} VND
-                        </p>
-                      )}
-                    </div>
-                    {selectedReader.can_borrow ? (
-                      <CheckCircleOutlined className="text-green-500 text-xl shrink-0" />
-                    ) : (
-                      <WarningOutlined className="text-red-500 text-xl shrink-0" />
-                    )}
-                  </div>
-
-                  {selectedReader.warnings.length > 0 && (
-                    <div className="mt-3 space-y-1">
-                      {selectedReader.warnings.map((w, i) => (
-                        <Alert
-                          key={i}
-                          message={w}
-                          type="warning"
-                          showIcon
-                          className="!py-1 !px-3 text-xs"
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </Card>
-
-          {/* Step 2: Scan Barcode */}
-          <Card
-            title={
-              <span className="flex items-center gap-2 font-semibold">
-                <ScanOutlined className="text-blue-500" />
-                Bước 2 — Quét barcode sách
-              </span>
-            }
-            className="!rounded-[10px] border border-gray-200 shadow-sm"
-          >
-            <div className="flex gap-2">
-              <Input
-                ref={barcodeRef}
-                placeholder="Quét hoặc nhập barcode, nhấn Enter..."
-                value={barcode}
-                onChange={(e) => setBarcode(e.target.value)}
-                onPressEnter={handleScanBarcode}
-                prefix={<BookOutlined className="text-gray-400" />}
-                disabled={!selectedReader || !selectedReader.can_borrow}
-                allowClear
-              />
-              <Button
-                type="default"
-                onClick={handleScanBarcode}
-                loading={validateCopyMutation.isPending}
-                disabled={!selectedReader || !selectedReader.can_borrow || !barcode.trim()}
-                icon={<ScanOutlined />}
-              >
-                Thêm
-              </Button>
-            </div>
-
-            {!selectedReader && (
-              <p className="mt-2 text-xs text-gray-400">
-                Tìm và chọn độc giả trước khi quét sách.
-              </p>
-            )}
-
-            {selectedBooks.length > 0 && (
-              <>
-                <Divider className="!my-4" />
-                <Table<SelectedBook>
-                  dataSource={selectedBooks}
-                  columns={bookColumns}
-                  rowKey="copy_id"
-                  pagination={false}
-                  size="small"
-                  locale={{ emptyText: 'Chưa có sách nào được thêm' }}
-                />
-              </>
-            )}
-          </Card>
-        </div>
-
-        {/* Right column — Summary + Checkout */}
-        <div className="lg:col-span-1">
-          <Card
-            title={
-              <span className="flex items-center gap-2 font-semibold">
-                <CheckCircleOutlined className="text-blue-500" />
-                Bước 3 — Xác nhận mượn
-              </span>
-            }
-            className="!rounded-[10px] border border-gray-200 shadow-sm lg:sticky lg:top-6"
-          >
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs text-gray-400 uppercase font-medium mb-2">Độc giả</p>
-                {selectedReader ? (
-                  <div className="space-y-1">
-                    <p className="m-0 font-semibold text-navyDark">{selectedReader.full_name}</p>
-                    <p className="m-0 text-sm text-gray-500">
-                      {selectedReader.library_card?.card_number ?? 'Chưa có thẻ'}
+                  <div>
+                    <p className="m-0 text-sm font-semibold text-navyDark">{r.full_name}</p>
+                    <p className="m-0 text-xs text-gray-500">
+                      {r.library_card?.card_number ?? 'Chưa có thẻ'} · {r.email}
                     </p>
                   </div>
+                  <div className="shrink-0 ml-3">
+                    {r.can_borrow ? (
+                      <Tag color="green">Có thể mượn</Tag>
+                    ) : (
+                      <Tag color="red">Không thể mượn</Tag>
+                    )}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Selected reader info */}
+          {selectedReader && (
+            <div
+              className={cn(
+                'mt-3 rounded-xl border px-4 py-3 flex items-start gap-3',
+                selectedReader.can_borrow
+                  ? 'border-green-200 bg-green-50'
+                  : 'border-red-200 bg-red-50'
+              )}
+            >
+              <div className="mt-0.5 shrink-0">
+                {selectedReader.can_borrow ? (
+                  <CheckCircleOutlined className="text-green-500 text-base" />
                 ) : (
-                  <p className="m-0 text-sm text-gray-400 italic">Chưa chọn độc giả</p>
+                  <WarningOutlined className="text-red-500 text-base" />
                 )}
               </div>
-
-              <Divider className="!my-3" />
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Đang mượn</span>
-                  <span className="font-medium">
-                    {selectedReader ? `${selectedReader.borrowing_count} quyển` : '—'}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-sm text-navyDark">
+                    {selectedReader.full_name}
+                  </span>
+                  <span className="font-mono text-xs text-gray-500 bg-white border border-gray-200 px-1.5 py-0.5 rounded">
+                    {selectedReader.library_card?.card_number ?? '—'}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Thêm hôm nay</span>
-                  <span className="font-medium text-blue-600">{selectedBooks.length} quyển</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Giới hạn</span>
-                  <span className="font-medium">
-                    {selectedReader ? `${selectedReader.borrow_limit} quyển` : '—'}
+                <div className="mt-1 flex items-center gap-3 text-xs text-gray-600 flex-wrap">
+                  <span>
+                    Đang mượn:{' '}
+                    <strong>
+                      {selectedReader.borrowing_count}/{selectedReader.borrow_limit}
+                    </strong>{' '}
+                    quyển
                   </span>
+                  {selectedReader.unpaid_fines > 0 && (
+                    <span className="text-red-600 font-medium">
+                      Nợ phí:{' '}
+                      {new Intl.NumberFormat('vi-VN').format(selectedReader.unpaid_fines)} VND
+                    </span>
+                  )}
                 </div>
-              </div>
-
-              <Divider className="!my-3" />
-
-              <div>
-                <p className="text-xs text-gray-400 uppercase font-medium mb-2">
-                  Sách được chọn ({selectedBooks.length})
-                </p>
-                {selectedBooks.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic">Chưa có sách nào</p>
-                ) : (
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                    {selectedBooks.map((b) => (
-                      <div
-                        key={b.copy_id}
-                        className="flex items-center gap-2 text-sm p-2 bg-gray-50 rounded"
-                      >
-                        <BookOutlined className="text-blue-400 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="m-0 font-mono text-xs text-gray-500">{b.barcode}</p>
-                          <p className="m-0 truncate text-navyDark">{b.title}</p>
-                        </div>
-                      </div>
+                {selectedReader.warnings.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {selectedReader.warnings.map((w, i) => (
+                      <Alert key={i} message={w} type="warning" showIcon className="!py-1 text-xs" />
                     ))}
                   </div>
                 )}
               </div>
+            </div>
+          )}
+        </div>
 
-              <Divider className="!my-3" />
+        <Divider className="!m-0" />
 
-              <Button
-                type="primary"
-                size="large"
-                block
-                disabled={!canCheckout}
-                loading={checkoutMutation.isPending}
-                onClick={handleCheckout}
-                icon={<CheckCircleOutlined />}
-              >
-                Tạo phiếu mượn
-              </Button>
+        {/* Section 2 — Quét barcode */}
+        <div className="px-6 py-5">
+          <p className="m-0 mb-2 text-sm font-semibold text-gray-700">Quét barcode sách</p>
 
-              {selectedReader && !selectedReader.can_borrow && (
-                <Alert
-                  message="Độc giả không đủ điều kiện mượn"
-                  type="error"
-                  showIcon
-                  className="!text-xs"
-                />
-              )}
+          <div className="flex gap-2">
+            <AutoComplete
+              style={{ flex: 1 }}
+              options={autoOptions}
+              value={barcode}
+              onChange={(val) => setBarcode(val)}
+              onSelect={(val: string) => addCopyByBarcode(val)}
+              disabled={!selectedReader || !selectedReader.can_borrow}
+              notFoundContent={
+                barcode.trim().length >= 1 && !searchingCopies
+                  ? <span className="text-xs text-gray-400 px-2">Không tìm thấy — nhấn Enter để quét trực tiếp</span>
+                  : null
+              }
+            >
+              <Input
+                ref={barcodeInputRef}
+                size="middle"
+                placeholder="Nhập tên sách, barcode hoặc ISBN..."
+                prefix={
+                  searchingCopies
+                    ? <Spin size="small" />
+                    : <ScanOutlined className="text-gray-400" />
+                }
+                allowClear
+                onPressEnter={() => addCopyByBarcode(barcode)}
+              />
+            </AutoComplete>
+            <Button
+              onClick={() => addCopyByBarcode(barcode)}
+              loading={validateCopyMutation.isPending}
+              disabled={!selectedReader || !selectedReader.can_borrow || !barcode.trim()}
+              style={{ minWidth: 72 }}
+            >
+              Thêm
+            </Button>
+          </div>
 
+          {!selectedReader && (
+            <p className="mt-1.5 text-xs text-gray-400">
+              Tìm và chọn độc giả trước khi quét sách.
+            </p>
+          )}
+          {selectedReader && selectedReader.can_borrow && (
+            <p className="mt-1.5 text-xs text-gray-400">
+              Gõ tên sách để tìm nhanh, hoặc quét barcode trực tiếp rồi nhấn Enter.
+            </p>
+          )}
+        </div>
+
+        <Divider className="!m-0" />
+
+        {/* Section 3 — Danh sách sách */}
+        <div className="px-6 py-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-semibold text-gray-700">Danh sách sách mượn</span>
+            <span className="text-sm text-gray-400">{selectedBooks.length} cuốn</span>
+          </div>
+
+          {selectedBooks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+              <BookOutlined style={{ fontSize: 28 }} className="mb-2 opacity-40" />
+              <p className="m-0 text-sm">Chưa có sách nào — quét barcode để bắt đầu</p>
+            </div>
+          ) : (
+            <>
+              <Table<SelectedBook>
+                dataSource={selectedBooks}
+                columns={bookColumns}
+                rowKey="copy_id"
+                pagination={false}
+                size="small"
+              />
               {exceedsLimit && (
                 <Alert
+                  className="mt-3"
                   message={`Vượt hạn mức: tổng ${totalAfterCheckout}/${selectedReader?.borrow_limit} quyển`}
                   type="error"
                   showIcon
-                  className="!text-xs"
                 />
               )}
-            </div>
-          </Card>
+            </>
+          )}
+        </div>
+
+        <Divider className="!m-0" />
+
+        {/* Bottom — Confirm button */}
+        <div className="px-6 py-4">
+          <Button
+            type="primary"
+            size="large"
+            block
+            disabled={!canCheckout}
+            loading={checkoutMutation.isPending}
+            onClick={handleCheckout}
+            icon={<PrinterOutlined />}
+            style={{ height: 48, fontSize: 15, fontWeight: 600 }}
+          >
+            Xác nhận &amp; In biên lai PDF
+          </Button>
         </div>
       </div>
 
-      {validateCopyMutation.isPending && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-          <Spin size="large" />
-        </div>
-      )}
     </div>
   );
 };
