@@ -11,13 +11,7 @@ import {
   EditOutlined,
   RightOutlined,
   SearchOutlined,
-  ShareAltOutlined,
   StarFilled,
-  LinkOutlined,
-  CopyOutlined,
-  CheckOutlined,
-  FacebookFilled,
-  XOutlined,
 } from '@ant-design/icons';
 import {
   useReadingList,
@@ -88,151 +82,6 @@ function NoteModal({
   );
 }
 
-function ShareModal({
-  open,
-  items,
-  onClose,
-}: {
-  open: boolean;
-  items: IReadingListItem[];
-  onClose: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-  const [shareTab, setShareTab] = useState<TabKey>('want_to_read');
-
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const shareUrl = `${origin}/reading-list/shared?tab=${shareTab}`;
-
-  const tabItems = items.filter((item) => item.status.value === shareTab);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopied(false);
-    }
-  };
-
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      width={440}
-      centered
-      destroyOnHidden
-      title={
-        <span className="flex items-center gap-2">
-          <ShareAltOutlined /> Chia sẻ danh sách đọc
-        </span>
-      }
-    >
-      <div className="space-y-4 pt-2">
-        <div>
-          <p className="text-xs text-gray-500 mb-2 font-medium">Chọn danh sách muốn chia sẻ</p>
-          <div className="flex gap-2">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setShareTab(tab.key)}
-                className={`flex-1 text-xs py-2 rounded-lg border transition-all ${
-                  shareTab === tab.key
-                    ? 'bg-blue-600 text-white border-blue-600 font-semibold'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                {tab.label}
-                <span className={`ml-1 text-[10px] ${shareTab === tab.key ? 'text-blue-100' : 'text-gray-400'}`}>
-                  ({items.filter((i) => i.status.value === tab.key).length})
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {tabItems.length > 0 ? (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-            <p className="text-xs text-gray-500 mb-2">Xem trước ({tabItems.length} sách):</p>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {tabItems.slice(0, 6).map((item) =>
-                item.cover_image ? (
-                  <img
-                    key={item.wishlist_id}
-                    src={item.cover_image}
-                    alt={item.title}
-                    className="w-10 h-14 object-cover rounded flex-shrink-0"
-                    title={item.title}
-                  />
-                ) : (
-                  <div
-                    key={item.wishlist_id}
-                    className="w-10 h-14 bg-gray-200 rounded flex-shrink-0 flex items-center justify-center text-gray-400 text-xs"
-                  >
-                    <BookOutlined />
-                  </div>
-                )
-              )}
-              {tabItems.length > 6 && (
-                <div className="w-10 h-14 bg-gray-200 rounded flex-shrink-0 flex items-center justify-center text-xs text-gray-500 font-semibold">
-                  +{tabItems.length - 6}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-center text-sm text-gray-400">
-            Danh sách &quot;{TAB_LABELS[shareTab]}&quot; trống
-          </div>
-        )}
-
-        <div>
-          <p className="text-xs text-gray-500 mb-1.5 font-medium">Link chia sẻ công khai</p>
-          <div className="flex gap-2">
-            <div className="flex-1 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-0">
-              <LinkOutlined className="text-gray-400 flex-shrink-0" />
-              <span className="text-xs text-gray-600 truncate">{shareUrl}</span>
-            </div>
-            <Button
-              size="small"
-              type="primary"
-              className={copied ? '!bg-green-500 hover:!bg-green-600' : ''}
-              icon={copied ? <CheckOutlined /> : <CopyOutlined />}
-              onClick={handleCopy}
-            >
-              {copied ? 'Đã sao chép' : 'Sao chép'}
-            </Button>
-          </div>
-          <p className="text-[11px] text-gray-400 mt-1.5">Bất kỳ ai có link đều có thể xem danh sách này (chỉ đọc).</p>
-        </div>
-
-        <div>
-          <p className="text-xs text-gray-500 mb-2 font-medium">Chia sẻ lên mạng xã hội</p>
-          <div className="flex gap-2">
-            <a
-              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 flex-1 justify-center py-2 rounded-lg bg-[#1877F2] text-white text-xs hover:bg-[#166FE5] transition-colors"
-            >
-              <FacebookFilled /> Facebook
-            </a>
-            <a
-              href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent('Danh sách đọc của tôi trên The Library')}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 flex-1 justify-center py-2 rounded-lg bg-black text-white text-xs hover:bg-gray-800 transition-colors"
-            >
-              <XOutlined /> X (Twitter)
-            </a>
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 export default function ReadingListPage() {
   const router = useRouter();
   const { message } = App.useApp();
@@ -243,7 +92,6 @@ export default function ReadingListPage() {
   const [activeTab, setActiveTab]   = useState<TabKey>('want_to_read');
   const [search, setSearch]         = useState('');
   const [noteTarget, setNoteTarget] = useState<IReadingListItem | null>(null);
-  const [showShare, setShowShare]   = useState(false);
 
   if (isLoading) {
     return (
@@ -310,24 +158,12 @@ export default function ReadingListPage() {
         }}
         onClose={() => setNoteTarget(null)}
       />
-      <ShareModal open={showShare} items={items} onClose={() => setShowShare(false)} />
 
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Danh sách đọc</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            Quản lý sách yêu thích và theo dõi tiến độ đọc của bạn
-          </p>
-        </div>
-        {items.length > 0 && (
-          <Button
-            icon={<ShareAltOutlined />}
-            className="text-blue-600 border-blue-200 hover:bg-blue-50 shrink-0"
-            onClick={() => setShowShare(true)}
-          >
-            Chia sẻ
-          </Button>
-        )}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Danh sách đọc</h1>
+        <p className="text-gray-500 text-sm mt-1">
+          Quản lý sách yêu thích và theo dõi tiến độ đọc của bạn
+        </p>
       </div>
 
       {/* Stat tiles */}
