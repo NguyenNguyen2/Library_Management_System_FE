@@ -28,7 +28,7 @@ import {
   useRemoveFromReadingList,
 } from '@/features/reading-list/hooks/useReadingList';
 import { useReservations } from '@/features/reservations/hooks/useReservations';
-import { READER_BORROW_LIMIT, READER_CATEGORIES } from '@/lib/mock/mockData';
+import { READER_BORROW_LIMIT } from '@/lib/mock/mockData';
 import { APP_ROUTE } from '@/constants/routes';
 import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
 import type { IHomeBook } from '@/features/books/api/bookApi';
@@ -285,18 +285,6 @@ export default function HomePage() {
                 </Button>
               </form>
 
-              {/* Category tags */}
-              <div className="flex flex-wrap gap-2 mt-4">
-                {READER_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => router.push(`/courses?category=${cat}`)}
-                    className="bg-white/15 hover:bg-white/25 backdrop-blur px-3 py-1.5 rounded-full text-sm transition-colors"
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Right stats (desktop only) */}

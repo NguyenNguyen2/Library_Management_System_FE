@@ -8,6 +8,8 @@ import {
   CameraOutlined,
   LoadingOutlined,
   UserOutlined,
+  LockOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -22,6 +24,7 @@ import {
   useUploadAvatar,
 } from '@/features/profile/hooks/useProfile';
 import { useGetLibraryCard } from '@/features/library-card/hooks/useLibraryCard';
+import { useLogout } from '@/features/auth/hooks/useAuth';
 import { APP_ROUTE } from '@/constants/routes';
 import { setCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
@@ -31,6 +34,7 @@ const ProfilePage = () => {
   const t = useTranslations();
   const { user, setUser } = useUser();
 
+  const { mutate: logout } = useLogout();
   const { mutate: requestChangePassword, isPending: isRequestingOtp } = useRequestChangePassword();
   const { mutate: verifyOtp, isPending: isVerifyingOtp } = useVerifyChangePasswordOtp();
 
@@ -210,7 +214,7 @@ const ProfilePage = () => {
   }
 
   return (
-    <div className="max-w-[480px]">
+    <div className="max-w-4xl mx-auto w-full">
       {/* Back button */}
       <Button
         type="text"
@@ -222,9 +226,11 @@ const ProfilePage = () => {
       </Button>
 
       <div className="flex flex-col gap-6">
+        {/* ── Top row: Personal Info + Library Card ── */}
+        <div className="grid md:grid-cols-2 gap-6 items-stretch">
         {/* ── Personal Info Card ── */}
         <Card
-          className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
+          className="h-full border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
           styles={{ body: { padding: 24 } }}
         >
           <p className="font-semibold text-lg tracking-tight text-(--blackSoft) mb-4">
@@ -256,7 +262,7 @@ const ProfilePage = () => {
                 onClick={() => setEditingInfo(true)}
                 className="border border-(--grayBorderMedium) rounded-lg text-(--blackSoft) font-medium text-sm h-10"
               >
-                {t('edit_button')}
+                Chỉnh sửa thông tin
               </Button>
             </div>
           ) : (
@@ -361,7 +367,7 @@ const ProfilePage = () => {
 
         {/* ── Library Card ── */}
         <Card
-          className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
+          className="h-full border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
           styles={{ body: { padding: 24 } }}
         >
           <p className="font-semibold text-lg tracking-tight text-(--blackSoft) mb-4">
@@ -417,23 +423,37 @@ const ProfilePage = () => {
           )}
         </Card>
 
-        {/* ── Change Password Card ── */}
+        </div>{/* end grid */}
+
+        {/* ── Bảo mật Card ── */}
         <Card
           className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
           styles={{ body: { padding: 24 } }}
         >
           <p className="font-semibold text-lg tracking-tight text-(--blackSoft) mb-4">
-            {t('change_password')}
+            Bảo mật
           </p>
 
           {!editingPw ? (
-            <Button
-              block
-              onClick={() => setEditingPw(true)}
-              className="border border-(--grayBorderMedium) rounded-lg text-(--blackSoft) font-medium text-sm h-10"
-            >
-              {t('change_password')}
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button
+                block
+                icon={<LockOutlined />}
+                onClick={() => setEditingPw(true)}
+                className="border border-(--grayBorderMedium) rounded-lg text-(--blackSoft) font-medium text-sm h-10"
+              >
+                Thay đổi mật khẩu
+              </Button>
+              <Button
+                block
+                danger
+                icon={<LogoutOutlined />}
+                onClick={() => logout()}
+                className="rounded-lg font-medium text-sm h-10"
+              >
+                Đăng xuất
+              </Button>
+            </div>
           ) : (
             <Form
               form={pwForm}
