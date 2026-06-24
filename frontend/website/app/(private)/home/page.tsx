@@ -16,6 +16,7 @@ import {
   TrophyOutlined,
   RightOutlined,
   StarOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import { getCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
@@ -32,6 +33,7 @@ import { APP_ROUTE } from '@/constants/routes';
 import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
 import type { IHomeBook } from '@/features/books/api/bookApi';
 import { useRecommendations } from '@/features/recommendations/hooks/useRecommendations';
+import { useCollaborativeRecommendations } from '@/features/recommendations/hooks/useCollaborativeRecommendations';
 
 function HomeBookCard({
   book,
@@ -212,8 +214,17 @@ export default function HomePage() {
   };
 
   const { data: homeBooks, isLoading: isHomeBooksLoading } = useHomeBooks();
+
   const { data: recommendationsData } = useRecommendations();
   const recommendedBooks: IHomeBook[] = (recommendationsData?.data ?? []).map((r) => ({
+    book_id:          r.book_id,
+    title:            r.title,
+    cover_image:      r.cover_image,
+    available_copies: r.available_copies,
+  }));
+
+  const { data: collaborativeData } = useCollaborativeRecommendations();
+  const collaborativeBooks: IHomeBook[] = (collaborativeData?.data ?? []).map((r) => ({
     book_id:          r.book_id,
     title:            r.title,
     cover_image:      r.cover_image,
@@ -444,6 +455,13 @@ export default function HomePage() {
               title="Sách gợi ý cho bạn"
               icon={<StarOutlined className="text-indigo-500" />}
               books={recommendedBooks}
+              onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
+            />
+            <BookSection
+              title="Độc giả giống bạn cũng đọc"
+              icon={<TeamOutlined className="text-teal-500" />}
+              books={collaborativeBooks}
               onBookClick={handleBookClick}
               makeHeartProps={makeHeartProps}
             />

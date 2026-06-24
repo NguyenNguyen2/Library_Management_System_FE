@@ -20,3 +20,10 @@ export const recommendationApi = {
     return response.data;
   },
 };
+
+export const collaborativeApi = {
+  get: async (): Promise<IRecommendationResponse> => {
+    const response = await axiosInstance.get('/v1/me/recommendations/collaborative');
+    return response.data;
+  },
+};
