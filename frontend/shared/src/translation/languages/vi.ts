@@ -430,6 +430,10 @@ const ViTranslation = {
   menu_librarian_permission: 'Thủ thư & phân quyền',
   menu_audit_log: 'Nhật ký truy cập',
   checkout_title: 'Mượn sách',
+  return_title: 'Trả sách',
+  renew_title: 'Gia hạn sách',
+  reservation_title: 'Đặt trước sách',
+  user_history_title: 'Lịch sử độc giả',
 };
 
 export default ViTranslation;
