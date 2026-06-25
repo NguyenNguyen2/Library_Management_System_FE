@@ -1,8 +1,17 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Button, Drawer } from 'antd';
-import { UserOutlined, LogoutOutlined, MenuOutlined } from '@ant-design/icons';
+import { Button, Drawer, Dropdown } from 'antd';
+import type { MenuProps } from 'antd';
+import {
+  UserOutlined,
+  LogoutOutlined,
+  MenuOutlined,
+  DownOutlined,
+  HeartOutlined,
+  ClockCircleOutlined,
+  FileTextOutlined,
+} from '@ant-design/icons';
 import { useRouter, usePathname } from 'next/navigation';
 import { getCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
@@ -15,37 +24,70 @@ import styles from './HeaderWithSideBar.module.css';
 import { LOGO_HEARTBEAT } from '@shared/constants/animation';
 
 const NAV_ITEMS = [
-  { href: APP_ROUTE.home, label: 'Trang chủ' },
-  { href: APP_ROUTE.courses, label: 'Danh mục' },
-  { href: APP_ROUTE.borrowed, label: 'Đang mượn' },
-  { href: APP_ROUTE.favorites, label: 'Yêu thích' },
+  { href: APP_ROUTE.home,        label: 'Trang chủ' },
+  { href: APP_ROUTE.courses,     label: 'Danh mục' },
+  { href: APP_ROUTE.borrowed,    label: 'Đang mượn' },
   { href: APP_ROUTE.readingList, label: 'Danh sách đọc' },
-  { href: APP_ROUTE.reservations, label: 'Đặt trước' },
-  { href: APP_ROUTE.history, label: 'Lịch sử' },
-  { href: APP_ROUTE.fines,   label: 'Lịch sử phí' },
+  { href: APP_ROUTE.reservations,label: 'Đặt trước' },
 ];
 
 const HeaderWithSideBar = () => {
-  const router = useRouter();
+  const router   = useRouter();
   const pathname = usePathname();
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken]             = useState<string | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const t = useTranslations();
-  const isSupportLanguage =
-    process.env.NEXT_PUBLIC_IS_SUPPORT_LANGUAGE === 'TRUE';
+  const isSupportLanguage = process.env.NEXT_PUBLIC_IS_SUPPORT_LANGUAGE === 'TRUE';
   const { mutate: logout } = useLogout();
   const { user } = useUser();
+
+  const isProfilePage = pathname === APP_ROUTE.profile;
 
   React.useEffect(() => {
     setToken(getCookie(STORAGES.ACCESS_TOKEN) || null);
   }, []);
+
+  const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: 'Thông tin cá nhân',
+      onClick: () => router.push(APP_ROUTE.profile),
+    },
+    {
+      key: 'history',
+      icon: <ClockCircleOutlined />,
+      label: 'Lịch sử mượn',
+      onClick: () => router.push(APP_ROUTE.history),
+    },
+    {
+      key: 'fines',
+      icon: <FileTextOutlined />,
+      label: 'Lịch sử phí phạt',
+      onClick: () => router.push(APP_ROUTE.fines),
+    },
+    {
+      key: 'favorites',
+      icon: <HeartOutlined />,
+      label: 'Yêu thích',
+      onClick: () => router.push(APP_ROUTE.favorites),
+    },
+    { type: 'divider' },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: 'Đăng xuất',
+      danger: true,
+      onClick: () => logout(),
+    },
+  ];
 
   return (
     <>
       <header
         className={`${styles.header} flex items-center justify-between px-6 bg-white border-b border-black/10 shrink-0`}
       >
-        {/* Left: book logo + academy name — heartbeat + click goes to /home */}
+        {/* Logo */}
         <button
           type="button"
           onClick={() => router.push(APP_ROUTE.home)}
@@ -72,13 +114,11 @@ const HeaderWithSideBar = () => {
               strokeLinecap="round"
             />
           </svg>
-          <span className="font-bold text-xl text-(--navyDark)">
-            {t('header_title')}
-          </span>
+          <span className="font-bold text-xl text-(--navyDark)">{t('header_title')}</span>
         </button>
 
-        {/* Center: navigation (visible when logged in) */}
-        {token && (
+        {/* Center nav — hidden on /profile */}
+        {token && !isProfilePage && (
           <nav className="hidden md:flex items-center gap-6">
             {NAV_ITEMS.map((item) => {
               const isActive = pathname === item.href;
@@ -87,9 +127,7 @@ const HeaderWithSideBar = () => {
                   key={item.href}
                   onClick={() => router.push(item.href)}
                   className={`text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'text-blue-600'
-                      : 'text-gray-700 hover:text-blue-600'
+                    isActive ? 'text-blue-600' : 'text-gray-700 hover:text-blue-600'
                   }`}
                 >
                   {item.label}
@@ -99,34 +137,30 @@ const HeaderWithSideBar = () => {
           </nav>
         )}
 
-        {/* Right: user + logout */}
+        {/* Right side */}
         {token ? (
           <div className="flex items-center gap-3">
-            {/* Mobile nav toggle — shown below md, where the center nav is hidden */}
-            <button
-              type="button"
-              onClick={() => setMobileNavOpen(true)}
-              className="md:hidden p-2 -m-2 text-gray-700 hover:text-blue-600"
-              aria-label="Menu"
-            >
-              <MenuOutlined style={{ fontSize: 20 }} />
-            </button>
-            <Button
-              icon={<UserOutlined />}
-              onClick={() => router.push(APP_ROUTE.profile)}
-              className={styles.actionButton}
-            >
-              {user?.name}
-            </Button>
-            <Button
-              type="primary"
-              danger
-              icon={<LogoutOutlined />}
-              onClick={() => logout()}
-              className="font-medium"
-            >
-              {t('logout')}
-            </Button>
+            {/* Mobile hamburger — hidden on /profile */}
+            {!isProfilePage && (
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                className="md:hidden p-2 -m-2 text-gray-700 hover:text-blue-600"
+                aria-label="Menu"
+              >
+                <MenuOutlined style={{ fontSize: 20 }} />
+              </button>
+            )}
+
+            {/* User dropdown */}
+            <Dropdown menu={{ items: userMenuItems }} trigger={['click']} placement="bottomRight">
+              <Button className={styles.actionButton}>
+                <UserOutlined />
+                <span>{user?.name}</span>
+                <DownOutlined style={{ fontSize: 10 }} />
+              </Button>
+            </Dropdown>
+
             {isSupportLanguage && <LanguageSwitcher />}
           </div>
         ) : (
@@ -136,37 +170,37 @@ const HeaderWithSideBar = () => {
         )}
       </header>
 
-      {/* Mobile nav drawer — mirrors the center nav for screens below md */}
-      <Drawer
-        title={t('header_title')}
-        placement="right"
-        width={260}
-        open={mobileNavOpen}
-        onClose={() => setMobileNavOpen(false)}
-      >
-        <nav className="flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <button
-                key={item.href}
-                type="button"
-                onClick={() => {
-                  setMobileNavOpen(false);
-                  router.push(item.href);
-                }}
-                className={`text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-      </Drawer>
+      {/* Mobile drawer — not shown on /profile */}
+      {!isProfilePage && (
+        <Drawer
+          title={t('header_title')}
+          placement="right"
+          width={260}
+          open={mobileNavOpen}
+          onClose={() => setMobileNavOpen(false)}
+        >
+          <nav className="flex flex-col gap-1">
+            {NAV_ITEMS.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <button
+                  key={item.href}
+                  type="button"
+                  onClick={() => {
+                    setMobileNavOpen(false);
+                    router.push(item.href);
+                  }}
+                  className={`text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    isActive ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+        </Drawer>
+      )}
     </>
   );
 };

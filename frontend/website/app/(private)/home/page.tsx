@@ -15,6 +15,8 @@ import {
   FireOutlined,
   TrophyOutlined,
   RightOutlined,
+  StarOutlined,
+  TeamOutlined,
 } from "@ant-design/icons";
 import { getCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
@@ -26,10 +28,12 @@ import {
   useRemoveFromReadingList,
 } from '@/features/reading-list/hooks/useReadingList';
 import { useReservations } from '@/features/reservations/hooks/useReservations';
-import { READER_BORROW_LIMIT, READER_CATEGORIES } from '@/lib/mock/mockData';
+import { READER_BORROW_LIMIT } from '@/lib/mock/mockData';
 import { APP_ROUTE } from '@/constants/routes';
 import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
 import type { IHomeBook } from '@/features/books/api/bookApi';
+import { useRecommendations } from '@/features/recommendations/hooks/useRecommendations';
+import { useCollaborativeRecommendations } from '@/features/recommendations/hooks/useCollaborativeRecommendations';
 
 function HomeBookCard({
   book,
@@ -211,6 +215,22 @@ export default function HomePage() {
 
   const { data: homeBooks, isLoading: isHomeBooksLoading } = useHomeBooks();
 
+  const { data: recommendationsData } = useRecommendations();
+  const recommendedBooks: IHomeBook[] = (recommendationsData?.data ?? []).map((r) => ({
+    book_id:          r.book_id,
+    title:            r.title,
+    cover_image:      r.cover_image,
+    available_copies: r.available_copies,
+  }));
+
+  const { data: collaborativeData } = useCollaborativeRecommendations();
+  const collaborativeBooks: IHomeBook[] = (collaborativeData?.data ?? []).map((r) => ({
+    book_id:          r.book_id,
+    title:            r.title,
+    cover_image:      r.cover_image,
+    available_copies: r.available_copies,
+  }));
+
   const handleBookClick = (bookId: number) => {
     router.push(`${APP_ROUTE.courses}/${bookId}`);
   };
@@ -265,18 +285,6 @@ export default function HomePage() {
                 </Button>
               </form>
 
-              {/* Category tags */}
-              <div className="flex flex-wrap gap-2 mt-4">
-                {READER_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => router.push(`/courses?category=${cat}`)}
-                    className="bg-white/15 hover:bg-white/25 backdrop-blur px-3 py-1.5 rounded-full text-sm transition-colors"
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Right stats (desktop only) */}
@@ -431,6 +439,20 @@ export default function HomePage() {
         ) : (
           /* ── Book collections ── */
           <>
+            <BookSection
+              title="Sách gợi ý cho bạn"
+              icon={<StarOutlined className="text-indigo-500" />}
+              books={recommendedBooks}
+              onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
+            />
+            <BookSection
+              title="Độc giả giống bạn cũng đọc"
+              icon={<TeamOutlined className="text-teal-500" />}
+              books={collaborativeBooks}
+              onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
+            />
             <BookSection
               title="Sách nổi bật"
               icon={<TrophyOutlined className="text-yellow-500" />}
