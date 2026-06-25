@@ -66,28 +66,35 @@
 
     const isFavorite = !!favoriteItem;
 
-    const handleReserveBook = async () => {
-      try {
-        setIsReserving(true);
+   const handleReserveBook = async () => {
+  try {
+    setIsReserving(true);
 
-        const { data } = await axiosInstance.post(
-          '/v1/me/reservations',
-          {
-            book_id: bookId,
-          }
-        );
-
-        message.success(
-          `Đặt trước thành công. Vị trí #${data.queue_position}`
-        );
-      } catch (error: any) {
-        message.error(
-          error?.response?.data?.message || 'Không thể kết nối máy chủ'
-        );
-      } finally {
-        setIsReserving(false);
+    const { data } = await axiosInstance.post(
+      '/v1/me/reservations',
+      {
+        book_id: bookId,
       }
-    };
+    );
+
+    message.success(
+      `Đặt trước thành công. Vị trí #${data.queue_position}`
+    );
+    queryClient.invalidateQueries({
+     queryKey: ['my-reservations'],
+    });
+
+    // Chuyển sang trang danh sách đặt trước
+    router.push('/reservations');
+
+  } catch (error: any) {
+    message.error(
+      error?.response?.data?.message || 'Không thể kết nối máy chủ'
+    );
+  } finally {
+    setIsReserving(false);
+  }
+};
 
     const handleToggleFavorite = () => {
       addItem.mutate(
@@ -293,17 +300,7 @@
                   Thêm vào yêu thích
                 </Button>
               )}
-            </div>
-            {book.available_copies === 0 && (
-              <Button
-                type="primary"
-                onClick={handleReserveBook}
-                loading={isReserving}
-                className="w-full mt-3 bg-blue-600"
-              >
-                Đặt trước sách
-              </Button>
-            )}
+         
             {/* Reading list widget */}
             <div className="mb-4">
               {!readingItem ? (
@@ -358,7 +355,17 @@
                 </div>
               )}
             </div>
-
+            </div>
+            {book.available_copies === 0 && (
+              <Button
+                type="primary"
+                onClick={handleReserveBook}
+                loading={isReserving}
+                className="w-full mt-3 bg-blue-600"
+              >
+                Đặt trước sách
+              </Button>
+            )}
             {metaRows.length > 0 && (
               <div className="border-t border-(--blackBorder) pt-4">
                 {metaRows.map(({ label, value }) => (
