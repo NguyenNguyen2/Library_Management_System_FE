@@ -1,240 +1,548 @@
-import { CopyOutlined, LockOutlined, CheckCircleOutlined, InfoCircleOutlined, UnlockOutlined } from '@ant-design/icons';
-import { Button, Flex, TableColumnsType, Tag, Tooltip, message, Card } from 'antd';
-import dayjs from 'dayjs';
-import { useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import FilterTable from '@shared/components/table/FilterTable';
-import { codeHooks } from '../../hooks/useCodes';
 import {
-  ICreateCode,
-  IDetailCode,
-  IListCode,
-  IUpdateCode,
-} from '../../types/CodeType';
+  Alert,
+  Button,
+  Card,
+  Divider,
+  Input,
+  InputRef,
+  Modal,
+  Spin,
+  Table,
+  TableColumnsType,
+  Tag,
+  message,
+} from 'antd';
+import {
+  BookOutlined,
+  DeleteOutlined,
+  SearchOutlined,
+  ScanOutlined,
+  CheckCircleOutlined,
+  UserOutlined,
+  WarningOutlined,
+} from '@ant-design/icons';
+import { useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ReaderInfo, BookCopyInfo } from '../../api/checkoutApi';
+import { checkoutHooks } from '../../hooks/useCheckout';
+import { cn } from '@shared/constants/commonConst';
+import dayjs from 'dayjs';
 
-// Status matches backend `CodeStatus` enum (code.entity.ts).
-const CODE_STATUS = { USED: 'used', UNUSED: 'unused' } as const;
-import { cn, DATE_DISPLAY_FORMAT } from '@shared/constants/commonConst';
-import { getKey } from '@shared/types/I18nKeyType';
-import ModalCreateTransaction from './components/ModalCreateTransaction';
-import { IValueLabel } from '@shared/types/UserType';
+interface SelectedBook {
+  copy_id: number;
+  barcode: string;
+  title: string;
+  condition: string;
+}
 
 const TransactionsPage = () => {
-  const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const currentTab = searchParams.get('tab') || 'borrow';
 
-  // Fetch all codes for statistics
-  const { data: allCodesData, isLoading: isStatsLoading } = codeHooks.useFetchListCodes({
-    page: 1,
-    limit: 1000,
-  });
+  const [keyword, setKeyword] = useState('');
+  const [readerResults, setReaderResults] = useState<ReaderInfo[]>([]);
+  const [selectedReader, setSelectedReader] = useState<ReaderInfo | null>(null);
+  const [barcode, setBarcode] = useState('');
+  const [selectedBooks, setSelectedBooks] = useState<SelectedBook[]>([]);
+  const barcodeRef = useRef<InputRef>(null);
 
-  const allCodes = allCodesData?.rows ?? [];
-  const totalCodesCount = allCodes.length;
-  const usedCodesCount = allCodes.filter((c) => c.status?.value === CODE_STATUS.USED).length;
-  const unusedCodesCount = allCodes.filter((c) => c.status?.value === CODE_STATUS.UNUSED).length;
-  const usageRate = totalCodesCount > 0 ? Math.round((usedCodesCount / totalCodesCount) * 100) : 0;
+  const findReaderMutation = checkoutHooks.useFindReader();
+  const validateCopyMutation = checkoutHooks.useValidateCopy();
+  const checkoutMutation = checkoutHooks.useCheckout();
 
-  const createMutation = codeHooks.useCreateCode();
-  const deleteMutation = codeHooks.useDeleteCode();
-
-  const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    message.success(t(getKey('code_copied')));
+  const handleFindReader = () => {
+    const trimmed = keyword.trim();
+    if (trimmed.length < 2) {
+      message.warning('Vui lòng nhập ít nhất 2 ký tự.');
+      return;
+    }
+    findReaderMutation.mutate(trimmed, {
+      onSuccess: (data) => {
+        setReaderResults(data);
+        setSelectedReader(null);
+        setSelectedBooks([]);
+        if (data.length === 0) {
+          message.info('Không tìm thấy độc giả nào.');
+        }
+      },
+      onError: (err) => {
+        const msg = (err.response?.data as { message?: string })?.message;
+        message.error(msg ?? 'Lỗi tìm kiếm độc giả.');
+      },
+    });
   };
 
-  const columns: TableColumnsType<IListCode> = useMemo(
-    () => [
+  const handleSelectReader = (reader: ReaderInfo) => {
+    setSelectedReader(reader);
+    setReaderResults([]);
+    setKeyword(reader.full_name);
+    setSelectedBooks([]);
+    setTimeout(() => barcodeRef.current?.focus(), 100);
+  };
+
+  const handleScanBarcode = () => {
+    const trimmed = barcode.trim();
+    if (!trimmed) return;
+
+    if (selectedBooks.some((b) => b.barcode === trimmed)) {
+      message.warning(`Barcode "${trimmed}" đã có trong danh sách.`);
+      setBarcode('');
+      return;
+    }
+
+    validateCopyMutation.mutate(trimmed, {
+      onSuccess: (copy: BookCopyInfo) => {
+        setSelectedBooks((prev) => [
+          ...prev,
+          {
+            copy_id: copy.copy_id,
+            barcode: copy.barcode,
+            title: copy.book.title,
+            condition: copy.condition,
+          },
+        ]);
+        setBarcode('');
+        barcodeRef.current?.focus();
+      },
+      onError: (err) => {
+        const msg = (err.response?.data as { message?: string })?.message;
+        message.error(msg ?? 'Barcode không hợp lệ hoặc không thể mượn.');
+        setBarcode('');
+        barcodeRef.current?.focus();
+      },
+    });
+  };
+
+  const handleRemoveBook = (copyId: number) => {
+    setSelectedBooks((prev) => prev.filter((b) => b.copy_id !== copyId));
+  };
+
+  const canCheckout =
+    selectedReader !== null &&
+    selectedReader.can_borrow &&
+    selectedBooks.length > 0 &&
+    !checkoutMutation.isPending;
+
+  const handleCheckout = () => {
+    if (!selectedReader) return;
+
+    const totalAfter = selectedReader.borrowing_count + selectedBooks.length;
+    if (totalAfter > selectedReader.borrow_limit) {
+      message.error(
+        `Vượt hạn mức: đang mượn ${selectedReader.borrowing_count}, thêm ${selectedBooks.length}, giới hạn ${selectedReader.borrow_limit}.`
+      );
+      return;
+    }
+
+    checkoutMutation.mutate(
       {
-        title: t(getKey('code')),
-        dataIndex: 'code',
-        key: 'code',
-        fixed: 'left',
-        width: 180,
-        render: (code: string) => (
-          <Flex gap={8} align="center">
-            <span
-              className={cn(
-                'rounded bg-bgAdvanceSection px-2 py-1 font-mono text-sm font-bold text-navyDark'
-              )}
-            >
-              {code}
-            </span>
-            <Tooltip title={t(getKey('copy_code'))}>
-              <Button
-                type="text"
-                size="small"
-                icon={<CopyOutlined />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopyCode(code);
-                }}
-                className="hover:bg-gray-100"
-              />
-            </Tooltip>
-          </Flex>
-        ),
+        user_id: selectedReader.user_id,
+        copy_ids: selectedBooks.map((b) => b.copy_id),
       },
       {
-        title: t(getKey('assigned_to')),
-        dataIndex: 'userInfo',
-        key: 'userInfo',
-        ellipsis: true,
-        className: 'font-semibold text-navyDark text-left',
-        render: (userInfo: IValueLabel | undefined) =>
-          userInfo?.label || <span className="text-gray-400">—</span>,
-      },
-      {
-        title: t(getKey('course')),
-        dataIndex: 'coursesInfo',
-        key: 'coursesInfo',
-        className: 'text-left',
-        render: (coursesInfo: IValueLabel[] | undefined) => (
-          <Flex gap={4} wrap="wrap">
-            {coursesInfo && coursesInfo.length > 0 ? (
-              coursesInfo.map((course) => (
-                <Tag
-                  key={course.value}
-                  color="blue"
-                  className="!m-0 !whitespace-nowrap !rounded-md border-0 font-medium"
-                >
-                  {course.label}
-                </Tag>
-              ))
-            ) : (
-              <span className="text-gray-400">—</span>
-            )}
-          </Flex>
-        ),
-      },
-      {
-        title: t(getKey('created_date')),
-        dataIndex: 'createdAt',
-        key: 'createdAt',
-        width: 120,
-        render: (date: string) =>
-          date ? dayjs(date).format(DATE_DISPLAY_FORMAT) : '',
-      },
-      {
-        title: t(getKey('status')),
-        dataIndex: 'status',
-        key: 'status',
-        width: 140,
-        render: (status: { value?: string; label?: string } | undefined) => {
-          const isUsed = status?.value === CODE_STATUS.USED;
-          return (
-            <Tag
-              className={cn('!rounded-full !px-2.5 !py-0.5 font-medium border-0')}
-              color={isUsed ? 'success' : 'default'}
-            >
-              {status?.label || t(getKey('status_unused'))}
-            </Tag>
-          );
+        onSuccess: (result) => {
+          Modal.success({
+            title: 'Tạo phiếu mượn thành công',
+            content: (
+              <div className="space-y-1 mt-2">
+                <p className="m-0">
+                  <strong>Mã phiếu:</strong> #{result.borrow_id}
+                </p>
+                <p className="m-0">
+                  <strong>Độc giả:</strong> {result.reader.full_name}
+                </p>
+                <p className="m-0">
+                  <strong>Hạn trả:</strong>{' '}
+                  {dayjs(result.due_date).format('DD/MM/YYYY')}
+                </p>
+                <p className="m-0">
+                  <strong>Số sách:</strong> {result.books.length} cuốn
+                </p>
+              </div>
+            ),
+            okText: 'Đóng',
+          });
+          setSelectedReader(null);
+          setSelectedBooks([]);
+          setKeyword('');
+          setBarcode('');
+          setReaderResults([]);
         },
+        onError: (err) => {
+          const msg = (err.response?.data as { message?: string })?.message;
+          message.error(msg ?? 'Có lỗi xảy ra khi tạo phiếu mượn.');
+        },
+      }
+    );
+  };
+
+  const bookColumns: TableColumnsType<SelectedBook> = [
+    {
+      title: 'Barcode',
+      dataIndex: 'barcode',
+      key: 'barcode',
+      width: 140,
+      render: (v: string) => (
+        <span className="font-mono font-semibold text-navyDark">{v}</span>
+      ),
+    },
+    {
+      title: 'Tên sách',
+      dataIndex: 'title',
+      key: 'title',
+      ellipsis: true,
+    },
+    {
+      title: 'Tình trạng',
+      dataIndex: 'condition',
+      key: 'condition',
+      width: 110,
+      render: (v: string) => {
+        const colorMap: Record<string, string> = {
+          good: 'green',
+          fair: 'orange',
+          poor: 'red',
+        };
+        return (
+          <Tag color={colorMap[v] ?? 'default'}>
+            {v === 'good' ? 'Tốt' : v === 'fair' ? 'Bình thường' : v === 'poor' ? 'Kém' : v}
+          </Tag>
+        );
       },
-    ],
-    [t]
-  );
+    },
+    {
+      title: '',
+      key: 'action',
+      width: 48,
+      render: (_: unknown, record: SelectedBook) => (
+        <Button
+          type="text"
+          danger
+          size="small"
+          icon={<DeleteOutlined />}
+          onClick={() => handleRemoveBook(record.copy_id)}
+        />
+      ),
+    },
+  ];
 
-  return (
-    <div className="max-w-[1400px] mx-auto flex flex-col gap-6">
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-left">
-        <Card
-          className="!rounded-[10px] border border-gray-200 shadow-sm"
-          bodyStyle={{ padding: '16px' }}
-          loading={isStatsLoading}
-        >
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-50 p-2.5 rounded-lg shrink-0 flex items-center justify-center">
-              <LockOutlined style={{ fontSize: 20 }} className="text-blue-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 m-0 font-medium">Tổng số thẻ</p>
-              <p className="m-0 text-[20px] font-bold text-navyDark mt-0.5">{totalCodesCount}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card
-          className="!rounded-[10px] border border-gray-200 shadow-sm"
-          bodyStyle={{ padding: '16px' }}
-          loading={isStatsLoading}
-        >
-          <div className="flex items-center gap-3">
-            <div className="bg-emerald-50 p-2.5 rounded-lg shrink-0 flex items-center justify-center">
-              <CheckCircleOutlined style={{ fontSize: 20 }} className="text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 m-0 font-medium">Đã kích hoạt</p>
-              <p className="m-0 text-[20px] font-bold text-emerald-600 mt-0.5">{usedCodesCount}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card
-          className="!rounded-[10px] border border-gray-200 shadow-sm"
-          bodyStyle={{ padding: '16px' }}
-          loading={isStatsLoading}
-        >
-          <div className="flex items-center gap-3">
-            <div className="bg-amber-50 p-2.5 rounded-lg shrink-0 flex items-center justify-center">
-              <UnlockOutlined style={{ fontSize: 20 }} className="text-amber-500" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 m-0 font-medium">Chưa sử dụng</p>
-              <p className="m-0 text-[20px] font-bold text-amber-500 mt-0.5">{unusedCodesCount}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card
-          className="!rounded-[10px] border border-gray-200 shadow-sm"
-          bodyStyle={{ padding: '16px' }}
-          loading={isStatsLoading}
-        >
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-50 p-2.5 rounded-lg shrink-0 flex items-center justify-center">
-              <InfoCircleOutlined style={{ fontSize: 20 }} className="text-purple-600" />
-            </div>
-            <div>
-              <p className="text-xs text-gray-500 m-0 font-medium">Tỷ lệ kích hoạt</p>
-              <p className="m-0 text-[20px] font-bold text-purple-600 mt-0.5">{usageRate}%</p>
-            </div>
-          </div>
+  // Render reservations tab if specified in query params
+  if (currentTab === 'reservations') {
+    return (
+      <div className="max-w-[1300px] mx-auto flex flex-col gap-6">
+        <div className="flex flex-col gap-1">
+          <h1 className="m-0 text-xl font-bold text-navyDark">Gia hạn & Đặt trước</h1>
+          <p className="m-0 text-gray-500 text-sm">Quản lý gia hạn sách và danh sách đặt trước của độc giả</p>
+        </div>
+        <Card className="!rounded-[10px] border border-gray-200 shadow-sm text-center py-12">
+          <p className="text-gray-500 m-0 text-base">Chức năng Gia hạn & Đặt trước đang được cập nhật...</p>
         </Card>
       </div>
+    );
+  }
 
-      <FilterTable<IListCode, IDetailCode, ICreateCode, IUpdateCode>
-        pageTitle={t(getKey('code_management'))}
-        pageSubtitle={t(getKey('code_management_desc'))}
-        title={t(getKey('code_list'))}
-        createButtonLabel={t(getKey('create_code'))}
-        columns={columns}
-        useQueryHook={codeHooks.useFetchListCodes}
-        actions={{
-          isDetail: false,
-          isEdit: false,
-          isDelete: true,
-          isDeleteDisabled: (record) =>
-            (record as IListCode).status?.value === CODE_STATUS.USED,
-        }}
-        deleteInfo={{
-          type: 'modal',
-          modalInfo: {
-            modalContent: null,
-            modalProps: {},
-            modalFunc: deleteMutation,
-          },
-        }}
-        createInfo={{
-          type: 'modal',
-          modalInfo: {
-            modalContent: <ModalCreateTransaction />,
-            modalProps: {},
-            modalFunc: createMutation,
-          },
-        }}
-      />
+  // Default layout: Checkout/Borrowing
+  return (
+    <div className="max-w-[1300px] mx-auto flex flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="m-0 text-xl font-bold text-navyDark">Mượn trả sách</h1>
+        <p className="m-0 text-gray-500 text-sm">Tạo phiếu mượn sách cho độc giả</p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column */}
+        <div className="lg:col-span-2 flex flex-col gap-5">
+          {/* Step 1: Find Reader */}
+          <Card
+            title={
+              <span className="flex items-center gap-2 font-semibold">
+                <UserOutlined className="text-blue-500" />
+                Bước 1 — Tìm độc giả
+              </span>
+            }
+            className="!rounded-[10px] border border-gray-200 shadow-sm"
+          >
+            <div className="flex gap-2">
+              <Input
+                placeholder="Tìm theo tên hoặc mã thẻ (ít nhất 2 ký tự)..."
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                onPressEnter={handleFindReader}
+                prefix={<SearchOutlined className="text-gray-400" />}
+                allowClear
+                onClear={() => {
+                  setKeyword('');
+                  setReaderResults([]);
+                  setSelectedReader(null);
+                  setSelectedBooks([]);
+                }}
+              />
+              <Button
+                type="primary"
+                onClick={handleFindReader}
+                loading={findReaderMutation.isPending}
+                icon={<SearchOutlined />}
+              >
+                Tìm
+              </Button>
+            </div>
+
+            {/* Search results */}
+            {readerResults.length > 0 && (
+              <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden divide-y divide-gray-100">
+                {readerResults.map((r) => (
+                  <button
+                    key={r.user_id}
+                    onClick={() => handleSelectReader(r)}
+                    className={cn(
+                      'w-full text-left px-4 py-3 flex items-center justify-between bg-white hover:bg-blue-50 cursor-pointer border-0 transition-colors'
+                    )}
+                  >
+                    <div>
+                      <p className="m-0 font-semibold text-navyDark text-sm">{r.full_name}</p>
+                      <p className="m-0 text-xs text-gray-500">
+                        {r.library_card?.card_number ?? 'Chưa có thẻ'} · {r.email}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {r.can_borrow ? (
+                        <Tag color="green">Có thể mượn</Tag>
+                      ) : (
+                        <Tag color="red">Không thể mượn</Tag>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Selected reader card */}
+            {selectedReader && (
+              <div className="mt-3">
+                <div
+                  className={cn(
+                    'rounded-lg border p-4',
+                    selectedReader.can_borrow
+                      ? 'border-green-200 bg-green-50'
+                      : 'border-red-200 bg-red-50'
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <p className="m-0 font-bold text-navyDark">{selectedReader.full_name}</p>
+                      <p className="m-0 text-sm text-gray-600">
+                        Mã thẻ:{' '}
+                        <span className="font-mono font-semibold">
+                          {selectedReader.library_card?.card_number ?? '—'}
+                        </span>
+                      </p>
+                      <p className="m-0 text-sm text-gray-600">
+                        Đang mượn:{' '}
+                        <strong>
+                          {selectedReader.borrowing_count}/{selectedReader.borrow_limit}
+                        </strong>{' '}
+                        quyển
+                      </p>
+                      {selectedReader.unpaid_fines > 0 && (
+                        <p className="m-0 text-sm text-red-600 font-medium">
+                          Nợ phí:{' '}
+                          {new Intl.NumberFormat('vi-VN').format(selectedReader.unpaid_fines)} VND
+                        </p>
+                      )}
+                    </div>
+                    {selectedReader.can_borrow ? (
+                      <CheckCircleOutlined className="text-green-500 text-xl shrink-0" />
+                    ) : (
+                      <WarningOutlined className="text-red-500 text-xl shrink-0" />
+                    )}
+                  </div>
+
+                  {selectedReader.warnings.length > 0 && (
+                    <div className="mt-3 space-y-1">
+                      {selectedReader.warnings.map((w, i) => (
+                        <Alert key={i} message={w} type="warning" showIcon className="!py-1 !px-3 text-xs" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </Card>
+
+          {/* Step 2: Scan Barcode */}
+          <Card
+            title={
+              <span className="flex items-center gap-2 font-semibold">
+                <ScanOutlined className="text-blue-500" />
+                Bước 2 — Quét barcode sách
+              </span>
+            }
+            className="!rounded-[10px] border border-gray-200 shadow-sm"
+          >
+            <div className="flex gap-2">
+              <Input
+                ref={barcodeRef}
+                placeholder="Quét hoặc nhập barcode, nhấn Enter..."
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                onPressEnter={handleScanBarcode}
+                prefix={<BookOutlined className="text-gray-400" />}
+                disabled={!selectedReader || !selectedReader.can_borrow}
+                allowClear
+              />
+              <Button
+                type="default"
+                onClick={handleScanBarcode}
+                loading={validateCopyMutation.isPending}
+                disabled={!selectedReader || !selectedReader.can_borrow || !barcode.trim()}
+                icon={<ScanOutlined />}
+              >
+                Thêm
+              </Button>
+            </div>
+
+            {!selectedReader && (
+              <p className="mt-2 text-xs text-gray-400">Tìm và chọn độc giả trước khi quét sách.</p>
+            )}
+
+            {selectedBooks.length > 0 && (
+              <>
+                <Divider className="!my-4" />
+                <Table<SelectedBook>
+                  dataSource={selectedBooks}
+                  columns={bookColumns}
+                  rowKey="copy_id"
+                  pagination={false}
+                  size="small"
+                  locale={{ emptyText: 'Chưa có sách nào được thêm' }}
+                />
+              </>
+            )}
+          </Card>
+        </div>
+
+        {/* Right column — Summary */}
+        <div className="lg:col-span-1">
+          <Card
+            title={
+              <span className="flex items-center gap-2 font-semibold">
+                <CheckCircleOutlined className="text-blue-500" />
+                Bước 3 — Xác nhận mượn
+              </span>
+            }
+            className="!rounded-[10px] border border-gray-200 shadow-sm lg:sticky lg:top-6"
+          >
+            <div className="space-y-4">
+              {/* Reader summary */}
+              <div>
+                <p className="text-xs text-gray-400 uppercase font-medium mb-2">Độc giả</p>
+                {selectedReader ? (
+                  <div className="space-y-1">
+                    <p className="m-0 font-semibold text-navyDark">{selectedReader.full_name}</p>
+                    <p className="m-0 text-sm text-gray-500">
+                      {selectedReader.library_card?.card_number ?? 'Chưa có thẻ'}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="m-0 text-sm text-gray-400 italic">Chưa chọn độc giả</p>
+                )}
+              </div>
+
+              <Divider className="!my-3" />
+
+              {/* Borrow info */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Đang mượn</span>
+                  <span className="font-medium">
+                    {selectedReader ? selectedReader.borrowing_count : '—'}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Thêm hôm nay</span>
+                  <span className="font-medium text-blue-600">{selectedBooks.length} quyển</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Giới hạn</span>
+                  <span className="font-medium">
+                    {selectedReader ? selectedReader.borrow_limit : '—'}
+                  </span>
+                </div>
+              </div>
+
+              <Divider className="!my-3" />
+
+              {/* Selected books list */}
+              <div>
+                <p className="text-xs text-gray-400 uppercase font-medium mb-2">
+                  Sách được chọn ({selectedBooks.length})
+                </p>
+                {selectedBooks.length === 0 ? (
+                  <p className="text-sm text-gray-400 italic">Chưa có sách nào</p>
+                ) : (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {selectedBooks.map((b) => (
+                      <div
+                        key={b.copy_id}
+                        className="flex items-center gap-2 text-sm p-2 bg-gray-50 rounded"
+                      >
+                        <BookOutlined className="text-blue-400 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="m-0 font-mono text-xs text-gray-500">{b.barcode}</p>
+                          <p className="m-0 truncate text-navyDark">{b.title}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Divider className="!my-3" />
+
+              {/* Checkout button */}
+              <Button
+                type="primary"
+                size="large"
+                block
+                disabled={!canCheckout}
+                loading={checkoutMutation.isPending}
+                onClick={handleCheckout}
+                icon={<CheckCircleOutlined />}
+              >
+                Tạo phiếu mượn
+              </Button>
+
+              {selectedReader && !selectedReader.can_borrow && (
+                <Alert
+                  message="Độc giả không đủ điều kiện mượn"
+                  type="error"
+                  showIcon
+                  className="!text-xs"
+                />
+              )}
+
+              {selectedReader &&
+                selectedReader.can_borrow &&
+                selectedReader.borrowing_count + selectedBooks.length >
+                  selectedReader.borrow_limit && (
+                  <Alert
+                    message={`Vượt hạn mức: tổng ${selectedReader.borrowing_count + selectedBooks.length}/${selectedReader.borrow_limit} quyển`}
+                    type="error"
+                    showIcon
+                    className="!text-xs"
+                  />
+                )}
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Loading overlay for validateCopy */}
+      {validateCopyMutation.isPending && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <Spin size="large" />
+        </div>
+      )}
     </div>
   );
 };

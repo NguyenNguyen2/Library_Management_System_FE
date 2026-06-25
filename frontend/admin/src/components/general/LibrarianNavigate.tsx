@@ -93,9 +93,11 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
       to: ROUTES.TRANSACTIONS,
       badge: 12,
       children: [
-        { label: 'Mượn / Trả sách', to: ROUTES.TRANSACTIONS },
-        { label: 'Gia hạn & Đặt trước', to: ROUTES.TRANSACTIONS + '?tab=reservations' },
-        { label: 'Lịch sử giao dịch', to: ROUTES.DASHBOARD },
+        { label: 'Mượn sách (Check-out)', to: ROUTES.TRANSACTIONS },
+        { label: 'Trả sách (Check-in)', to: ROUTES.RETURN },
+        { label: 'Gia hạn', to: ROUTES.RENEW },
+        { label: 'Đặt trước', to: ROUTES.RESERVATION },
+        { label: 'Lịch sử giao dịch', to: ROUTES.TRANSACTION_LOG },
       ],
     },
     {
@@ -140,6 +142,14 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
     if (!pathname) return;
     const path = pathname.pathname + pathname.search;
     setSelectItem(path);
+
+    // Auto-expand parent menu if a child is active
+    const activeParent = menuConfig.find((item) =>
+      item.children?.some((child) => child.to === path)
+    );
+    if (activeParent) {
+      setOpenMenu(activeParent.key);
+    }
   }, [pathname]);
 
   const handleLogout = () => {

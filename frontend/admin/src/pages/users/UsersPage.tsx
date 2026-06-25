@@ -2,7 +2,7 @@ import { TableColumnsType, Tag, Card, Table, Button, Input, Select, Modal, Form,
 import dayjs from 'dayjs';
 import { useMemo, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   UserOutlined,
   TrophyOutlined,
@@ -16,7 +16,9 @@ import {
   KeyOutlined,
   SearchOutlined,
   ReloadOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
+import { ROUTES } from '../../constants/routers';
 import FilterTable from '@shared/components/table/FilterTable';
 import { userHooks } from '../../hooks/useUsers';
 import {
@@ -634,6 +636,7 @@ const AuditLogsSection = () => {
 
 const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; onTriggerReset: () => void }) => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
@@ -884,9 +887,16 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
       {
         title: 'Thao tác',
         key: 'actions',
-        width: 150,
+        width: 180,
         render: (_: any, record: any, index: number) => (
-          <Space size="middle">
+          <Space size="small">
+            <Tooltip title="Lịch sử độc giả">
+              <Button
+                type="text"
+                icon={<HistoryOutlined className="text-indigo-500" />}
+                onClick={() => navigate(ROUTES.USER_HISTORY.replace(':userId', String(record.id)))}
+              />
+            </Tooltip>
             <Tooltip title="Chỉnh sửa">
               <Button
                 type="text"
