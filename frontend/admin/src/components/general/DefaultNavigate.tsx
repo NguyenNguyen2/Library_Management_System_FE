@@ -91,7 +91,7 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       children: [
         { label: t(getKey('menu_borrow_return')), to: ROUTES.TRANSACTIONS },
         { label: t(getKey('menu_renew_reserve')), to: ROUTES.TRANSACTIONS + '?tab=reservations' },
-        { label: t(getKey('menu_transaction_history')), to: ROUTES.DASHBOARD },
+        { label: t(getKey('menu_transaction_history')), to: ROUTES.TRANSACTION_LOG },
         { label: t(getKey('user_management')), to: ROUTES.USERS },
       ],
     },
