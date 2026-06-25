@@ -89,10 +89,11 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       to: ROUTES.TRANSACTIONS,
       badge: 47,
       children: [
-        { label: t(getKey('menu_borrow_return')), to: ROUTES.TRANSACTIONS },
-        { label: t(getKey('menu_renew_reserve')), to: ROUTES.TRANSACTIONS + '?tab=reservations' },
+        { label: t(getKey('checkout_title')), to: ROUTES.TRANSACTIONS },
+        { label: t(getKey('return_title')), to: ROUTES.RETURN },
+        { label: t(getKey('renew_title')), to: ROUTES.RENEW },
+        { label: t(getKey('reservation_title')), to: ROUTES.RESERVATION },
         { label: t(getKey('menu_transaction_history')), to: ROUTES.TRANSACTION_LOG },
-        { label: t(getKey('user_management')), to: ROUTES.USERS },
       ],
     },
     {
