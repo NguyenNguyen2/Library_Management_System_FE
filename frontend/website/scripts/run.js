@@ -12,11 +12,11 @@ const nextBin = path.join(path.dirname(nextPkgPath), 'dist', 'bin', 'next');
 const env = { ...process.env };
 
 // if (Number(process.versions.node.split('.')[0]) < 22)
-if (Number(process.versions.node.split('.')[0]) >= 22) {
-  env.NODE_OPTIONS = [env.NODE_OPTIONS, '--no-webstorage']
-    .filter(Boolean)
-    .join(' ');
-}
+// if (Number(process.versions.node.split('.')[0]) >= 22) {
+//   env.NODE_OPTIONS = [env.NODE_OPTIONS, '--no-webstorage']
+//     .filter(Boolean)
+//     .join(' ');
+// }
 
 const result = spawnSync(process.execPath, [nextBin, ...process.argv.slice(2)], {
   stdio: 'inherit',
