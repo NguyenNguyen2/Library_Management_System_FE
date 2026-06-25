@@ -18,7 +18,8 @@ import {
   Tabs,
   Drawer,
   List,
-  Descriptions
+  Descriptions,
+  Upload
 } from 'antd';
 import {
   Plus,
@@ -38,7 +39,14 @@ import {
   Calendar,
   Eye,
   CheckCircle2,
-  XCircle
+  XCircle,
+  QrCode,
+  Archive,
+  Upload as UploadIcon,
+  FileBarChart,
+  Layers,
+  Printer,
+  Download
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -63,6 +71,14 @@ import {
   deleteAuthor,
   getAuthorDetail
 } from '../../services/authorService';
+import {
+  getBookCopies,
+  createBookCopy,
+  updateBookCopy,
+  deleteBookCopy,
+  importCopies,
+  getInventorySummary
+} from '../../services/copyService';
 
 type Author = {
   author_id: number;
@@ -156,6 +172,186 @@ export function BooksListPage() {
   const [isAuthorProfileOpen, setIsAuthorProfileOpen] = useState(false);
   const [profileAuthor, setProfileAuthor] = useState<any>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+
+  // Book copies management states
+  const [copies, setCopies] = useState<any[]>([]);
+  const [copiesLoading, setCopiesLoading] = useState(false);
+  const [copiesPage, setCopiesPage] = useState(1);
+  const [totalCopies, setTotalCopies] = useState(0);
+  const [copiesSearchText, setCopiesSearchText] = useState('');
+  const [copiesStats, setCopiesStats] = useState({ available: 0, borrowed: 0, reserved: 0, lost: 0, total: 0 });
+  const [selectedCopyKeys, setSelectedCopyKeys] = useState<React.Key[]>([]);
+  const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+  const [editingCopy, setEditingCopy] = useState<any | null>(null);
+  const [selectBooks, setSelectBooks] = useState<Book[]>([]);
+  const [copyForm] = Form.useForm();
+  const [addCopyForm] = Form.useForm();
+  const [isRetireModalOpen, setIsRetireModalOpen] = useState(false);
+  const [retiringCopyId, setRetiringCopyId] = useState<number | null>(null);
+  const [retireForm] = Form.useForm();
+  const [importResult, setImportResult] = useState<any | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  // Warehouse report states
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryCategoryId, setSummaryCategoryId] = useState<number | undefined>(undefined);
+
+  const nowYMD = () => {
+    const d = new Date();
+    const month = '' + (d.getMonth() + 1);
+    const day = '' + d.getDate();
+    const year = d.getFullYear();
+    return [year, month.padStart(2, '0'), day.padStart(2, '0')].join('-');
+  };
+
+  const loadCopies = async (page = 1, query = '') => {
+    setCopiesLoading(true);
+    try {
+      const res = await getBookCopies(page, query);
+      if (res) {
+        setCopies(res.data || []);
+        setTotalCopies(res.total || 0);
+        setCopiesPage(res.current_page || 1);
+        if (res.stats) {
+          setCopiesStats(res.stats);
+        }
+      }
+    } catch (err: any) {
+      console.error(err);
+      message.error("Lỗi khi tải danh sách bản sao!");
+    } finally {
+      setCopiesLoading(false);
+    }
+  };
+
+  const loadSelectBooks = async (query = '') => {
+    try {
+      const res = await getBooks(1, query);
+      if (res && res.data) {
+        setSelectBooks(res.data);
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải sách:", err);
+    }
+  };
+
+  const openCopyModal = (copy: any | null = null) => {
+    setEditingCopy(copy);
+    setIsCopyModalOpen(true);
+    if (copy) {
+      copyForm.setFieldsValue({
+        barcode: copy.barcode,
+        shelf_location: copy.location === 'Chưa xếp kệ' ? '' : copy.location,
+        condition: copy.condition,
+        status: copy.status,
+        acquisition_date: copy.acquired
+      });
+    } else {
+      copyForm.resetFields();
+      copyForm.setFieldsValue({
+        condition: 'good',
+        status: 'available',
+        acquisition_date: nowYMD()
+      });
+    }
+  };
+
+  const handleSaveCopy = async (values: any) => {
+    try {
+      if (editingCopy) {
+        await updateBookCopy(editingCopy.copy_id, {
+          barcode: values.barcode,
+          shelf_location: values.shelf_location,
+          condition: values.condition,
+          status: values.status,
+          acquisition_date: values.acquisition_date
+        });
+        message.success("Cập nhật bản sao thành công!");
+      } else {
+        await createBookCopy({
+          book_id: values.book_id,
+          barcode: values.barcode,
+          shelf_location: values.shelf_location,
+          condition: values.condition,
+          status: values.status,
+          acquisition_date: values.acquisition_date
+        });
+        message.success("Thêm mới bản sao thành công!");
+      }
+      setIsCopyModalOpen(false);
+      loadCopies(copiesPage, copiesSearchText);
+    } catch (err: any) {
+      console.error(err);
+      message.error(err?.response?.data?.message || "Lỗi khi lưu bản sao!");
+    }
+  };
+
+  const openRetireModal = (copyId: number) => {
+    setRetiringCopyId(copyId);
+    setIsRetireModalOpen(true);
+    retireForm.setFieldsValue({
+      reason: 'Hư hỏng nặng không thể sửa',
+      retired_date: nowYMD(),
+      note: ''
+    });
+  };
+
+  const handleSaveRetire = async (values: any) => {
+    if (!retiringCopyId) return;
+    try {
+      await deleteBookCopy(retiringCopyId, {
+        reason: values.reason,
+        retired_date: values.retired_date,
+        note: values.note
+      });
+      message.success("Thanh lý bản sao thành công!");
+      setIsRetireModalOpen(false);
+      loadCopies(copiesPage, copiesSearchText);
+    } catch (err: any) {
+      console.error(err);
+      message.error(err?.response?.data?.message || "Lỗi khi thanh lý bản sao!");
+    }
+  };
+ 
+  const handleImportExcel = async (file: File) => {
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const res = await importCopies(file);
+      if (res) {
+        setImportResult({
+          successCount: res.success_count,
+          errors: res.errors || [],
+          errorCsv: res.error_csv || null
+        });
+        if (res.errors && res.errors.length > 0) {
+          message.warning(`Nhập kho hoàn tất với một số lỗi! Thành công: ${res.success_count}, Thất bại: ${res.errors.length}`);
+        } else {
+          message.success(`Nhập kho thành công toàn bộ! Số lượng: ${res.success_count}`);
+        }
+        loadCopies(1);
+      }
+    } catch (err: any) {
+      console.error(err);
+      message.error(err?.response?.data?.message || "Lỗi hệ thống khi tải file!");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const loadSummaryReport = async (categoryId?: number) => {
+    setSummaryLoading(true);
+    try {
+      const res = await getInventorySummary(categoryId);
+      setSummaryData(res);
+    } catch (err: any) {
+      console.error(err);
+      message.error("Lỗi khi tải số liệu báo cáo kho!");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
 
   // Filter dropdown data
   const [filterData, setFilterData] = useState<{
@@ -288,6 +484,24 @@ export function BooksListPage() {
       loadAuthorsData(1);
     }
   }, [activeTab]);
+
+  // Trigger loading copy list
+  useEffect(() => {
+    if (activeTab === 'copies') {
+      const delayDebounceFn = setTimeout(() => {
+        loadCopies(1, copiesSearchText);
+      }, 300);
+
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [copiesSearchText, activeTab]);
+
+  // Trigger loading report summary data
+  useEffect(() => {
+    if (activeTab === 'report') {
+      loadSummaryReport(summaryCategoryId);
+    }
+  }, [activeTab, summaryCategoryId]);
 
   // View Author Profile Page (Drawer)
   const viewAuthorProfile = async (id: number) => {
@@ -693,6 +907,154 @@ export function BooksListPage() {
     }
   ];
 
+  const copiesColumns = [
+    {
+      title: 'Mã bản sao',
+      dataIndex: 'copy_id',
+      key: 'copy_id',
+      width: 110,
+      render: (id: number) => <span className="font-mono text-gray-500 font-semibold">CP-{id}</span>
+    },
+    {
+      title: 'Tên sách',
+      dataIndex: 'book_title',
+      key: 'book_title',
+      className: 'font-semibold text-gray-800 text-left',
+    },
+    {
+      title: 'Barcode',
+      dataIndex: 'barcode',
+      key: 'barcode',
+      width: 130,
+      render: (barcode: string) => <span className="font-mono text-xs text-gray-600 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">{barcode}</span>
+    },
+    {
+      title: 'Vị trí',
+      dataIndex: 'location',
+      key: 'location',
+      width: 120,
+      render: (loc: string) => <span className="text-gray-700">{loc}</span>
+    },
+    {
+      title: 'Tình trạng',
+      dataIndex: 'condition',
+      key: 'condition',
+      width: 120,
+      render: (cond: string) => {
+        let label = 'Tốt';
+        let color = 'success';
+        if (cond === 'new') {
+          label = 'Mới';
+          color = 'blue';
+        } else if (cond === 'old') {
+          label = 'Cũ';
+          color = 'default';
+        } else if (cond === 'light') {
+          label = 'Hỏng nhẹ';
+          color = 'warning';
+        } else if (cond === 'heavy') {
+          label = 'Hỏng nặng';
+          color = 'error';
+        }
+        return (
+          <Tag color={color} className="!rounded-md border-0 font-medium text-xs">
+            {label}
+          </Tag>
+        );
+      }
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 130,
+      render: (status: string) => {
+        let label = 'Có sẵn';
+        let color = 'green';
+        if (status === 'borrowed') {
+          label = 'Đang mượn';
+          color = 'blue';
+        } else if (status === 'reserved') {
+          label = 'Đặt trước';
+          color = 'orange';
+        } else if (status === 'maintenance') {
+          label = 'Bảo trì';
+          color = 'purple';
+        } else if (status === 'lost') {
+          label = 'Mất/Hỏng';
+          color = 'red';
+        } else if (status === 'liquidated') {
+          label = 'Đã thanh lý';
+          color = 'default';
+        }
+        return (
+          <Tag color={color} className="!rounded-full border-0 font-semibold text-xs px-2.5">
+            {label}
+          </Tag>
+        );
+      }
+    },
+    {
+      title: 'Ngày nhập',
+      dataIndex: 'acquired',
+      key: 'acquired',
+      width: 120,
+      render: (date: string) => <span className="text-gray-500 text-xs">{date}</span>
+    },
+    {
+      title: 'Thao tác',
+      key: 'action',
+      width: 140,
+      render: (_: any, record: any) => (
+        <Space size="middle">
+          <Tooltip title="In QR Barcode">
+            <Button
+              type="text"
+              icon={<QrCode size={16} className="text-blue-600 hover:text-blue-800" />}
+              onClick={() => {
+                Modal.info({
+                  title: 'Mã QR Bản sao: ' + record.barcode,
+                  content: (
+                    <div className="flex flex-col items-center justify-center p-4">
+                      <div className="border p-4 bg-white rounded-lg shadow-sm">
+                        <img 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${record.barcode}`} 
+                          alt="QR Code" 
+                          className="w-[150px] h-[150px]"
+                        />
+                      </div>
+                      <p className="mt-3 font-mono font-bold text-gray-700">{record.barcode}</p>
+                      <p className="text-xs text-gray-400 mt-1">{record.book_title}</p>
+                    </div>
+                  ),
+                  centered: true,
+                });
+              }}
+              className="flex items-center justify-center p-1 rounded hover:bg-blue-50 border-0"
+            />
+          </Tooltip>
+          <Tooltip title="Sửa bản sao">
+            <Button
+              type="text"
+              icon={<Edit size={16} className="text-amber-500 hover:text-amber-700" />}
+              onClick={() => openCopyModal(record)}
+              className="flex items-center justify-center p-1 rounded hover:bg-amber-50 border-0"
+            />
+          </Tooltip>
+          <Tooltip title="Thanh lý bản sao">
+            <Button
+              type="text"
+              icon={<Trash2 size={16} className={record.status === 'liquidated' ? "text-gray-300" : "text-red-500 hover:text-red-700"} />}
+              onClick={() => openRetireModal(record.copy_id)}
+              disabled={record.status === 'liquidated'}
+              className="flex items-center justify-center p-1 rounded hover:bg-red-50 border-0"
+            />
+          </Tooltip>
+        </Space>
+      )
+    }
+  ];
+
   // Tab change handlers mapped to SearchParams URL sync
   const handleTabChange = (key: string) => {
     setSearchParams({ tab: key });
@@ -701,14 +1063,16 @@ export function BooksListPage() {
   const totalDistinctBooks = totalBooks;
   const featuredBooksCount = books.filter(b => b.is_featured).length;
 
+  const isWarehouseTab = ['copies', 'add-copy', 'import', 'report'].includes(activeTab);
+
   return (
     <div className="max-w-[1400px] mx-auto flex flex-col gap-4 animate-fade-in text-left">
       
-      {/* Tab Navigation header */}
-      <Tabs activeKey={activeTab} onChange={handleTabChange} type="card" className="book-tabs font-semibold">
-        
-        {/* TAB 1: BOOK LIST */}
-        <Tabs.TabPane tab={<span><BookOpen size={14} className="inline mr-1" /> Danh sách sách</span>} key="list">
+      {!isWarehouseTab && (
+        <Tabs activeKey={activeTab} onChange={handleTabChange} type="card" className="book-tabs font-semibold">
+          
+          {/* TAB 1: BOOK LIST */}
+          <Tabs.TabPane tab={<span><BookOpen size={14} className="inline mr-1" /> Danh sách sách</span>} key="list">
           <div className="flex flex-col gap-6">
             {/* STATS OVERVIEW CARDS */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1024,6 +1388,548 @@ export function BooksListPage() {
         </Tabs.TabPane>
 
       </Tabs>
+      )}
+
+      {/* TAB 4: COPIES LIST (QUẢN LÝ KHO) */}
+      {activeTab === 'copies' && (
+        <div className="flex flex-col gap-6 text-left">
+            {/* STATS OVERVIEW CARDS */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-emerald-50/20" bodyStyle={{ padding: '16px' }}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-emerald-50 p-2.5 rounded-xl shrink-0 flex items-center justify-center">
+                    <CheckCircle2 size={20} className="text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 m-0 font-medium">Có sẵn</p>
+                    <p className="m-0 text-[20px] font-bold text-emerald-600 mt-0.5">{copiesStats.available}</p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-blue-50/20" bodyStyle={{ padding: '16px' }}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-blue-50 p-2.5 rounded-xl shrink-0 flex items-center justify-center">
+                    <BookOpen size={20} className="text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 m-0 font-medium">Đang mượn</p>
+                    <p className="m-0 text-[20px] font-bold text-blue-600 mt-0.5">{copiesStats.borrowed}</p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-amber-50/20" bodyStyle={{ padding: '16px' }}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-amber-50 p-2.5 rounded-xl shrink-0 flex items-center justify-center">
+                    <History size={20} className="text-amber-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 m-0 font-medium">Đặt trước</p>
+                    <p className="m-0 text-[20px] font-bold text-amber-500 mt-0.5">{copiesStats.reserved}</p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-red-50/20" bodyStyle={{ padding: '16px' }}>
+                <div className="flex items-center gap-3">
+                  <div className="bg-red-50 p-2.5 rounded-xl shrink-0 flex items-center justify-center">
+                    <XCircle size={20} className="text-red-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 m-0 font-medium">Mất / Hỏng</p>
+                    <p className="m-0 text-[20px] font-bold text-red-500 mt-0.5">{copiesStats.lost}</p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* SEARCH AND ACTION PANEL */}
+            <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-white" bodyStyle={{ padding: '20px' }}>
+              <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+                <div className="w-full lg:w-1/3">
+                  <Input
+                    placeholder="Tìm theo tên sách, barcode, kệ..."
+                    prefix={<Search size={16} className="text-gray-400" />}
+                    value={copiesSearchText}
+                    onChange={(e) => setCopiesSearchText(e.target.value)}
+                    allowClear
+                    className="h-10 rounded-lg"
+                  />
+                </div>
+
+                <div className="w-full lg:w-auto flex flex-wrap gap-3 items-center justify-end">
+                  {copies.length > 0 && (
+                    <Button
+                      type="primary"
+                      icon={<Printer size={16} />}
+                      onClick={() => {
+                        const printIds = selectedCopyKeys.length > 0 
+                          ? selectedCopyKeys.join(',') 
+                          : copies.map((c: any) => c.copy_id).join(',');
+                        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                        window.open(`${baseUrl}/v1/book-copies/print-labels?ids=${printIds}`, '_blank');
+                      }}
+                      className={`h-10 rounded-lg border-0 flex items-center justify-center font-semibold shadow-md ${
+                        selectedCopyKeys.length > 0 
+                          ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-500/10 text-white' 
+                          : 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/10 text-white'
+                      }`}
+                    >
+                      {selectedCopyKeys.length > 0 
+                        ? `In nhãn đã chọn (${selectedCopyKeys.length})` 
+                        : 'In toàn bộ trang này (A4 PDF)'}
+                    </Button>
+                  )}
+                  <Button
+                    type="default"
+                    icon={<Download size={16} />}
+                    onClick={() => {
+                      const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                      window.open(`${baseUrl}/v1/book-copies/export-excel`, '_blank');
+                    }}
+                    className="h-10 rounded-lg flex items-center justify-center font-semibold border-emerald-500 text-emerald-600 hover:text-emerald-700 hover:border-emerald-600 hover:bg-emerald-50/10"
+                  >
+                    Xuất Excel kho
+                  </Button>
+                  <Button
+                    type="default"
+                    icon={<UploadIcon size={16} />}
+                    onClick={() => handleTabChange('import')}
+                    className="h-10 rounded-lg flex items-center justify-center font-semibold"
+                  >
+                    Import / Thanh lý
+                  </Button>
+                  <Button
+                    type="default"
+                    icon={<FileBarChart size={16} />}
+                    onClick={() => handleTabChange('report')}
+                    className="h-10 rounded-lg flex items-center justify-center font-semibold"
+                  >
+                    Báo cáo kho
+                  </Button>
+                  <Button
+                    type="primary"
+                    icon={<Plus size={16} />}
+                    onClick={() => handleTabChange('add-copy')}
+                    className="h-10 rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center font-semibold shadow-md shadow-blue-500/10"
+                  >
+                    Thêm bản sao
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* COPIES TABLE */}
+            <Card className="!rounded-[12px] border border-gray-100 shadow-sm overflow-hidden" bodyStyle={{ padding: 0 }}>
+              <Table
+                rowSelection={{
+                  selectedRowKeys: selectedCopyKeys,
+                  onChange: (keys) => setSelectedCopyKeys(keys),
+                }}
+                columns={copiesColumns}
+                dataSource={copies.map((c) => ({ ...c, key: c.copy_id }))}
+                loading={copiesLoading}
+                pagination={{
+                  current: copiesPage,
+                  pageSize: 20,
+                  total: totalCopies,
+                  onChange: (page) => {
+                    setCopiesPage(page);
+                    loadCopies(page, copiesSearchText);
+                  },
+                  showTotal: (total) => `Tổng số ${total} bản sao`,
+                  className: "px-6 py-4 border-t border-gray-50",
+                }}
+                className="copy-table"
+              />
+            </Card>
+          </div>
+      )}
+
+      {/* TAB 5: ADD COPY FORM */}
+      {activeTab === 'add-copy' && (
+          <Card className="!rounded-[12px] border border-gray-100 shadow-sm max-w-[800px] mx-auto text-left" title={<span className="font-bold text-navyDark text-base">Thêm mới bản sao vật lý</span>}>
+            <Form
+              form={addCopyForm}
+              layout="vertical"
+              onFinish={async (values) => {
+                try {
+                  await createBookCopy({
+                    book_id: values.book_id,
+                    barcode: values.barcode,
+                    shelf_location: values.shelf_location,
+                    condition: values.condition,
+                    status: values.status,
+                    acquisition_date: values.acquisition_date
+                  });
+                  message.success("Thêm mới bản sao thành công!");
+                  addCopyForm.resetFields(); // Reset fields after success
+                  handleTabChange('copies');
+                } catch (err: any) {
+                  console.error(err);
+                  message.error(err?.response?.data?.message || "Lỗi khi thêm bản sao!");
+                }
+              }}
+              initialValues={{
+                condition: 'good',
+                status: 'available',
+                acquisition_date: nowYMD()
+              }}
+              className="py-2"
+            >
+              <Form.Item
+                name="book_id"
+                label={<span className="font-semibold text-gray-700">Chọn đầu sách</span>}
+                rules={[{ required: true, message: 'Vui lòng chọn đầu sách!' }]}
+              >
+                <Select
+                  showSearch
+                  placeholder="Nhập tên sách để tìm kiếm..."
+                  onSearch={(val) => loadSelectBooks(val)}
+                  filterOption={false}
+                  options={selectBooks.map(b => ({ value: b.book_id, label: b.title + ' (ISBN: ' + b.isbn + ')' }))}
+                  onDropdownVisibleChange={(open) => {
+                    if (open && selectBooks.length === 0) {
+                      loadSelectBooks('');
+                    }
+                  }}
+                  className="w-full"
+                />
+              </Form.Item>
+ 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                <Form.Item
+                  name="barcode"
+                  label={<span className="font-semibold text-gray-700">Barcode / Mã vạch</span>}
+                  rules={[{ required: true, message: 'Vui lòng nhập hoặc tự sinh barcode!' }]}
+                >
+                  <Input 
+                    placeholder="Ví dụ: A1-01 hoặc tự sinh..." 
+                    className="h-9" 
+                    addonAfter={
+                      <Button 
+                        type="link" 
+                        size="small" 
+                        onClick={() => {
+                          const randomBarcode = 'LIB-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+                          addCopyForm.setFieldsValue({ barcode: randomBarcode });
+                        }}
+                        style={{ padding: 0, height: 'auto' }}
+                      >
+                        Tự sinh
+                      </Button>
+                    }
+                  />
+                </Form.Item>
+ 
+                <Form.Item
+                  name="shelf_location"
+                  label={<span className="font-semibold text-gray-700">Vị trí kệ</span>}
+                >
+                  <Input placeholder="Ví dụ: A1-01, B2-05..." className="h-9" />
+                </Form.Item>
+ 
+                <Form.Item
+                  name="condition"
+                  label={<span className="font-semibold text-gray-700">Tình trạng vật lý</span>}
+                  rules={[{ required: true, message: 'Vui lòng chọn tình trạng vật lý!' }]}
+                >
+                  <Select className="h-9">
+                    <Select.Option value="new">Mới (New)</Select.Option>
+                    <Select.Option value="good">Tốt (Good)</Select.Option>
+                    <Select.Option value="old">Cũ (Old)</Select.Option>
+                    <Select.Option value="light">Hỏng nhẹ (Light damage)</Select.Option>
+                    <Select.Option value="heavy">Hỏng nặng (Heavy damage)</Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  name="status"
+                  label={<span className="font-semibold text-gray-700">Trạng thái</span>}
+                  rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
+                >
+                  <Select className="h-9">
+                    <Select.Option value="available">Có sẵn trong kho (Available)</Select.Option>
+                    <Select.Option value="borrowed">Đang cho mượn (Borrowed)</Select.Option>
+                    <Select.Option value="reserved">Đang đặt trước (Reserved)</Select.Option>
+                    <Select.Option value="maintenance">Bảo trì (Maintenance)</Select.Option>
+                    <Select.Option value="lost">Mất/Hỏng (Lost/Damaged)</Select.Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  name="acquisition_date"
+                  label={<span className="font-semibold text-gray-700">Ngày nhập kho</span>}
+                  className="md:col-span-2"
+                >
+                  <Input type="date" className="h-9" />
+                </Form.Item>
+              </div>
+
+              <Form.Item className="mb-0 flex justify-end gap-2 border-t border-gray-100 pt-4 mt-2">
+                <Button onClick={() => handleTabChange('copies')} className="mr-2 h-9 rounded-lg">
+                  Hủy bỏ
+                </Button>
+                <Button type="primary" htmlType="submit" className="bg-blue-600 hover:bg-blue-700 h-9 rounded-lg">
+                  Thêm bản sao
+                </Button>
+              </Form.Item>
+            </Form>
+          </Card>
+      )}
+
+      {/* TAB 6: IMPORT & LIQUIDATION */}
+      {activeTab === 'import' && (
+          <Card 
+            className="!rounded-[12px] border border-gray-100 shadow-sm max-w-[800px] mx-auto text-center py-6" 
+            title={<span className="font-bold text-navyDark text-base">Import & Thanh lý kho</span>}
+            extra={
+              <Button onClick={() => handleTabChange('copies')} className="rounded-lg h-9">
+                Quay lại danh sách
+              </Button>
+            }
+          >
+            <div className="flex flex-col items-center justify-center gap-4">
+              <Upload.Dragger
+                accept=".csv"
+                beforeUpload={(file: any) => {
+                  handleImportExcel(file);
+                  return false;
+                }}
+                showUploadList={false}
+                disabled={importing}
+                className="w-full bg-gray-50/30 p-6 rounded-xl border-dashed border-gray-200 hover:border-blue-400 transition-all duration-200"
+              >
+                <p className="ant-upload-drag-icon flex justify-center mb-2">
+                  <UploadIcon size={40} className="text-blue-500 animate-bounce" />
+                </p>
+                <p className="ant-upload-text font-bold text-gray-700 text-sm">
+                  Kéo thả file CSV nhập kho vào đây hoặc click để chọn file
+                </p>
+                <p className="ant-upload-hint text-xs text-gray-400 mt-1 max-w-sm mx-auto">
+                  Hỗ trợ định dạng file .csv chứa thông tin: barcode, isbn, shelf_location, condition, status, acquisition_date.
+                </p>
+              </Upload.Dragger>
+ 
+              <Button 
+                type="link" 
+                onClick={() => {
+                  const headers = 'barcode,isbn,shelf_location,condition,status,acquisition_date\n';
+                  const row1 = 'LIB-SP001,978-604-1-09876-5,A1-01,new,available,2026-06-25\n';
+                  const row2 = 'LIB-SP002,978-604-1-09876-5,B2-04,good,available,2026-06-25\n';
+                  const blob = new Blob([headers + row1 + row2], { type: 'text/csv;charset=utf-8;' });
+                  const url = URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.setAttribute('download', 'file_mau_nhap_kho.csv');
+                  link.click();
+                }}
+                className="text-xs text-blue-500 hover:text-blue-700 mt-0"
+              >
+                Tải file CSV mẫu (Template)
+              </Button>
+ 
+              {importResult && (
+                <div className="w-full text-left bg-gray-50 p-4 rounded-xl border border-gray-100 mt-2 space-y-3">
+                  <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                    <span className="font-bold text-gray-800 text-sm">Kết quả nhập kho hàng loạt:</span>
+                    {importResult.errorCsv && (
+                      <Button 
+                        type="primary" 
+                        danger 
+                        size="small" 
+                        icon={<Printer size={12} />} // Reusing icon for print/download
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = 'data:text/csv;charset=utf-8;base64,' + importResult.errorCsv;
+                          link.download = `file_loi_nhap_kho_${new Date().getTime()}.csv`;
+                          link.click();
+                        }}
+                      >
+                        Tải file lỗi (.csv)
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="text-xs text-gray-600 space-y-1">
+                    <p>✓ Nhập kho thành công: <strong className="text-green-600">{importResult.successCount}</strong> bản sao hợp lệ.</p>
+                    <p>✗ Bị từ chối nhập: <strong className="text-red-500">{importResult.errors.length}</strong> dòng dữ liệu bị lỗi.</p>
+                  </div>
+ 
+                  {importResult.errors.length > 0 && (
+                    <div className="mt-2 border border-red-100 rounded-lg overflow-hidden max-h-[180px] overflow-y-auto">
+                      <Table
+                        size="small"
+                        dataSource={importResult.errors.map((e: any, idx: number) => ({ ...e, key: idx }))}
+                        columns={[
+                          { title: 'Dòng', dataIndex: 'row', width: 60, align: 'center' },
+                          { title: 'Mã Barcode', dataIndex: 'barcode', width: 120 },
+                          { 
+                            title: 'Chi tiết lỗi phát hiện', 
+                            dataIndex: 'errors', 
+                            render: (errs: string[]) => <span className="text-red-500 font-medium text-xs">{errs.join(', ')}</span> 
+                          }
+                        ]}
+                        pagination={false}
+                        className="error-table"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+ 
+              <div className="border-t border-gray-100 w-full my-4 pt-4 text-left">
+                <h4 className="font-bold text-gray-700 mb-1 text-sm">Thanh lý bản sao (Liquidation)</h4>
+                <p className="text-xs text-gray-400 mb-2">Chuyển trạng thái các bản sao hư hỏng nặng hoặc mất sang danh mục thanh lý.</p>
+                <Button danger className="rounded-lg h-9" onClick={() => handleTabChange('copies')}>Đi tới danh sách để chọn thanh lý</Button>
+              </div>
+            </div>
+          </Card>
+      )}
+
+      {/* TAB 7: REPORT */}
+      {activeTab === 'report' && (
+          <Card 
+            className="!rounded-[12px] border border-gray-100 shadow-sm max-w-[900px] mx-auto text-left" 
+            title={<span className="font-bold text-navyDark text-base">Báo cáo tình trạng kho sách</span>}
+            extra={
+              <Space size="middle">
+                <Select
+                  placeholder="Lọc theo thể loại"
+                  allowClear
+                  style={{ width: 200 }}
+                  value={summaryCategoryId}
+                  onChange={(val) => setSummaryCategoryId(val)}
+                  className="rounded-lg"
+                >
+                  {filterData.categories.map((cat: any) => (
+                    <Select.Option key={cat.category_id} value={cat.category_id}>
+                      {cat.category_name}
+                    </Select.Option>
+                  ))}
+                </Select>
+                <Button
+                  type="default"
+                  icon={<Printer size={14} />}
+                  onClick={() => {
+                    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                    const url = `${baseUrl}/v1/book-copies/export-pdf${summaryCategoryId ? `?category_id=${summaryCategoryId}` : ''}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="rounded-lg h-9 flex items-center font-semibold"
+                >
+                  Xuất PDF báo cáo
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<Download size={14} />}
+                  onClick={() => {
+                    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+                    const url = `${baseUrl}/v1/book-copies/export-excel${summaryCategoryId ? `?category_id=${summaryCategoryId}` : ''}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="rounded-lg h-9 bg-emerald-600 hover:bg-emerald-700 border-0 flex items-center font-semibold text-white"
+                >
+                  Xuất Excel kho
+                </Button>
+              </Space>
+            }
+          >
+            <div className="flex flex-col gap-6 p-4">
+              {/* SUMMARY STATISTICS GRID */}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-blue-50/20" bodyStyle={{ padding: '16px' }} loading={summaryLoading}>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-gray-500 font-medium">Tổng đầu sách</span>
+                    <span className="text-xl font-bold text-navyDark mt-1">{summaryData?.total_books ?? 0}</span>
+                  </div>
+                </Card>
+                <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-purple-50/20" bodyStyle={{ padding: '16px' }} loading={summaryLoading}>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-gray-500 font-medium">Tổng bản sao</span>
+                    <span className="text-xl font-bold text-purple-600 mt-1">{summaryData?.total_copies ?? 0}</span>
+                  </div>
+                </Card>
+                <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-emerald-50/20" bodyStyle={{ padding: '16px' }} loading={summaryLoading}>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-gray-500 font-medium">Số có sẵn</span>
+                    <span className="text-xl font-bold text-emerald-600 mt-1">{summaryData?.available ?? 0}</span>
+                  </div>
+                </Card>
+                <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-blue-50/20" bodyStyle={{ padding: '16px' }} loading={summaryLoading}>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-gray-500 font-medium">Số đang mượn</span>
+                    <span className="text-xl font-bold text-blue-600 mt-1">{summaryData?.borrowed ?? 0}</span>
+                  </div>
+                </Card>
+                <Card className="!rounded-[12px] border border-gray-100 shadow-sm bg-gradient-to-br from-white to-amber-50/20" bodyStyle={{ padding: '16px' }} loading={summaryLoading}>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs text-gray-500 font-medium">Số bảo trì/mất</span>
+                    <span className="text-xl font-bold text-amber-600 mt-1">{summaryData?.maintenance_or_lost ?? 0}</span>
+                  </div>
+                </Card>
+              </div>
+
+              {/* GRAPHICS SECTION */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="border border-gray-100 p-4 rounded-xl bg-gray-50/50">
+                  <h4 className="font-bold text-gray-700 mb-3">Phân bổ trạng thái bản sao</h4>
+                  <div className="space-y-3.5">
+                    {[
+                      { label: 'Có sẵn (Available)', count: summaryData?.available ?? 0, color: 'bg-emerald-500' },
+                      { label: 'Đang mượn (Borrowed)', count: summaryData?.borrowed ?? 0, color: 'bg-blue-500' },
+                      { label: 'Đặt trước (Reserved)', count: summaryData?.reserved ?? 0, color: 'bg-purple-500' },
+                      { label: 'Bảo trì (Maintenance)', count: summaryData?.maintenance ?? 0, color: 'bg-violet-400' },
+                      { label: 'Mất / Hỏng (Lost)', count: summaryData?.lost ?? 0, color: 'bg-red-500' },
+                    ].map((item, idx) => {
+                      const total = summaryData?.total_copies || 1;
+                      const pct = Math.round((item.count / total) * 100);
+                      return (
+                        <div key={idx} className="flex flex-col gap-1">
+                          <div className="flex justify-between text-xs font-semibold text-gray-600">
+                            <span>{item.label}</span>
+                            <span>{item.count} quyển ({pct}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-200/60 rounded-full h-2">
+                            <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${pct}%` }}></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="border border-gray-100 p-4 rounded-xl bg-gray-50/50">
+                  <h4 className="font-bold text-gray-700 mb-3">Tình trạng vật lý sách bản sao</h4>
+                  <div className="space-y-3.5">
+                    {[
+                      { label: 'Mới (New)', count: summaryData?.conditions?.new ?? 0, color: 'bg-green-500' },
+                      { label: 'Tốt (Good)', count: summaryData?.conditions?.good ?? 0, color: 'bg-blue-500' },
+                      { label: 'Cũ (Old)', count: summaryData?.conditions?.old ?? 0, color: 'bg-yellow-500' },
+                      { label: 'Hỏng nhẹ (Light damage)', count: summaryData?.conditions?.light ?? 0, color: 'bg-orange-500' },
+                      { label: 'Hỏng nặng (Heavy damage)', count: summaryData?.conditions?.heavy ?? 0, color: 'bg-red-500' },
+                    ].map((item, idx) => {
+                      const total = summaryData?.total_copies || 1;
+                      const pct = Math.round((item.count / total) * 100);
+                      return (
+                        <div key={idx} className="flex flex-col gap-1">
+                          <div className="flex justify-between text-xs font-semibold text-gray-600">
+                            <span>{item.label}</span>
+                            <span>{item.count} quyển ({pct}%)</span>
+                          </div>
+                          <div className="w-full bg-gray-200/60 rounded-full h-2">
+                            <div className={`h-2 rounded-full ${item.color}`} style={{ width: `${pct}%` }}></div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+      )}
 
       {/* CREATE & EDIT BOOK MODAL */}
       <Modal
@@ -1492,6 +2398,177 @@ export function BooksListPage() {
         )}
       </Drawer>
 
+      {/* CREATE & EDIT COPY MODAL */}
+      <Modal
+        title={
+          <div className="border-b border-gray-100 pb-3 flex items-center gap-2 text-base font-bold text-navyDark text-left">
+            <Layers size={18} className="text-blue-500" />
+            {editingCopy ? "Chỉnh sửa bản sao" : "Thêm bản sao mới"}
+          </div>
+        }
+        open={isCopyModalOpen}
+        onCancel={() => setIsCopyModalOpen(false)}
+        onOk={() => copyForm.submit()}
+        okText={editingCopy ? "Cập nhật" : "Tạo mới"}
+        cancelText="Hủy"
+        centered
+      >
+        <Form
+          form={copyForm}
+          layout="vertical"
+          onFinish={handleSaveCopy}
+          className="py-3 text-left"
+        >
+          {/* If editing, book is read-only. If creating, choose book */}
+          {editingCopy ? (
+            <Form.Item label="Đầu sách">
+              <Input value={editingCopy.book_title} disabled className="h-9" />
+            </Form.Item>
+          ) : (
+            <Form.Item
+              name="book_id"
+              label="Chọn đầu sách"
+              rules={[{ required: true, message: 'Vui lòng chọn đầu sách!' }]}
+            >
+              <Select
+                showSearch
+                placeholder="Nhập tên sách để tìm kiếm..."
+                onSearch={(val) => loadSelectBooks(val)}
+                filterOption={false}
+                options={selectBooks.map(b => ({ value: b.book_id, label: b.title }))}
+                onDropdownVisibleChange={(open) => {
+                  if (open && selectBooks.length === 0) {
+                    loadSelectBooks('');
+                  }
+                }}
+              />
+            </Form.Item>
+          )}
+
+          <Form.Item
+            name="barcode"
+            label="Barcode / Mã vạch"
+            rules={[{ required: true, message: 'Vui lòng nhập hoặc tự sinh barcode!' }]}
+          >
+            <Input 
+              placeholder="Ví dụ: A1-01 hoặc tự sinh..." 
+              className="h-9" 
+              addonAfter={
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={() => {
+                    const randomBarcode = 'LIB-' + Math.random().toString(36).substring(2, 9).toUpperCase();
+                    copyForm.setFieldsValue({ barcode: randomBarcode });
+                  }}
+                  style={{ padding: 0, height: 'auto' }}
+                >
+                  Tự sinh
+                </Button>
+              }
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="shelf_location"
+            label="Vị trí kệ"
+          >
+            <Input placeholder="Ví dụ: A1-01, B2-05..." className="h-9" />
+          </Form.Item>
+
+          <Form.Item
+            name="condition"
+            label="Tình trạng vật lý"
+            rules={[{ required: true, message: 'Vui lòng chọn tình trạng vật lý!' }]}
+          >
+            <Select className="h-9">
+              <Select.Option value="new">Mới (New)</Select.Option>
+              <Select.Option value="good">Tốt (Good)</Select.Option>
+              <Select.Option value="old">Cũ (Old)</Select.Option>
+              <Select.Option value="light">Hỏng nhẹ (Light damage)</Select.Option>
+              <Select.Option value="heavy">Hỏng nặng (Heavy damage)</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="status"
+            label="Trạng thái"
+            rules={[{ required: true, message: 'Vui lòng chọn trạng thái!' }]}
+          >
+            <Select className="h-9">
+              <Select.Option value="available">Có sẵn trong kho (Available)</Select.Option>
+              <Select.Option value="borrowed">Đang cho mượn (Borrowed)</Select.Option>
+              <Select.Option value="reserved">Đang đặt trước (Reserved)</Select.Option>
+              <Select.Option value="maintenance">Bảo trì (Maintenance)</Select.Option>
+              <Select.Option value="lost">Mất/Hỏng (Lost/Damaged)</Select.Option>
+              <Select.Option value="liquidated" disabled>Đã thanh lý (Liquidated)</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="acquisition_date"
+            label="Ngày nhập kho"
+          >
+            <Input type="date" className="h-9" />
+          </Form.Item>
+        </Form>
+      </Modal>
+ 
+      {/* RETIRE COPY MODAL */}
+      <Modal
+        title={
+          <div className="border-b border-gray-100 pb-3 flex items-center gap-2 text-base font-bold text-red-600 text-left">
+            <Trash2 size={18} />
+            Thanh lý bản sao sách
+          </div>
+        }
+        open={isRetireModalOpen}
+        onCancel={() => setIsRetireModalOpen(false)}
+        onOk={() => retireForm.submit()}
+        okText="Xác nhận thanh lý"
+        cancelText="Hủy"
+        okButtonProps={{ danger: true }}
+        centered
+      >
+        <Form
+          form={retireForm}
+          layout="vertical"
+          onFinish={handleSaveRetire}
+          className="py-3 text-left"
+        >
+          <Form.Item
+            name="reason"
+            label={<span className="font-semibold text-gray-700">Lý do thanh lý</span>}
+            rules={[{ required: true, message: 'Vui lòng nhập hoặc chọn lý do thanh lý!' }]}
+          >
+            <Select 
+              className="h-9"
+              options={[
+                { value: 'Hư hỏng nặng không thể sửa', label: 'Hư hỏng nặng không thể sửa' },
+                { value: 'Sách bị mất / Thất thoát', label: 'Sách bị mất / Thất thoát' },
+                { value: 'Hết hạn sử dụng / Lỗi thời', label: 'Hết hạn sử dụng / Lỗi thời' },
+                { value: 'Khác', label: 'Lý do khác' }
+              ]}
+            />
+          </Form.Item>
+ 
+          <Form.Item
+            name="retired_date"
+            label={<span className="font-semibold text-gray-700">Ngày thanh lý</span>}
+            rules={[{ required: true, message: 'Vui lòng chọn ngày thanh lý!' }]}
+          >
+            <Input type="date" className="h-9" />
+          </Form.Item>
+ 
+          <Form.Item
+            name="note"
+            label={<span className="font-semibold text-gray-700">Ghi chú thêm (nếu có)</span>}
+          >
+            <Input.TextArea placeholder="Nhập thêm chi tiết về tình trạng thanh lý..." rows={3} />
+          </Form.Item>
+        </Form>
+      </Modal>
+ 
     </div>
   );
 }

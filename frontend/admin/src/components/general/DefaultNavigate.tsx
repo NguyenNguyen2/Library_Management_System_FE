@@ -77,8 +77,6 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       to: ROUTES.BOOKS + '?tab=copies',
       children: [
         { label: t(getKey('menu_copy_list')), to: ROUTES.BOOKS + '?tab=copies' },
-        { label: t(getKey('menu_add_copy_qr')), to: ROUTES.BOOKS + '?tab=add-copy' },
-        { label: t(getKey('menu_import_retire')), to: ROUTES.BOOKS + '?tab=import' },
         { label: t(getKey('menu_inventory_report')), to: ROUTES.BOOKS + '?tab=report' },
       ],
     },

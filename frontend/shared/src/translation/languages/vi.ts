@@ -124,6 +124,7 @@ const ViTranslation = {
   // Courses
  
   course_management_desc: 'Quản lý thông tin sách và các bản sao',
+  course_management: 'Quản lý kho',
   course_list: 'Danh sách đầu sách',
   add_course: 'Thêm Đầu sách',
   download_question_template: 'Tải template excel',
