@@ -81,8 +81,6 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
       to: ROUTES.BOOKS + '?tab=copies',
       children: [
         { label: 'Danh sách bản sao', to: ROUTES.BOOKS + '?tab=copies' },
-        { label: 'Thêm bản sao & In QR', to: ROUTES.BOOKS + '?tab=add-copy' },
-        { label: 'Import & Thanh lý', to: ROUTES.BOOKS + '?tab=import' },
         { label: 'Báo cáo kho', to: ROUTES.BOOKS + '?tab=report' },
       ],
     },

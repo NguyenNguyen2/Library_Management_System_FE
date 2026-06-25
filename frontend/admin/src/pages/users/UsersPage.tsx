@@ -828,7 +828,6 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
         key: 'name',
         ellipsis: true,
         className: 'font-semibold text-navyDark text-left',
-        className: 'font-semibold text-navyDark text-left',
       },
       {
         title: t(getKey('email')),
