@@ -268,9 +268,9 @@ const LoginPage = () => {
             <div className="bg-white rounded-2xl shadow-2xl px-6 py-6 text-gray-800">
               <div className="flex flex-col items-center text-center mb-6">
                 <img
-                  src="/image-2.png"
+                  src="/images/logo.png"
                   alt="The Library Dashboard"
-                  className="w-20 h-20 object-contain"
+                  className="w-20 h-20 object-contain animate-heartbeat hover-clickable"
                 />
                 <h2
                   className="mt-3 text-blue-700"
