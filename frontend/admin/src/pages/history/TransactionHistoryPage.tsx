@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
-import { Button, Input, Table, Tag, Tooltip, DatePicker, Space } from 'antd';
-import { SearchOutlined, DownloadOutlined, ArrowUpOutlined, ArrowDownOutlined, SwapOutlined } from '@ant-design/icons';
+import { Button, Input, Table, Tag, Tooltip, DatePicker, Space, message } from 'antd';
+import { SearchOutlined, DownloadOutlined, ArrowUpOutlined, ArrowDownOutlined, SwapOutlined, PrinterOutlined } from '@ant-design/icons';
+import { receiptHooks } from '../../hooks/useReceipt';
 import type { TableColumnsType, TablePaginationConfig } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
@@ -69,6 +70,9 @@ const TYPE_TABS: { key: FilterType; label: string }[] = [
 // ── Main page ───────────────────────────────────────────────────────────────
 
 export default function TransactionHistoryPage() {
+  const checkoutReceiptMutation = receiptHooks.useCheckoutReceipt();
+  const returnReceiptMutation   = receiptHooks.useReturnReceipt();
+
   const [params, setParams] = useState<TransactionLogParams>({
     q: '',
     type: '',
@@ -167,6 +171,51 @@ export default function TransactionHistoryPage() {
           {formatVND(v)}
         </span>
       ),
+    },
+    {
+      title: 'THAO TÁC',
+      key: 'actions',
+      width: 140,
+      align: 'center',
+      render: (_: unknown, r: TransactionLogItem) => {
+        if (r.event_type === 'borrow' || r.event_type === 'renew') {
+          return (
+            <Tooltip title="In phiếu mượn">
+              <Button
+                size="small"
+                icon={<PrinterOutlined />}
+                loading={checkoutReceiptMutation.isPending}
+                onClick={() =>
+                  checkoutReceiptMutation.mutate(r.borrow_id, {
+                    onError: () => message.error('Không thể tạo PDF phiếu mượn.'),
+                  })
+                }
+              >
+                Phiếu mượn
+              </Button>
+            </Tooltip>
+          );
+        }
+        if (r.event_type === 'return') {
+          return (
+            <Tooltip title="In biên lai trả">
+              <Button
+                size="small"
+                icon={<PrinterOutlined />}
+                loading={returnReceiptMutation.isPending}
+                onClick={() =>
+                  returnReceiptMutation.mutate(r.borrow_id, {
+                    onError: () => message.error('Không thể tạo PDF biên lai trả.'),
+                  })
+                }
+              >
+                Biên lai trả
+              </Button>
+            </Tooltip>
+          );
+        }
+        return null;
+      },
     },
   ];
 

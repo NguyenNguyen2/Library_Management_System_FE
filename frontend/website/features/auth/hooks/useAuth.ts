@@ -7,11 +7,13 @@ import { IResponseLogin } from '@shared/types/AuthType';
 import { APP_ROUTE } from '@/constants/routes';
 import { authApi } from '../api/authApi';
 import { mockSignIn, mockSignUp, mockForgotPassword, mockResetPassword } from '@/lib/mock/mockAuth';
+import { useUser } from '@shared/provider/UserProvider';
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
 
 export const useLogin = () => {
   const router = useRouter();
+  const { setUser } = useUser();
 
   return useMutation<
     IResponseLogin,
@@ -23,6 +25,7 @@ export const useLogin = () => {
       setCookie(STORAGES.ACCESS_TOKEN, data?.accessToken);
       if (data?.user) {
         setCookie(STORAGES.USER_LOGIN, data.user);
+        setUser(data.user);
       }
       router.push(APP_ROUTE.home);
     },
@@ -31,6 +34,7 @@ export const useLogin = () => {
 
 export const useRegister = () => {
   const router = useRouter();
+  const { setUser } = useUser();
 
   return useMutation<
     IResponseLogin,
@@ -42,6 +46,7 @@ export const useRegister = () => {
       setCookie(STORAGES.ACCESS_TOKEN, data?.accessToken);
       if (data?.user) {
         setCookie(STORAGES.USER_LOGIN, data.user);
+        setUser(data.user);
       }
       router.push(APP_ROUTE.home);
     },
