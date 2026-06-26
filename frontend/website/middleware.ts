@@ -62,5 +62,5 @@ export function middleware(req: NextRequest) {
 
 // Skip Next.js internals + static assets.
 export const config = {
-  matcher: '/((?!api/public|_next/static|_next/image|favicon.ico).*)',
+  matcher: '/((?!api/public|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|woff2?)$).*)',
 };
