@@ -37,8 +37,8 @@ export const getFilterOptions = async () => {
     return response.data;
 };
 
-// Lấy chi tiết sách bao gồm lịch sử chỉnh sửa
+// Lấy chi tiết sách bao gồm lịch sử chỉnh sửa (admin endpoint)
 export const getBookDetail = async (id: number) => {
-    const response = await axiosInstance.get(`/v1/books/${id}`);
+    const response = await axiosInstance.get(`/v1/books/${id}/admin-detail`);
     return response.data;
 };
