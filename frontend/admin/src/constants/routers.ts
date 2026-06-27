@@ -35,7 +35,7 @@ export const HEADER_TITLES: Record<RoutePath, keyof I18nKey> = {
   [ROUTES.ACHIEVEMENTS]: 'achievement_management',
   [ROUTES.SETTINGS]: 'settings_title',
   [ROUTES.USER_HISTORY]: 'user_history_title',
-  [ROUTES.TRANSACTION_LOG]: 'menu_transaction_history',
+  [ROUTES.TRANSACTION_LOG]: 'menu_user_list',
 };
 
 export const DYNAMIC_ROUTES: string[] = [ROUTES.USER_HISTORY];

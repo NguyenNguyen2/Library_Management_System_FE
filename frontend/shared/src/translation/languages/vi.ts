@@ -425,6 +425,7 @@ const ViTranslation = {
   menu_borrow_return: 'Mượn / Trả sách',
   menu_renew_reserve: 'Gia hạn & Đặt trước',
   menu_transaction_history: 'Lịch sử giao dịch',
+  menu_user_list: 'Danh sách người dùng',
   menu_achievements: 'Quản lý Danh hiệu',
   menu_settings: 'Cấu hình hệ thống',
   menu_all_settings: 'Tất cả cấu hình',

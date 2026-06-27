@@ -1,335 +1,231 @@
-import { useState, useCallback } from 'react';
-import { Button, Input, Table, Tag, Tooltip, DatePicker, Space, message } from 'antd';
-import { SearchOutlined, DownloadOutlined, ArrowUpOutlined, ArrowDownOutlined, SwapOutlined, PrinterOutlined } from '@ant-design/icons';
-import { receiptHooks } from '../../hooks/useReceipt';
-import type { TableColumnsType, TablePaginationConfig } from 'antd';
+import { useCallback, useEffect, useState } from 'react';
+import { Input, Avatar, Pagination, Empty, Spin } from 'antd';
+import { SearchOutlined, UserOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import dayjs from 'dayjs';
-import {
-  transactionLogApi,
-  TransactionLogItem,
-  TransactionLogParams,
-  EventType,
-  TxStatus,
-} from '../../api/transactionLogApi';
+import { userApi, ReaderListItem } from '../../api/userApi';
+import UserHistoryTable from './UserHistoryTable';
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-const EVENT_LABEL: Record<EventType, { label: string; color: string; icon: React.ReactNode }> = {
-  borrow: { label: 'Mượn',   color: '#3B82F6', icon: <ArrowUpOutlined />   },
-  return: { label: 'Trả',    color: '#10B981', icon: <ArrowDownOutlined /> },
-  renew:  { label: 'Gia hạn', color: '#F59E0B', icon: <SwapOutlined />     },
-};
+function getInitials(name: string): string {
+  return name.trim().split(' ').slice(-1)[0]?.charAt(0).toUpperCase() ?? 'U';
+}
 
-const STATUS_LABEL: Record<TxStatus, { label: string; color: string }> = {
-  active:            { label: 'Đang mượn', color: 'blue'    },
-  overdue:           { label: 'Quá hạn',  color: 'red'     },
-  returned_on_time:  { label: 'Đúng hạn', color: 'green'   },
-  overdue_returned:  { label: 'Trễ hạn',  color: 'volcano' },
-};
+function ReaderCard({
+  reader,
+  selected,
+  onClick,
+}: {
+  reader: ReaderListItem;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const isActive = reader.status.value === '1';
 
-function EventBadge({ type }: { type: EventType }) {
-  const cfg = EVENT_LABEL[type];
   return (
-    <span
+    <button
+      onClick={onClick}
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '2px 10px',
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 600,
-        background: cfg.color + '18',
-        color: cfg.color,
-        border: `1px solid ${cfg.color}40`,
-        whiteSpace: 'nowrap',
+        width: '100%',
+        textAlign: 'left',
+        border: 'none',
+        cursor: 'pointer',
+        padding: '10px 14px',
+        borderRadius: 8,
+        background: selected ? '#EFF6FF' : 'transparent',
+        borderLeft: selected ? '3px solid #2563EB' : '3px solid transparent',
+        transition: 'all 0.15s',
       }}
+      className="hover:bg-blue-50"
     >
-      {cfg.icon} {cfg.label}
-    </span>
+      <div className="flex items-center gap-3 min-w-0">
+        <Avatar
+          size={38}
+          src={reader.avatar ?? undefined}
+          style={{ background: selected ? '#2563EB' : '#6B7280', flexShrink: 0 }}
+          icon={!reader.avatar ? <UserOutlined /> : undefined}
+        >
+          {!reader.avatar ? getInitials(reader.name) : undefined}
+        </Avatar>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className="text-sm font-semibold truncate"
+              style={{ color: selected ? '#1D4ED8' : '#1F2937' }}
+            >
+              {reader.name}
+            </span>
+            {!isActive && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 shrink-0">
+                Khoá
+              </span>
+            )}
+          </div>
+
+          <p className="text-xs text-gray-400 truncate m-0 mt-0.5">{reader.email}</p>
+
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-[11px] font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+              {reader.card_number === '—' ? 'Chưa có thẻ' : reader.card_number}
+            </span>
+            {reader.borrowing > 0 && (
+              <span className="text-[11px] text-blue-600">
+                {reader.borrowing} đang mượn
+              </span>
+            )}
+            {reader.overdue > 0 && (
+              <span className="text-[11px] text-red-500 font-medium">
+                {reader.overdue} quá hạn
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </button>
   );
 }
 
-function formatVND(amount: number) {
-  if (!amount) return '—';
-  return amount.toLocaleString('vi-VN') + 'đ';
-}
-
-// ── Filter type tabs ────────────────────────────────────────────────────────
-
-type FilterType = '' | 'borrow' | 'return' | 'renew';
-
-const TYPE_TABS: { key: FilterType; label: string }[] = [
-  { key: '',       label: 'Tất cả' },
-  { key: 'borrow', label: 'Mượn'   },
-  { key: 'return', label: 'Trả'    },
-  { key: 'renew',  label: 'Gia hạn' },
-];
-
-// ── Main page ───────────────────────────────────────────────────────────────
+// ── Main page ────────────────────────────────────────────────────────────────
 
 export default function TransactionHistoryPage() {
-  const checkoutReceiptMutation = receiptHooks.useCheckoutReceipt();
-  const returnReceiptMutation   = receiptHooks.useReturnReceipt();
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string } | null>(null);
 
-  const [params, setParams] = useState<TransactionLogParams>({
-    q: '',
-    type: '',
-    date: '',
-    page: 1,
-    per_page: 20,
-  });
-  const [searchText, setSearchText] = useState('');
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['transaction-log', params],
-    queryFn: () => transactionLogApi.getList(params),
-    staleTime: 15_000,
-  });
-
-  const items = data?.objects ?? [];
-  const meta  = data?.meta;
-
-  const setFilter = useCallback((patch: Partial<TransactionLogParams>) => {
-    setParams(prev => ({ ...prev, ...patch, page: 1 }));
+  const handleSearchChange = useCallback((val: string) => {
+    setSearch(val);
   }, []);
 
-  const handleSearch = () => setFilter({ q: searchText });
+  // Fetch readers list
+  const { data: readersData, isLoading: loadingReaders } = useQuery({
+    queryKey: ['readers-list', debouncedSearch, page],
+    queryFn: () => userApi.getReaderList({ keyword: debouncedSearch, page, limit: 10 }),
+    staleTime: 30_000,
+    placeholderData: prev => prev,
+  });
 
-  const handleTableChange = (pagination: TablePaginationConfig) => {
-    setParams(prev => ({
-      ...prev,
-      page: pagination.current ?? 1,
-      per_page: pagination.pageSize ?? 20,
-    }));
-  };
+  const readers: ReaderListItem[] = readersData?.rows ?? [];
+  const total: number = readersData?.total ?? 0;
 
-  // ── Columns ──────────────────────────────────────────────────────────────
+  const handleSelectUser = useCallback((reader: ReaderListItem) => {
+    setSelectedUser({ id: reader.id, name: reader.name });
+  }, []);
 
-  const columns: TableColumnsType<TransactionLogItem> = [
-    {
-      title: 'MÃ GD',
-      dataIndex: 'ma_gd',
-      width: 100,
-      render: (v: string) => (
-        <span className="font-mono text-xs font-semibold text-gray-600">{v}</span>
-      ),
-    },
-    {
-      title: 'THỜI GIAN',
-      dataIndex: 'event_date',
-      width: 130,
-      render: (v: string) => (
-        <span className="text-sm text-gray-500">{v}</span>
-      ),
-    },
-    {
-      title: 'LOẠI',
-      dataIndex: 'event_type',
-      width: 110,
-      render: (v: EventType) => <EventBadge type={v} />,
-    },
-    {
-      title: 'ĐỘC GIẢ',
-      dataIndex: 'reader_name',
-      width: 160,
-      render: (v: string) => <span className="font-semibold text-gray-800">{v}</span>,
-    },
-    {
-      title: 'SÁCH',
-      dataIndex: 'book_title',
-      ellipsis: { showTitle: false },
-      render: (v: string) => (
-        <Tooltip title={v}>
-          <span className="text-gray-700">{v}</span>
-        </Tooltip>
-      ),
-    },
-    {
-      title: 'THỦ THƯ',
-      dataIndex: 'librarian_name',
-      width: 150,
-      render: (v: string) => <span className="text-gray-500 text-sm">{v}</span>,
-    },
-    {
-      title: 'TRẠNG THÁI',
-      dataIndex: 'tx_status',
-      width: 120,
-      render: (v: TxStatus) => {
-        const cfg = STATUS_LABEL[v] ?? { label: v, color: 'default' };
-        return <Tag color={cfg.color} className="text-xs font-medium">{cfg.label}</Tag>;
-      },
-    },
-    {
-      title: 'PHÍ',
-      dataIndex: 'fine_amount',
-      width: 100,
-      align: 'right',
-      render: (v: number) => (
-        <span className={v > 0 ? 'font-semibold text-red-500' : 'text-gray-400'}>
-          {formatVND(v)}
-        </span>
-      ),
-    },
-    {
-      title: 'THAO TÁC',
-      key: 'actions',
-      width: 140,
-      align: 'center',
-      render: (_: unknown, r: TransactionLogItem) => {
-        if (r.event_type === 'borrow' || r.event_type === 'renew') {
-          return (
-            <Tooltip title="In phiếu mượn">
-              <Button
-                size="small"
-                icon={<PrinterOutlined />}
-                loading={checkoutReceiptMutation.isPending}
-                onClick={() =>
-                  checkoutReceiptMutation.mutate(r.borrow_id, {
-                    onError: () => message.error('Không thể tạo PDF phiếu mượn.'),
-                  })
-                }
-              >
-                Phiếu mượn
-              </Button>
-            </Tooltip>
-          );
-        }
-        if (r.event_type === 'return') {
-          return (
-            <Tooltip title="In biên lai trả">
-              <Button
-                size="small"
-                icon={<PrinterOutlined />}
-                loading={returnReceiptMutation.isPending}
-                onClick={() =>
-                  returnReceiptMutation.mutate(r.borrow_id, {
-                    onError: () => message.error('Không thể tạo PDF biên lai trả.'),
-                  })
-                }
-              >
-                Biên lai trả
-              </Button>
-            </Tooltip>
-          );
-        }
-        return null;
-      },
-    },
-  ];
-
-  // ── CSV Export (simple download) ─────────────────────────────────────────
-
-  const handleExportCSV = () => {
-    const header = 'Mã GD,Thời gian,Loại,Độc giả,Sách,Thủ thư,Trạng thái,Phí';
-    const rows = items.map(r => [
-      r.ma_gd,
-      r.event_date,
-      EVENT_LABEL[r.event_type]?.label ?? r.event_type,
-      r.reader_name,
-      `"${r.book_title.replace(/"/g, '""')}"`,
-      r.librarian_name,
-      STATUS_LABEL[r.tx_status]?.label ?? r.tx_status,
-      r.fine_amount > 0 ? r.fine_amount : '',
-    ].join(','));
-    const csv = [header, ...rows].join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lich-su-giao-dich-${dayjs().format('YYYYMMDD')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Lịch sử giao dịch</h1>
-          <p className="text-sm text-gray-500">Toàn bộ giao dịch mượn / trả / gia hạn</p>
-        </div>
-        <Button
-          icon={<DownloadOutlined />}
-          onClick={handleExportCSV}
-          className="border-gray-300 text-gray-700 hover:border-gray-400"
-        >
-          Xuất CSV
-        </Button>
-      </div>
-
-      {/* Filter bar */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-4">
-        <div className="flex flex-wrap gap-3 items-center">
-          {/* Search */}
+    <div className="flex h-full" style={{ minHeight: 'calc(100vh - 88px)' }}>
+      {/* ── Left panel: Reader list ─────────────────────────────────────── */}
+      <div
+        style={{
+          width: 300,
+          minWidth: 300,
+          borderRight: '1px solid #E5E7EB',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#fff',
+        }}
+      >
+        {/* Panel header */}
+        <div className="px-4 py-4 border-b border-gray-100 shrink-0">
+          <h2 className="text-base font-bold text-gray-800 m-0 mb-3">Danh sách người dùng</h2>
           <Input
             prefix={<SearchOutlined className="text-gray-400" />}
-            placeholder="Tìm theo mã, độc giả, sách..."
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-            onPressEnter={handleSearch}
+            placeholder="Tìm theo tên, email..."
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
             allowClear
-            onClear={() => { setSearchText(''); setFilter({ q: '' }); }}
-            style={{ width: 300 }}
+            onClear={() => handleSearchChange('')}
+            size="small"
           />
+        </div>
 
-          {/* Type tabs */}
-          <Space size={4}>
-            {TYPE_TABS.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setFilter({ type: tab.key })}
-                style={{
-                  padding: '5px 16px',
-                  borderRadius: 6,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  border: params.type === tab.key ? '1.5px solid #2563EB' : '1.5px solid #E5E7EB',
-                  background: params.type === tab.key ? '#2563EB' : '#fff',
-                  color: params.type === tab.key ? '#fff' : '#374151',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </Space>
+        {/* Reader list */}
+        <div className="flex-1 overflow-y-auto p-2">
+          <Spin spinning={loadingReaders} size="small">
+            {readers.length === 0 && !loadingReaders ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={
+                    <span className="text-gray-400 text-sm">
+                      {debouncedSearch ? 'Không tìm thấy kết quả' : 'Chưa có độc giả'}
+                    </span>
+                  }
+                />
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {readers.map(reader => (
+                  <ReaderCard
+                    key={reader.id}
+                    reader={reader}
+                    selected={selectedUser?.id === reader.id}
+                    onClick={() => handleSelectUser(reader)}
+                  />
+                ))}
+              </div>
+            )}
+          </Spin>
+        </div>
 
-          {/* Date picker */}
-          <DatePicker
-            format="DD/MM/YYYY"
-            placeholder="dd/mm/yyyy"
-            onChange={d => setFilter({ date: d ? d.format('YYYY-MM-DD') : '' })}
-            style={{ width: 150 }}
-          />
+        {/* Pagination */}
+        {total > 10 && (
+          <div className="px-4 py-3 border-t border-gray-100 shrink-0 flex justify-center">
+            <Pagination
+              current={page}
+              total={total}
+              pageSize={10}
+              size="small"
+              showSizeChanger={false}
+              onChange={p => setPage(p)}
+            />
+          </div>
+        )}
+
+        {/* Total count */}
+        <div className="px-4 py-2 border-t border-gray-100 shrink-0">
+          <p className="text-xs text-gray-400 m-0 text-center">
+            {total} độc giả
+          </p>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <Table<TransactionLogItem>
-          columns={columns}
-          dataSource={items}
-          rowKey={r => `${r.borrow_id}-${r.copy_id}`}
-          loading={isLoading}
-          pagination={{
-            current: params.page,
-            pageSize: params.per_page,
-            total: meta?.total ?? 0,
-            showSizeChanger: true,
-            pageSizeOptions: ['10', '20', '50'],
-            showTotal: (total) => `Tổng ${total} giao dịch`,
-          }}
-          onChange={handleTableChange}
-          scroll={{ x: 900 }}
-          size="middle"
-          rowClassName={() => 'hover:bg-blue-50 transition-colors'}
-        />
+      {/* ── Right panel: History table ──────────────────────────────────── */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-white">
+        {selectedUser ? (
+          <UserHistoryTable userId={selectedUser.id} userName={selectedUser.name} />
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-center px-8">
+            <div
+              style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: '#F3F4F6', display: 'flex',
+                alignItems: 'center', justifyContent: 'center',
+                marginBottom: 16,
+              }}
+            >
+              <UserOutlined style={{ fontSize: 28, color: '#9CA3AF' }} />
+            </div>
+            <h3 className="text-gray-500 font-medium text-base m-0 mb-2">
+              Chọn một độc giả
+            </h3>
+            <p className="text-gray-400 text-sm m-0">
+              Nhấn vào tên độc giả ở cột trái để xem toàn bộ lịch sử giao dịch
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

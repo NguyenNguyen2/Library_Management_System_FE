@@ -91,7 +91,7 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
         { label: t(getKey('return_title')), to: ROUTES.RETURN },
         { label: t(getKey('renew_title')), to: ROUTES.RENEW },
         { label: t(getKey('reservation_title')), to: ROUTES.RESERVATION },
-        { label: t(getKey('menu_transaction_history')), to: ROUTES.TRANSACTION_LOG },
+        { label: t(getKey('menu_user_list')), to: ROUTES.TRANSACTION_LOG },
       ],
     },
     {
