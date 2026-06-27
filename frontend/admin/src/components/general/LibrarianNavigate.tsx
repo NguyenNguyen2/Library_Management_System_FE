@@ -184,7 +184,7 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
               <BookOutlined style={{ fontSize: 24, color: '#60A5FA' }} className="shrink-0" />
               <div>
                 <span style={{ fontSize: '15px', fontWeight: 600 }} className="text-white truncate block leading-none">
-                  Thư Viện ABC
+                  Thư Viện Sách Việt
                 </span>
                 <span className="text-[10px] text-[#60A5FA] mt-1.5 block leading-none">Thủ Thư</span>
               </div>

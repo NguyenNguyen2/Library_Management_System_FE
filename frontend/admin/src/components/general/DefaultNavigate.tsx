@@ -159,7 +159,7 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
             <Flex align="center" gap={12} className="min-w-0">
               <BookOutlined style={{ fontSize: 24, color: '#60A5FA' }} className="shrink-0" />
               <span style={{ fontSize: '16px', fontWeight: 600 }} className="text-white truncate">
-                Thư Viện ABC
+                Thư Viện Sách Việt
               </span>
             </Flex>
             <Button
