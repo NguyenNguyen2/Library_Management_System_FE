@@ -243,7 +243,7 @@ const ViTranslation = {
   mess_image: 'Chỉ được tải file ảnh',
   // User Home
   user_home_greeting: 'Xin chào {achievement} {name}!',
-  user_home_welcome_back: 'Chào mừng trở lại với Thư viện ABC',
+  user_home_welcome_back: 'Chào mừng trở lại với Thư viện Sách Việt',
   achievement_system: '🏆 Hệ thống danh hiệu',
   achievement_status_achieved: 'Đã đạt',
   achievement_status_current: 'Hiện tại',
@@ -254,7 +254,7 @@ const ViTranslation = {
   complete_btn: 'Hoàn thành',
   course_continue_btn: 'Mượn thêm',
   course_completed_btn: 'Đã trả',
-  user_home_title: '📖 Thư viện ABC',
+  user_home_title: '📖 Thư viện Sách Việt',
   user_home_achievement_hint:
     'Mượn thêm 1 cuốn sách nữa để đạt danh hiệu "Bậc Thầy Đọc Sách"',
   achievement_new_student_name: 'Độc giả Mới',
@@ -357,7 +357,7 @@ const ViTranslation = {
 
   // ===== Website-only keys (User-facing pages) =====
   // Header
-  header_title: 'Thư viện ABC',
+  header_title: 'Thư viện Sách Việt',
   // Home page – stats / activate / ranking
   stats_title: 'Thống kê mượn sách',
   stats_subtitle: 'Xem tiến độ và thành tích',
