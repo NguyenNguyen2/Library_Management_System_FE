@@ -18,7 +18,10 @@ const DefaultHeader = () => {
     return matched ? HEADER_TITLES[matched] : t(getKey('unknown_page'));
   };
 
-  const title = HEADER_TITLES[pathname.pathname] ?? handleDynamicRouteTitle();
+  const tab = new URLSearchParams(pathname.search).get('tab');
+  const title = (tab === 'copies' || tab === 'report' ? 'menu_inventory' : null)
+    ?? HEADER_TITLES[pathname.pathname]
+    ?? handleDynamicRouteTitle();
 
   return (
     <div className="flex justify-center items-center w-full gap-4">
