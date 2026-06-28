@@ -34,21 +34,15 @@ export const useLogin = () => {
 
 export const useRegister = () => {
   const router = useRouter();
-  const { setUser } = useUser();
 
   return useMutation<
-    IResponseLogin,
+    { success: boolean; message: string },
     AxiosError,
     { full_name: string; email: string; password: string; password_confirmation: string }
   >({
     mutationFn: USE_MOCK ? mockSignUp : authApi.signUp,
-    onSuccess: (data) => {
-      setCookie(STORAGES.ACCESS_TOKEN, data?.accessToken);
-      if (data?.user) {
-        setCookie(STORAGES.USER_LOGIN, data.user);
-        setUser(data.user);
-      }
-      router.push(APP_ROUTE.home);
+    onSuccess: (_data, variables) => {
+      router.push(`/auth/verify-email-sent?email=${encodeURIComponent(variables.email)}`);
     },
   });
 };

@@ -30,6 +30,7 @@ function CallbackContent() {
 
     const token  = searchParams.get('token');
     const userId = searchParams.get('user_id');
+    const role   = searchParams.get('role');
     const error  = searchParams.get('error');
 
     if (error) {
@@ -56,7 +57,7 @@ function CallbackContent() {
           id:      String(profile.user_id),
           name:    profile.full_name,
           email:   profile.email,
-          role:    'reader',
+          role:    role ?? 'reader',
           phone:   profile.phone    ?? undefined,
           address: profile.address  ?? undefined,
           avatar:  profile.avatar_url ?? undefined,

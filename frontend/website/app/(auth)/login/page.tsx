@@ -83,10 +83,17 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [emailNotVerified, setEmailNotVerified] = useState('');
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isPending = loginMutation.isPending || registerMutation.isPending;
   const isForgotPending = forgotPasswordMutation.isPending;
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('verified') === '1') {
+      message.success('Xác minh email thành công. Vui lòng đăng nhập.');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => {
@@ -110,6 +117,7 @@ const LoginPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setEmailNotVerified('');
 
     if (!email || !password || (view === 'register' && (!fullName || !passwordConfirmation))) {
       setError('Vui lòng điền đầy đủ thông tin');
@@ -125,10 +133,15 @@ const LoginPage = () => {
       loginMutation.mutate(
         { email, password },
         {
-          onError: (err) =>
+          onError: (err) => {
+            const axiosErr = err as { response?: { data?: { error?: string } } };
+            if (axiosErr?.response?.data?.error === 'email_not_verified') {
+              setEmailNotVerified(email);
+            }
             setError(
               extractErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.')
-            ),
+            );
+          },
         }
       );
     } else {
@@ -181,6 +194,7 @@ const LoginPage = () => {
   const goToLogin = () => {
     setView('login');
     setError('');
+    setEmailNotVerified('');
     setForgotEmail('');
   };
 
@@ -442,7 +456,17 @@ const LoginPage = () => {
                   {error && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
                       <AlertCircleIcon />
-                      <p className="text-xs text-red-600 m-0">{error}</p>
+                      <div>
+                        <p className="text-xs text-red-600 m-0">{error}</p>
+                        {emailNotVerified && (
+                          <a
+                            href={`/auth/verify-email-sent?email=${encodeURIComponent(emailNotVerified)}`}
+                            className="text-xs text-blue-600 hover:underline mt-1 block"
+                          >
+                            Gửi lại email xác minh →
+                          </a>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -460,6 +484,7 @@ const LoginPage = () => {
                     onClick={() => {
                       setView(view === 'login' ? 'register' : 'login');
                       setError('');
+                      setEmailNotVerified('');
                     }}
                     disabled={isPending}
                     className="w-full h-10 border border-blue-600 text-blue-600 hover:bg-blue-50 rounded-lg font-semibold"

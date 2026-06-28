@@ -5,6 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { App, Button, Spin } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, MailOutlined } from '@ant-design/icons';
 import { APP_ROUTE } from '@/constants/routes';
+import { setCookie } from '@shared/utils/cookie';
+import { STORAGES } from '@shared/constants/storage';
+import { useUser } from '@shared/provider/UserProvider';
+import type { IDetailUser } from '@shared/types/UserType';
 
 const ERROR_MESSAGES: Record<string, string> = {
   expired:          'Link xác minh đã hết hạn (hiệu lực 24 giờ).',
@@ -19,12 +23,42 @@ function VerifyEmailContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const { message }  = App.useApp();
+  const { setUser }  = useUser();
   const handled      = useRef(false);
 
   const [state, setState]           = useState<State>('loading');
   const [errorCode, setErrorCode]   = useState('');
   const [errorEmail, setErrorEmail] = useState('');
   const [resending, setResending]   = useState(false);
+
+  const doAutoLogin = (token: string, userId: string, role: string) => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api';
+    fetch(`${apiUrl}/v1/profile/${userId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('profile_failed');
+        return res.json();
+      })
+      .then((profile) => {
+        const user: IDetailUser = {
+          id:      String(profile.user_id),
+          name:    profile.full_name,
+          email:   profile.email,
+          role:    role,
+          phone:   profile.phone    ?? undefined,
+          address: profile.address  ?? undefined,
+          avatar:  profile.avatar_url ?? undefined,
+          status:  { value: '1', label: 'Active' },
+        };
+        setCookie(STORAGES.ACCESS_TOKEN, token);
+        setCookie(STORAGES.USER_LOGIN, user);
+        setUser(user);
+        router.replace(APP_ROUTE.home);
+      })
+      .catch(() => {
+        // Profile fetch failed — fallback to login with verified notification
+        router.replace(`${APP_ROUTE.login}?verified=1`);
+      });
+  };
 
   useEffect(() => {
     if (handled.current) return;
@@ -41,7 +75,11 @@ function VerifyEmailContent() {
       .then((res) => res.json())
       .then((data) => {
         if (data.success || data.error === 'already_verified') {
-          setState('success');
+          if (data.token && data.user_id) {
+            doAutoLogin(String(data.token), String(data.user_id), String(data.role ?? 'reader'));
+          } else {
+            router.replace(`${APP_ROUTE.login}?verified=1`);
+          }
         } else {
           setErrorCode(data.error ?? 'invalid');
           setErrorEmail(data.email ?? '');
