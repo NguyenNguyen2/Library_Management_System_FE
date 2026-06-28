@@ -12,7 +12,7 @@ const PUBLIC_PREFIX_PATHS = ['/login', '/signup', '/forgot-password', '/auth/goo
  * Open paths: accessible to everyone (logged-in and logged-out).
  * Unlike PUBLIC_PREFIX_PATHS, logged-in users are NOT redirected away.
  */
-const OPEN_PREFIX_PATHS = ['/shared'];
+const OPEN_PREFIX_PATHS = ['/shared', '/auth/verify-email'];
 
 /**
  * Development-only public paths (only when mock data is enabled)
