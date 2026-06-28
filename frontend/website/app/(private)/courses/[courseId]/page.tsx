@@ -302,10 +302,10 @@
               )}
          
             {/* Reading list widget */}
-            <div className="mb-4">
+            <div className="mt-3 mb-4">
               {!readingItem ? (
                 <Button
-                  icon={<HeartOutlined />}
+                  icon={<BookOutlined />}
                   onClick={handleAddToList}
                   loading={addItem.isPending}
                   className="w-full"
