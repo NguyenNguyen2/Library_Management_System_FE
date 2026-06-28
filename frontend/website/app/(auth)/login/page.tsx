@@ -9,6 +9,8 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import { useLogin, useRegister, useForgotPassword } from '@/features/auth/hooks/useAuth';
+import PasswordStrengthChecklist from '@/features/auth/components/PasswordStrengthChecklist';
+import { PASSWORD_PATTERN } from '@shared/constants/regex';
 
 type View = 'login' | 'register' | 'forgot' | 'forgot-sent';
 
@@ -121,6 +123,11 @@ const LoginPage = () => {
 
     if (!email || !password || (view === 'register' && (!fullName || !passwordConfirmation))) {
       setError('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    if (view === 'register' && !PASSWORD_PATTERN.test(password)) {
+      setError('Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&).');
       return;
     }
 
@@ -441,6 +448,10 @@ const LoginPage = () => {
                   </div>
 
                   {view === 'register' && (
+                    <PasswordStrengthChecklist password={password} />
+                  )}
+
+                  {view === 'register' && (
                     <div>
                       <Input.Password
                         placeholder="Xác nhận mật khẩu"
@@ -450,6 +461,11 @@ const LoginPage = () => {
                         disabled={isPending}
                         required
                       />
+                      {passwordConfirmation && (
+                        <p className={`text-xs mt-1 px-1 ${password === passwordConfirmation ? 'text-green-600' : 'text-red-500'}`}>
+                          {password === passwordConfirmation ? '✓ Mật khẩu khớp' : 'Mật khẩu chưa khớp'}
+                        </p>
+                      )}
                     </div>
                   )}
 

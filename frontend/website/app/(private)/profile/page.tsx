@@ -2,6 +2,7 @@
 
 import { Avatar, Card, Button, Form, Input, Modal, Spin, Upload, message } from 'antd';
 import { PASSWORD_PATTERN } from '@shared/constants/regex';
+import PasswordStrengthChecklist from '@/features/auth/components/PasswordStrengthChecklist';
 import type { UploadRequestOption } from 'rc-upload/lib/interface';
 import {
   ArrowLeftOutlined,
@@ -52,6 +53,10 @@ const ProfilePage = () => {
   const [otpValue, setOtpValue] = useState('');
   const [pendingNewPassword, setPendingNewPassword] = useState('');
   const [pendingConfirmNewPassword, setPendingConfirmNewPassword] = useState('');
+
+  // Realtime password display (for checklist + confirm match)
+  const [newPwDisplay, setNewPwDisplay] = useState('');
+  const [confirmPwDisplay, setConfirmPwDisplay] = useState('');
 
   const userId = user?.id ?? '';
 
@@ -187,8 +192,7 @@ const ProfilePage = () => {
           setOtpValue('');
           setPendingNewPassword('');
           setPendingConfirmNewPassword('');
-          pwForm.resetFields();
-          setEditingPw(false);
+          resetPasswordFields();
         },
         onError: (err) => {
           const errMsg = (err as AxiosError<{ message: string }>)?.response?.data?.message;
@@ -196,6 +200,13 @@ const ProfilePage = () => {
         },
       }
     );
+  };
+
+  const resetPasswordFields = () => {
+    setNewPwDisplay('');
+    setConfirmPwDisplay('');
+    pwForm.resetFields();
+    setEditingPw(false);
   };
 
   const handleCancelOtp = () => {
@@ -486,8 +497,12 @@ const ProfilePage = () => {
                   { pattern: PASSWORD_PATTERN, message: t('password_invalid') },
                 ]}
               >
-                <CustomInput.Password placeholder={t('enter_password')} />
+                <CustomInput.Password
+                  placeholder={t('enter_password')}
+                  onChange={(e) => setNewPwDisplay(e.target.value)}
+                />
               </Form.Item>
+              <PasswordStrengthChecklist password={newPwDisplay} />
 
               <Form.Item
                 label={
@@ -510,15 +525,20 @@ const ProfilePage = () => {
                   }),
                 ]}
               >
-                <CustomInput.Password placeholder={t('reenter_new_password')} />
+                <CustomInput.Password
+                  placeholder={t('reenter_new_password')}
+                  onChange={(e) => setConfirmPwDisplay(e.target.value)}
+                />
               </Form.Item>
+              {confirmPwDisplay && (
+                <p className={`text-xs -mt-4 mb-3 px-1 ${newPwDisplay === confirmPwDisplay ? 'text-green-600' : 'text-red-500'}`}>
+                  {newPwDisplay === confirmPwDisplay ? '✓ Mật khẩu khớp' : 'Mật khẩu chưa khớp'}
+                </p>
+              )}
 
               <div className="flex gap-2">
                 <Button
-                  onClick={() => {
-                    pwForm.resetFields();
-                    setEditingPw(false);
-                  }}
+                  onClick={resetPasswordFields}
                   className="flex-1 rounded-lg font-medium text-base h-10"
                 >
                   {t('cancel_btn')}

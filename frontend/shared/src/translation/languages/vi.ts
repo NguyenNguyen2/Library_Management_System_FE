@@ -16,7 +16,7 @@ const ViTranslation = {
   enter_password: 'Nhập mật khẩu của bạn',
   password_required: 'Mật khẩu là bắt buộc',
   password_invalid:
-    'Mật khẩu phải có ít nhất 6 ký tự và bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt',
+    'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&)',
   password_tooltip: 'Tooltip với biểu tượng tùy chỉnh',
   remember: 'Ghi nhớ tôi',
   // General
