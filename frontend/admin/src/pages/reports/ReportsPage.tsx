@@ -1,236 +1,538 @@
+import {
+  Alert,
+  Avatar,
+  Card,
+  Col,
+  DatePicker,
+  Row,
+  Select,
+  Skeleton,
+  Space,
+  Statistic,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
+import {
+  AlertOutlined,
+  BookOutlined,
+  RiseOutlined,
+  SwapOutlined,
+  TeamOutlined,
+} from '@ant-design/icons';
+import dayjs, { Dayjs } from 'dayjs';
 import { useState } from 'react';
-import { Card, Table, Tag, Button, Select, Space, Row, Col, Statistic, Tooltip, Typography, List, Alert } from 'antd';
-import { FileExcelOutlined, FilePdfOutlined, RiseOutlined, UserOutlined, AlertOutlined, BookOutlined, BulbOutlined, ExperimentOutlined } from '@ant-design/icons';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, ResponsiveContainer, LineChart, Line, Legend } from 'recharts';
+import ColumnChart from '@shared/components/chart/ColumnChart';
+import { reportHooks } from '../../hooks/useReport';
+import { ReportGroupBy, TopBook, TopReader } from '../../types/ReportType';
 
-const { Title, Text, Paragraph } = Typography;
+const { RangePicker } = DatePicker;
 
-const forecastData = [
-  { month: 'T1', actual: 320, forecast: 310 },
-  { month: 'T2', actual: 380, forecast: 360 },
-  { month: 'T3', actual: 410, forecast: 420 },
-  { month: 'T4', actual: 450, forecast: 460 },
-  { month: 'T5', actual: 510, forecast: 520 },
-  { month: 'T6', actual: 0, forecast: 580 },
-  { month: 'T7', actual: 0, forecast: 640 },
-  { month: 'T8', actual: 0, forecast: 720 },
+// ── Constants ──────────────────────────────────────────────────────────────
+
+const DEFAULT_FROM = dayjs().startOf('month').subtract(5, 'month');
+const DEFAULT_TO   = dayjs();
+
+const GROUP_OPTIONS: { label: string; value: ReportGroupBy }[] = [
+  { label: 'Theo ngày',  value: 'day'   },
+  { label: 'Theo tuần', value: 'week'  },
+  { label: 'Theo tháng', value: 'month' },
 ];
 
-const topBooksData = [
-  { name: 'Đắc Nhân Tâm', borrows: 87 },
-  { name: 'Nhà Giả Kim', borrows: 75 },
-  { name: 'Sapiens', borrows: 68 },
-  { name: 'Atomic Habits', borrows: 61 },
-  { name: 'Tuổi Trẻ Đáng Giá', borrows: 52 },
-  { name: 'Mắt Biếc', borrows: 49 },
-  { name: 'Cây Cam Ngọt...', borrows: 44 },
+const LIMIT_OPTIONS = [
+  { label: 'Top 5',  value: 5  },
+  { label: 'Top 10', value: 10 },
+  { label: 'Top 20', value: 20 },
+  { label: 'Top 50', value: 50 },
 ];
 
-const overdueList = [
-  { id: 'GD-3039', reader: 'Nguyễn Văn An', book: 'Đắc Nhân Tâm', days: 12, fine: 60000 },
-  { id: 'GD-3038', reader: 'Trần Thị Bình', book: 'Nhà Giả Kim', days: 8, fine: 40000 },
-  { id: 'GD-3037', reader: 'Lê Hoàng Cường', book: 'Sapiens', days: 5, fine: 25000 },
-  { id: 'GD-3036', reader: 'Phạm Minh Đức', book: 'Tôi Tài Giỏi', days: 3, fine: 15000 },
+// ── Table columns cho Top Books ────────────────────────────────────────────
+
+const TOP_BOOKS_COLUMNS = [
+  {
+    title: '#',
+    dataIndex: 'rank',
+    key: 'rank',
+    width: 52,
+    render: (rank: number) => (
+      <Tag color={rank <= 3 ? 'gold' : 'default'} className="font-bold min-w-[28px] text-center">
+        {rank}
+      </Tag>
+    ),
+  },
+  {
+    title: 'Tên sách',
+    dataIndex: 'title',
+    key: 'title',
+    render: (title: string, record: TopBook) => (
+      <Space>
+        <Avatar
+          src={record.cover_image ?? undefined}
+          icon={<BookOutlined />}
+          shape="square"
+          size={36}
+          className="flex-shrink-0"
+        />
+        <span className="font-medium leading-tight">{title}</span>
+      </Space>
+    ),
+  },
+  {
+    title: 'Tác giả',
+    dataIndex: 'author_name',
+    key: 'author_name',
+    render: (v: string) => v || <span className="text-gray-400">—</span>,
+  },
+  {
+    title: 'Thể loại',
+    dataIndex: 'category_names',
+    key: 'category_names',
+    render: (v: string | null) =>
+      v
+        ? v.split(', ').map((cat) => (
+            <Tag key={cat} className="mb-1">
+              {cat}
+            </Tag>
+          ))
+        : <span className="text-gray-400">—</span>,
+  },
+  {
+    title: 'Lượt mượn',
+    dataIndex: 'borrow_count',
+    key: 'borrow_count',
+    align: 'right' as const,
+    render: (v: number) => (
+      <Tag color="blue" className="font-semibold text-sm">
+        {v}
+      </Tag>
+    ),
+  },
 ];
+
+// ── Table columns cho Top Readers (Phase 3A) ───────────────────────────────
+
+const TOP_READERS_COLUMNS = [
+  {
+    title: '#',
+    dataIndex: 'rank',
+    key: 'rank',
+    width: 52,
+    render: (rank: number) => (
+      <Tag color={rank <= 3 ? 'gold' : 'default'} className="font-bold min-w-[28px] text-center">
+        {rank}
+      </Tag>
+    ),
+  },
+  {
+    title: 'Độc giả',
+    dataIndex: 'full_name',
+    key: 'full_name',
+    render: (name: string, record: TopReader) => (
+      <Space>
+        <Avatar
+          src={record.avatar_url ?? undefined}
+          icon={<TeamOutlined />}
+          size={36}
+          className="flex-shrink-0"
+        />
+        <span className="font-medium leading-tight">{name}</span>
+      </Space>
+    ),
+  },
+  {
+    title: 'Email',
+    dataIndex: 'email',
+    key: 'email',
+    render: (v: string) => <span className="text-gray-600 text-sm">{v}</span>,
+  },
+  {
+    title: 'Lượt mượn',
+    dataIndex: 'borrow_count',
+    key: 'borrow_count',
+    align: 'right' as const,
+    render: (v: number) => (
+      <Tag color="purple" className="font-semibold text-sm">
+        {v}
+      </Tag>
+    ),
+  },
+];
+
+// ── Component ──────────────────────────────────────────────────────────────
 
 export function ReportsPage() {
-  const [timeRange, setTimeRange] = useState('Tháng này');
+  // ── Shared state: date range dùng chung cho cả Phase 1, 2 và 3 ───────────
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([DEFAULT_FROM, DEFAULT_TO]);
 
-  const overdueColumns = [
-    {
-      title: 'Độc giả',
-      dataIndex: 'reader',
-      key: 'reader',
-      render: (text: string) => <Text className="font-semibold">{text}</Text>,
-    },
-    {
-      title: 'Sách quá hạn',
-      dataIndex: 'book',
-      key: 'book',
-    },
-    {
-      title: 'Số ngày trễ',
-      dataIndex: 'days',
-      key: 'days',
-      align: 'right' as const,
-      render: (days: number) => <Text type="danger" className="font-medium">{days} ngày</Text>,
-    },
-    {
-      title: 'Tiền phạt',
-      dataIndex: 'fine',
-      key: 'fine',
-      align: 'right' as const,
-      render: (fine: number) => <Text className="font-bold text-red-600">{fine.toLocaleString('vi-VN')}đ</Text>,
-    },
+  // ── Phase 1 state ─────────────────────────────────────────────────────────
+  const [groupBy, setGroupBy] = useState<ReportGroupBy>('month');
+
+  // ── Phase 2 state ─────────────────────────────────────────────────────────
+  const [topLimit, setTopLimit] = useState<number>(10);
+
+  // ── Phase 3A state — limit riêng cho top readers ──────────────────────────
+  const [readerLimit, setReaderLimit] = useState<number>(10);
+
+  // ── Params cho các API call ───────────────────────────────────────────────
+  const sharedDateParams = {
+    from_date: dateRange[0].format('YYYY-MM-DD'),
+    to_date:   dateRange[1].format('YYYY-MM-DD'),
+  };
+
+  const phase1Params = { ...sharedDateParams, group_by: groupBy };
+  const phase2Params = { ...sharedDateParams, limit: topLimit };
+  const phase3AParams = { ...sharedDateParams, limit: readerLimit };
+  // Phase 3B chỉ cần date range — không có limit, không có group_by
+  const phase3BParams = sharedDateParams;
+
+  // ── React Query hooks ─────────────────────────────────────────────────────
+  const {
+    data:      txData,
+    isLoading: txLoading,
+    isError:   txError,
+    error:     txErr,
+  } = reportHooks.useTransactionReport(phase1Params);
+
+  const {
+    data:      topBooks,
+    isLoading: topLoading,
+    isError:   topError,
+    error:     topErr,
+  } = reportHooks.useTopBooks(phase2Params);
+
+  const {
+    data:      topReaders,
+    isLoading: readersLoading,
+    isError:   readersError,
+    error:     readersErr,
+  } = reportHooks.useTopReaders(phase3AParams);
+
+  const {
+    data:      registrations,
+    isLoading: regLoading,
+    isError:   regError,
+    error:     regErr,
+  } = reportHooks.useReaderRegistrations(phase3BParams);
+
+  // ── Derived data cho Phase 1 chart ────────────────────────────────────────
+  const summary      = txData?.summary;
+  const chart        = txData?.chart ?? [];
+  const p1Categories = chart.map((p) => p.label);
+  const p1Series     = [
+    { name: 'Lượt mượn', data: chart.map((p) => p.borrows) },
+    { name: 'Lượt trả',  data: chart.map((p) => p.returns) },
   ];
 
+  // ── Derived data cho Phase 2 chart ────────────────────────────────────────
+  const books = topBooks ?? [];
+  const p2Categories = books.map((b) =>
+    b.title.length > 22 ? b.title.slice(0, 22) + '…' : b.title
+  );
+  const p2Series    = [{ name: 'Lượt mượn', data: books.map((b) => b.borrow_count) }];
+  const p2Height    = Math.max(300, books.length * 42);
+
+  // ── Derived data cho Phase 3A chart ──────────────────────────────────────
+  // Cắt ngắn tên độc giả (tối đa 20 ký tự) tránh chart bị vỡ layout
+  const readers = topReaders ?? [];
+  const p3ACategories = readers.map((r) =>
+    r.full_name.length > 20 ? r.full_name.slice(0, 20) + '…' : r.full_name
+  );
+  const p3ASeries = [{ name: 'Lượt mượn', data: readers.map((r) => r.borrow_count) }];
+  const p3AHeight = Math.max(300, readers.length * 42);
+
+  // ── Derived data cho Phase 3B chart ──────────────────────────────────────
+  // Trend theo tháng — vertical column chart, trục X là thời gian
+  const trend        = registrations ?? [];
+  const p3BCategories = trend.map((t) => t.label);     // ['T7/2025', 'T8/2025', ...]
+  const p3BSeries    = [{ name: 'Độc giả mới', data: trend.map((t) => t.count) }];
+
+  // ── Handler ───────────────────────────────────────────────────────────────
+  const handleRangeChange = (values: [Dayjs | null, Dayjs | null] | null) => {
+    if (values?.[0] && values?.[1]) {
+      setDateRange([values[0], values[1]]);
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex justify-between items-center flex-wrap gap-4">
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          SHARED FILTER — date range dùng chung cho toàn trang
+      ═══════════════════════════════════════════════════════════════════ */}
+      <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
-          <h1 className="m-0 text-[30px] font-bold leading-[36px] text-navyDark">Báo cáo & AI Insights</h1>
-          <p className="m-0 mt-1 text-base leading-6 text-gray-500">Phân tích tần suất mượn trả, kiểm soát sách quá hạn và tổng hợp AI Insights</p>
+          <Typography.Title level={3} className="!mb-1">
+            Báo cáo & Thống kê
+          </Typography.Title>
+          <Typography.Text type="secondary">
+            Thống kê lượt mượn trả, sách nổi bật và tình trạng hiện tại
+          </Typography.Text>
         </div>
-        <Space>
-          <Select value={timeRange} onChange={setTimeRange} className="min-w-[120px] h-10">
-            <Select.Option value="Tháng này">Tháng này</Select.Option>
-            <Select.Option value="Quý này">Quý này</Select.Option>
-            <Select.Option value="Năm nay">Năm nay</Select.Option>
-          </Select>
-          <Button icon={<FileExcelOutlined />} className="h-10 rounded-lg">Xuất Excel</Button>
-          <Button type="primary" icon={<FilePdfOutlined />} className="h-10 rounded-lg">Xuất PDF</Button>
-        </Space>
+        <RangePicker
+          value={dateRange}
+          onChange={handleRangeChange}
+          format="DD/MM/YYYY"
+          allowClear={false}
+          maxDate={dayjs()}
+          disabledDate={(d) => d.isAfter(dayjs())}
+        />
       </div>
 
-      {/* Top Statistic cards */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} className="shadow-sm rounded-[10px]" style={{ borderLeft: '4px solid #1890ff' }}>
-            <Statistic
-              title="Tổng lượt mượn trả"
-              value={1248}
-              valueStyle={{ fontWeight: 700 }}
-              prefix={<RiseOutlined className="text-blue-500 mr-2" />}
-            />
-            <div className="text-xs text-emerald-600 mt-2">▲ 12% so với tháng trước</div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} className="shadow-sm rounded-[10px]" style={{ borderLeft: '4px solid #52c41a' }}>
-            <Statistic
-              title="Độc giả hoạt động"
-              value={562}
-              valueStyle={{ fontWeight: 700 }}
-              prefix={<UserOutlined className="text-green-500 mr-2" />}
-            />
-            <div className="text-xs text-emerald-600 mt-2">▲ 32 độc giả hoạt động mới</div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} className="shadow-sm rounded-[10px]" style={{ borderLeft: '4px solid #ff4d4f' }}>
-            <Statistic
-              title="Số sách quá hạn"
-              value={overdueList.length}
-              valueStyle={{ color: '#cf1322', fontWeight: 700 }}
-              prefix={<AlertOutlined className="text-red-500 mr-2" />}
-            />
-            <div className="text-xs text-red-500 mt-2">Tổng phạt: 140.000đ</div>
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} lg={6}>
-          <Card bordered={false} className="shadow-sm rounded-[10px]" style={{ borderLeft: '4px solid #722ed1' }}>
-            <Statistic
-              title="Sách đang được mượn"
-              value={312}
-              valueStyle={{ color: '#722ed1', fontWeight: 700 }}
-              prefix={<BookOutlined className="text-purple-500 mr-2" />}
-            />
-            <div className="text-xs text-gray-500 mt-2">Bản sao đang lưu thông</div>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Main charts */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={14}>
-          <Card title="Top 10 sách mượn nhiều nhất" bordered={false} className="shadow-sm rounded-[10px]">
-            <div style={{ width: '100%', height: 300 }}>
-              <ResponsiveContainer>
-                <BarChart data={topBooksData} layout="vertical" margin={{ left: 20, right: 10, top: 10, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis type="number" stroke="#8c8c8c" />
-                  <YAxis type="category" dataKey="name" width={110} stroke="#8c8c8c" style={{ fontSize: 12 }} />
-                  <ChartTooltip contentStyle={{ borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 12 }} />
-                  <Bar dataKey="borrows" fill="#1890ff" name="Lượt mượn" radius={[0, 6, 6, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-        </Col>
-        <Col xs={24} lg={10}>
-          <Card title="Danh sách sách trễ hạn cần xử lý" bordered={false} className="shadow-sm rounded-[10px]">
-            <Table
-              dataSource={overdueList}
-              columns={overdueColumns}
-              rowKey="id"
-              pagination={false}
-              size="small"
-              bordered={false}
-            />
-          </Card>
-        </Col>
-      </Row>
-
-      {/* AI Analytics Section */}
+      {/* ═══════════════════════════════════════════════════════════════════
+          PHASE 1 — Báo cáo giao dịch mượn/trả
+      ═══════════════════════════════════════════════════════════════════ */}
       <Card
-        title={
-          <Space>
-            <div className="bg-gradient-to-br from-purple-600 to-indigo-600 p-1.5 rounded-lg flex items-center justify-center">
-              <ExperimentOutlined className="text-white text-base" />
-            </div>
-            <Title level={4} className="!mb-0">AI Assistant & Dự đoán xu hướng</Title>
-            <Tag color="purple" className="rounded-full">DeepMind Core</Tag>
-          </Space>
-        }
         bordered={false}
-        className="shadow-sm rounded-[10px] relative overflow-hidden"
-        style={{ background: 'linear-gradient(to bottom right, #f9f0ff, #f0f5ff)' }}
+        className="shadow-sm rounded-[10px]"
+        title={
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-base">Báo cáo giao dịch mượn / trả</span>
+            <Select
+              value={groupBy}
+              onChange={setGroupBy}
+              options={GROUP_OPTIONS}
+              className="w-[130px]"
+              size="small"
+            />
+          </div>
+        }
       >
-        <Row gutter={[20, 20]}>
-          <Col xs={24} lg={12}>
-            <div className="bg-white/80 backdrop-blur p-5 rounded-xl border border-purple-100 shadow-sm h-full flex flex-col justify-between">
-              <div>
-                <Title level={5} className="!mt-0 flex items-center gap-2">
-                  <BulbOutlined className="text-amber-500" /> Phân tích và Tóm tắt của AI
-                </Title>
-                <Paragraph className="text-gray-700 text-sm leading-relaxed mb-4">
-                  Dựa trên tần suất giao dịch trong 30 ngày qua, trợ lý AI đề xuất các hành động sau:
-                </Paragraph>
-                <List
-                  size="small"
-                  dataSource={[
-                    'Lượng mượn sách có xu hướng tăng mạnh 12% so với tháng trước, đỉnh điểm vào các ngày Thứ Sáu và Thứ Bảy.',
-                    'Thể loại kỹ năng sống và tâm lý học đang có nhu cầu tăng vọt, đề xuất bổ sung thêm bản sao.',
-                    'Ghi nhận tỷ lệ trễ hạn đối với độc giả dùng thẻ thường tăng nhẹ, nên kích hoạt thông báo tự động trước 2 ngày hết hạn.',
-                    'Đề xuất nhập thêm đầu sách "Lược Sử Tương Lai" do có lượt tìm kiếm tăng đột biến (84 lượt tháng này).'
-                  ]}
-                  renderItem={(item) => (
-                    <List.Item className="border-0 px-0 py-1.5 items-start">
-                      <span className="text-purple-600 mr-2">•</span>
-                      <Text className="text-sm text-gray-600 leading-snug">{item}</Text>
-                    </List.Item>
-                  )}
+        {txError && (
+          <Alert
+            type="error"
+            showIcon
+            message="Không thể tải dữ liệu giao dịch"
+            description={(txErr as Error)?.message}
+            className="mb-4"
+          />
+        )}
+
+        {/* Summary cards */}
+        <Row gutter={[12, 12]} className="mb-5">
+          <Col xs={24} sm={12} lg={6}>
+            <div className="border-l-4 border-blue-500 pl-3">
+              {txLoading ? <Skeleton active paragraph={{ rows: 1 }} /> : (
+                <Statistic
+                  title="Tổng lượt mượn"
+                  value={summary?.total_borrows ?? 0}
+                  prefix={<RiseOutlined className="text-blue-500 mr-1" />}
+                  valueStyle={{ fontWeight: 700 }}
                 />
-              </div>
-              <Alert
-                message="Dự báo: Tháng 7 và 8 là mùa tựu trường, dự báo lượt mượn sách giáo trình và nghiên cứu sẽ tăng đột biến khoảng 25%."
-                type="info"
-                showIcon
-                className="mt-4 border-blue-100 bg-blue-50/50"
-              />
+              )}
+              <div className="text-xs text-gray-400 mt-1">Trong khoảng thời gian đã chọn</div>
             </div>
           </Col>
-          <Col xs={24} lg={12}>
-            <div className="bg-white/80 backdrop-blur p-5 rounded-xl border border-purple-100 shadow-sm h-full">
-              <Title level={5} className="!mt-0">Dự báo nhu cầu mượn 3 tháng tiếp theo</Title>
-              <div style={{ width: '100%', height: 230 }} className="mt-2">
-                <ResponsiveContainer>
-                  <LineChart data={forecastData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" stroke="#8c8c8c" />
-                    <YAxis stroke="#8c8c8c" />
-                    <ChartTooltip contentStyle={{ borderRadius: 8, border: '1px solid #E2E8F0', fontSize: 11 }} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Line type="monotone" dataKey="actual" name="Thực tế" stroke="#1890ff" strokeWidth={2} activeDot={{ r: 6 }} />
-                    <Line type="monotone" dataKey="forecast" name="Dự đoán AI" stroke="#722ed1" strokeWidth={2} strokeDasharray="5 5" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+          <Col xs={24} sm={12} lg={6}>
+            <div className="border-l-4 border-green-500 pl-3">
+              {txLoading ? <Skeleton active paragraph={{ rows: 1 }} /> : (
+                <Statistic
+                  title="Tổng lượt trả"
+                  value={summary?.total_returns ?? 0}
+                  prefix={<SwapOutlined className="text-green-500 mr-1" />}
+                  valueStyle={{ fontWeight: 700 }}
+                />
+              )}
+              <div className="text-xs text-gray-400 mt-1">Trong khoảng thời gian đã chọn</div>
+            </div>
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <div className="border-l-4 border-purple-500 pl-3">
+              {txLoading ? <Skeleton active paragraph={{ rows: 1 }} /> : (
+                <Statistic
+                  title="Đang mượn"
+                  value={summary?.active_borrows ?? 0}
+                  prefix={<BookOutlined className="text-purple-500 mr-1" />}
+                  valueStyle={{ color: '#722ed1', fontWeight: 700 }}
+                />
+              )}
+              <div className="text-xs text-gray-400 mt-1">Bản sao đang lưu thông</div>
+            </div>
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <div className="border-l-4 border-red-500 pl-3">
+              {txLoading ? <Skeleton active paragraph={{ rows: 1 }} /> : (
+                <Statistic
+                  title="Quá hạn"
+                  value={summary?.overdue ?? 0}
+                  prefix={<AlertOutlined className="text-red-500 mr-1" />}
+                  valueStyle={{ color: '#cf1322', fontWeight: 700 }}
+                />
+              )}
+              <div className="text-xs text-red-400 mt-1">Giao dịch chưa trả và đã quá hạn</div>
             </div>
           </Col>
         </Row>
+
+        {/* Chart mượn/trả */}
+        {txLoading ? (
+          <Skeleton active paragraph={{ rows: 6 }} />
+        ) : (
+          <ColumnChart
+            categories={p1Categories}
+            series={p1Series}
+            height={300}
+            columnWidth="55%"
+          />
+        )}
       </Card>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          PHASE 2 — Top sách được mượn nhiều nhất
+      ═══════════════════════════════════════════════════════════════════ */}
+      <Card
+        bordered={false}
+        className="shadow-sm rounded-[10px]"
+        title={
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-base">
+              Top sách được mượn nhiều nhất
+            </span>
+            <Select
+              value={topLimit}
+              onChange={setTopLimit}
+              options={LIMIT_OPTIONS}
+              className="w-[110px]"
+              size="small"
+            />
+          </div>
+        }
+      >
+        {topError && (
+          <Alert
+            type="error"
+            showIcon
+            message="Không thể tải dữ liệu top sách"
+            description={(topErr as Error)?.message}
+            className="mb-4"
+          />
+        )}
+
+        {topLoading ? (
+          <Skeleton active paragraph={{ rows: 8 }} />
+        ) : (
+          <>
+            <ColumnChart
+              categories={p2Categories}
+              series={p2Series}
+              horizontal={true}
+              height={p2Height}
+              columnWidth="60%"
+            />
+            <Table
+              dataSource={books}
+              columns={TOP_BOOKS_COLUMNS}
+              rowKey="book_id"
+              pagination={false}
+              size="small"
+              className="mt-5"
+              bordered={false}
+              locale={{ emptyText: 'Không có dữ liệu trong khoảng thời gian đã chọn' }}
+            />
+          </>
+        )}
+      </Card>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          PHASE 3A — Top độc giả mượn nhiều nhất
+      ═══════════════════════════════════════════════════════════════════ */}
+      <Card
+        bordered={false}
+        className="shadow-sm rounded-[10px]"
+        title={
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-base">
+              Top độc giả mượn nhiều nhất
+            </span>
+            <Select
+              value={readerLimit}
+              onChange={setReaderLimit}
+              options={LIMIT_OPTIONS}
+              className="w-[110px]"
+              size="small"
+            />
+          </div>
+        }
+      >
+        {readersError && (
+          <Alert
+            type="error"
+            showIcon
+            message="Không thể tải dữ liệu top độc giả"
+            description={(readersErr as Error)?.message}
+            className="mb-4"
+          />
+        )}
+
+        {readersLoading ? (
+          <Skeleton active paragraph={{ rows: 8 }} />
+        ) : (
+          <>
+            {/* Horizontal bar chart — tên độc giả trục Y, lượt mượn trục X */}
+            <ColumnChart
+              categories={p3ACategories}
+              series={p3ASeries}
+              horizontal={true}
+              height={p3AHeight}
+              columnWidth="60%"
+            />
+
+            {/* Bảng chi tiết: #, Tên độc giả (Avatar + tên), Email, Lượt mượn */}
+            <Table
+              dataSource={readers}
+              columns={TOP_READERS_COLUMNS}
+              rowKey="user_id"
+              pagination={false}
+              size="small"
+              className="mt-5"
+              bordered={false}
+              locale={{ emptyText: 'Không có dữ liệu trong khoảng thời gian đã chọn' }}
+            />
+          </>
+        )}
+      </Card>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          PHASE 3B — Xu hướng đăng ký độc giả mới theo tháng
+          Dùng vertical ColumnChart (không horizontal) vì đây là time series:
+          trục X = thời gian (tháng) đọc từ trái sang phải,
+          trục Y = số độc giả — đây là cách đọc chart time series tự nhiên nhất.
+          Không có Table vì dữ liệu theo tháng đã đủ rõ trên chart.
+      ═══════════════════════════════════════════════════════════════════ */}
+      <Card
+        bordered={false}
+        className="shadow-sm rounded-[10px]"
+        title={
+          <div className="flex items-center gap-2">
+            <TeamOutlined className="text-blue-500" />
+            <span className="font-semibold text-base">
+              Xu hướng đăng ký độc giả mới
+            </span>
+          </div>
+        }
+      >
+        {regError && (
+          <Alert
+            type="error"
+            showIcon
+            message="Không thể tải dữ liệu đăng ký"
+            description={(regErr as Error)?.message}
+            className="mb-4"
+          />
+        )}
+
+        {regLoading ? (
+          <Skeleton active paragraph={{ rows: 6 }} />
+        ) : (
+          <ColumnChart
+            categories={p3BCategories}
+            series={p3BSeries}
+            height={300}
+            columnWidth="55%"
+          />
+        )}
+      </Card>
+
     </div>
   );
 }
