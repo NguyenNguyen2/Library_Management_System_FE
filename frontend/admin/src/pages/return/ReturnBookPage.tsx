@@ -25,6 +25,7 @@ import { returnHooks } from '../../hooks/useReturnBook';
 import { receiptHooks } from '../../hooks/useReceipt';
 import { cn } from '@shared/constants/commonConst';
 import dayjs from 'dayjs';
+import { Printer } from 'lucide-react';
 
 const ReturnBookPage = () => {
   const [keyword, setKeyword] = useState('');
@@ -158,18 +159,13 @@ const ReturnBookPage = () => {
                 )}
                 {receiptBorrowId && (
                   <Button
-                    size="small"
-                    icon={<RollbackOutlined />}
-                    loading={returnReceiptMutation.isPending}
-                    onClick={() =>
-                      returnReceiptMutation.mutate(receiptBorrowId, {
-                        onError: () => message.warning('Không thể tạo biên lai PDF.'),
-                      })
-                    }
-                    className="mt-2 w-full"
-                  >
-                    In biên lai PDF
-                  </Button>
+                  type="default"
+                  icon={<Printer size={14} />}
+                  onClick={() => returnReceiptMutation.mutate(receiptBorrowId)}
+                  className="rounded-lg h-9 flex items-center font-semibold"
+                >
+                  In biên lai PDF
+                </Button>
                 )}
               </div>
             ),

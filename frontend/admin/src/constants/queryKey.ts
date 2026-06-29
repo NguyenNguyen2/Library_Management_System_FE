@@ -18,4 +18,10 @@ export const QueryKey = {
     list: 'achievementsList',
     detail: 'achievementsDetail',
   },
+  reports: {
+    transactions:        'reportTransactions',
+    topBooks:            'reportTopBooks',
+    topReaders:          'reportTopReaders',          // Phase 3A
+    readerRegistrations: 'reportReaderRegistrations', // Phase 3B
+  },
 } as const;

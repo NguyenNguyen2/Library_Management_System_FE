@@ -3,7 +3,6 @@ import axiosInstance from '@/lib/axios/axios-client';
 export const authApi = {
   signIn: async (body: { email: string; password: string }) => {
     const response = await axiosInstance.post('/v1/auth/login', body);
-    console.log('response', response);
     return response?.data?.results?.object;
   },
   signOut: async () => {
@@ -11,7 +10,7 @@ export const authApi = {
   },
   signUp: async (body: { full_name: string; email: string; password: string; password_confirmation: string }) => {
     const response = await axiosInstance.post('/v1/auth/register', body);
-    return response?.data?.results?.object;
+    return response?.data as { success: boolean; message: string };
   },
   forgotPassword: async (body: { email: string }): Promise<{ message: string }> => {
     const response = await axiosInstance.post('/v1/auth/forgot-password', body);

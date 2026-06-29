@@ -9,6 +9,11 @@ const HeaderWithSideBar = dynamic(
   { ssr: false }
 )
 
+const ChatWidget = dynamic(
+  () => import('@/features/ai-chat/components/ChatWidget'),
+  { ssr: false }
+)
+
 const PrivateLayout = ({ children }: { children: ReactNode }) => {
   return (
     <div className='flex flex-col min-h-screen w-full bg-(--grayLightest)'>
@@ -16,6 +21,7 @@ const PrivateLayout = ({ children }: { children: ReactNode }) => {
       {/* 25px padding on every edge for all private pages; individual pages
           only control their inner layout, no outer padding needed. */}
       <main className='flex-1 p-6.25'>{children}</main>
+      <ChatWidget />
     </div>
   )
 }

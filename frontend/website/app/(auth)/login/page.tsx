@@ -9,6 +9,8 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import { useLogin, useRegister, useForgotPassword } from '@/features/auth/hooks/useAuth';
+import PasswordStrengthChecklist from '@/features/auth/components/PasswordStrengthChecklist';
+import { PASSWORD_PATTERN } from '@shared/constants/regex';
 
 type View = 'login' | 'register' | 'forgot' | 'forgot-sent';
 
@@ -82,10 +84,18 @@ const LoginPage = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [error, setError] = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [emailNotVerified, setEmailNotVerified] = useState('');
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isPending = loginMutation.isPending || registerMutation.isPending;
   const isForgotPending = forgotPasswordMutation.isPending;
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('verified') === '1') {
+      message.success('Xác minh email thành công. Vui lòng đăng nhập.');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => {
@@ -109,9 +119,15 @@ const LoginPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setEmailNotVerified('');
 
     if (!email || !password || (view === 'register' && (!fullName || !passwordConfirmation))) {
       setError('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    if (view === 'register' && !PASSWORD_PATTERN.test(password)) {
+      setError('Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&).');
       return;
     }
 
@@ -124,10 +140,15 @@ const LoginPage = () => {
       loginMutation.mutate(
         { email, password },
         {
-          onError: (err) =>
+          onError: (err) => {
+            const axiosErr = err as { response?: { data?: { error?: string } } };
+            if (axiosErr?.response?.data?.error === 'email_not_verified') {
+              setEmailNotVerified(email);
+            }
             setError(
               extractErrorMessage(err, 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin đăng nhập.')
-            ),
+            );
+          },
         }
       );
     } else {
@@ -180,17 +201,15 @@ const LoginPage = () => {
   const goToLogin = () => {
     setView('login');
     setError('');
+    setEmailNotVerified('');
     setForgotEmail('');
   };
 
   const handleGoogleLogin = () => {
     setError('');
-    loginMutation.mutate(
-      { email: 'docgia1@example.com', password: 'google-oauth' },
-      {
-        onError: (err) => setError(extractErrorMessage(err, 'Không thể đăng nhập với Google')),
-      }
-    );
+    setGoogleLoading(true);
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:8000/api';
+    window.location.href = `${apiUrl}/v1/auth/google`;
   };
 
   const heading =
@@ -429,6 +448,10 @@ const LoginPage = () => {
                   </div>
 
                   {view === 'register' && (
+                    <PasswordStrengthChecklist password={password} />
+                  )}
+
+                  {view === 'register' && (
                     <div>
                       <Input.Password
                         placeholder="Xác nhận mật khẩu"
@@ -438,13 +461,28 @@ const LoginPage = () => {
                         disabled={isPending}
                         required
                       />
+                      {passwordConfirmation && (
+                        <p className={`text-xs mt-1 px-1 ${password === passwordConfirmation ? 'text-green-600' : 'text-red-500'}`}>
+                          {password === passwordConfirmation ? '✓ Mật khẩu khớp' : 'Mật khẩu chưa khớp'}
+                        </p>
+                      )}
                     </div>
                   )}
 
                   {error && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
                       <AlertCircleIcon />
-                      <p className="text-xs text-red-600 m-0">{error}</p>
+                      <div>
+                        <p className="text-xs text-red-600 m-0">{error}</p>
+                        {emailNotVerified && (
+                          <a
+                            href={`/auth/verify-email-sent?email=${encodeURIComponent(emailNotVerified)}`}
+                            className="text-xs text-blue-600 hover:underline mt-1 block"
+                          >
+                            Gửi lại email xác minh →
+                          </a>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -462,6 +500,7 @@ const LoginPage = () => {
                     onClick={() => {
                       setView(view === 'login' ? 'register' : 'login');
                       setError('');
+                      setEmailNotVerified('');
                     }}
                     disabled={isPending}
                     className="w-full h-10 border border-blue-600 text-blue-600 hover:bg-blue-50 rounded-lg font-semibold"
@@ -499,34 +538,22 @@ const LoginPage = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button className="h-9 text-xs rounded-lg flex items-center justify-center gap-1.5" disabled={isPending}>
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#1877F2">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-                      </svg>
-                      Facebook
-                    </Button>
-                    <Button
-                      className="h-9 text-xs rounded-lg flex items-center justify-center gap-1.5"
-                      disabled={isPending}
-                      onClick={handleGoogleLogin}
-                    >
+                  <Button
+                    className="w-full h-9 text-xs rounded-lg flex items-center justify-center gap-1.5"
+                    loading={googleLoading}
+                    disabled={isPending || googleLoading}
+                    onClick={handleGoogleLogin}
+                  >
+                    {!googleLoading && (
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                         <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
                         <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
                         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                       </svg>
-                      Google
-                    </Button>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-gray-100 text-[11px] text-gray-500 space-y-0.5">
-                    <p className="text-gray-800 mb-1"><strong>Tài khoản demo</strong> (mật khẩu bất kỳ)</p>
-                    <p>👤 Độc giả: docgia1@example.com</p>
-                    <p>📚 Thủ thư: thuthu1@library.com</p>
-                    <p>🛡️ Admin: admin@library.com</p>
-                  </div>
+                    )}
+                    Google
+                  </Button>
                 </>
               )}
             </div>

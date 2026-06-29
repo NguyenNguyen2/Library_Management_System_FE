@@ -6,13 +6,13 @@ import { STORAGES } from '@shared/constants/storage';
  * Paths matched by a prefix — anything starting with these is public.
  * Auth pages must stay accessible to logged-out users.
  */
-const PUBLIC_PREFIX_PATHS = ['/login', '/signup', '/forgot-password'];
+const PUBLIC_PREFIX_PATHS = ['/login', '/signup', '/forgot-password', '/auth/google', '/auth/verify-email-sent'];
 
 /**
  * Open paths: accessible to everyone (logged-in and logged-out).
  * Unlike PUBLIC_PREFIX_PATHS, logged-in users are NOT redirected away.
  */
-const OPEN_PREFIX_PATHS = ['/shared'];
+const OPEN_PREFIX_PATHS = ['/shared', '/auth/verify-email'];
 
 /**
  * Development-only public paths (only when mock data is enabled)

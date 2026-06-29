@@ -199,13 +199,14 @@ const TransactionsPage = () => {
       width: 110,
       render: (v: string) => {
         const colorMap: Record<string, string> = {
-          good: 'green',
-          fair: 'orange',
-          poor: 'red',
+          new: 'blue', good: 'green', old: 'default', light: 'orange', heavy: 'red',
+        };
+        const labelMap: Record<string, string> = {
+          new: 'Mới', good: 'Tốt', old: 'Cũ', light: 'Hỏng nhẹ', heavy: 'Hỏng nặng',
         };
         return (
           <Tag color={colorMap[v] ?? 'default'}>
-            {v === 'good' ? 'Tốt' : v === 'fair' ? 'Bình thường' : v === 'poor' ? 'Kém' : v}
+            {labelMap[v] ?? v}
           </Tag>
         );
       },

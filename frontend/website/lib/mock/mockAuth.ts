@@ -79,23 +79,14 @@ export const mockResetPassword = (_body: { token: string; email: string; passwor
 
 // New accounts always register as readers. Demo emails are treated as
 // already taken, mirroring the "tài khoản demo" list shown on the login page.
-export const mockSignUp = ({ full_name, email }: { full_name: string; email: string; password: string; password_confirmation: string }): Promise<IResponseLogin> => {
+export const mockSignUp = ({ email }: { full_name: string; email: string; password: string; password_confirmation: string }): Promise<{ success: boolean; message: string }> => {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (MOCK_ACCOUNTS[email.toLowerCase().trim()]) {
         reject({ response: { data: { results: { message: 'Email đã tồn tại' } } } });
         return;
       }
-      resolve({
-        accessToken: 'mock-access-token-reader',
-        refreshToken: 'mock-refresh-token-reader',
-        user: {
-          id: `mock-reader-${Date.now()}`,
-          email,
-          name: full_name,
-          role: 'reader',
-        },
-      });
+      resolve({ success: true, message: 'Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản.' });
     }, MOCK_DELAY);
   });
 };

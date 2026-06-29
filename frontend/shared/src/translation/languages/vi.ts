@@ -16,7 +16,7 @@ const ViTranslation = {
   enter_password: 'Nhập mật khẩu của bạn',
   password_required: 'Mật khẩu là bắt buộc',
   password_invalid:
-    'Mật khẩu phải có ít nhất 6 ký tự và bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt',
+    'Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&)',
   password_tooltip: 'Tooltip với biểu tượng tùy chỉnh',
   remember: 'Ghi nhớ tôi',
   // General
@@ -124,7 +124,7 @@ const ViTranslation = {
   // Courses
  
   course_management_desc: 'Quản lý thông tin sách và các bản sao',
-  course_management: 'Quản lý kho',
+  course_management: 'Quản lý sách',
   course_list: 'Danh sách đầu sách',
   add_course: 'Thêm Đầu sách',
   download_question_template: 'Tải template excel',
@@ -243,7 +243,7 @@ const ViTranslation = {
   mess_image: 'Chỉ được tải file ảnh',
   // User Home
   user_home_greeting: 'Xin chào {achievement} {name}!',
-  user_home_welcome_back: 'Chào mừng trở lại với Thư viện ABC',
+  user_home_welcome_back: 'Chào mừng trở lại với Thư viện Sách Việt',
   achievement_system: '🏆 Hệ thống danh hiệu',
   achievement_status_achieved: 'Đã đạt',
   achievement_status_current: 'Hiện tại',
@@ -254,7 +254,7 @@ const ViTranslation = {
   complete_btn: 'Hoàn thành',
   course_continue_btn: 'Mượn thêm',
   course_completed_btn: 'Đã trả',
-  user_home_title: '📖 Thư viện ABC',
+  user_home_title: '📖 Thư viện Sách Việt',
   user_home_achievement_hint:
     'Mượn thêm 1 cuốn sách nữa để đạt danh hiệu "Bậc Thầy Đọc Sách"',
   achievement_new_student_name: 'Độc giả Mới',
@@ -357,7 +357,7 @@ const ViTranslation = {
 
   // ===== Website-only keys (User-facing pages) =====
   // Header
-  header_title: 'Thư viện ABC',
+  header_title: 'Thư viện Sách Việt',
   // Home page – stats / activate / ranking
   stats_title: 'Thống kê mượn sách',
   stats_subtitle: 'Xem tiến độ và thành tích',
@@ -425,6 +425,7 @@ const ViTranslation = {
   menu_borrow_return: 'Mượn / Trả sách',
   menu_renew_reserve: 'Gia hạn & Đặt trước',
   menu_transaction_history: 'Lịch sử giao dịch',
+  menu_user_list: 'Danh sách người dùng',
   menu_achievements: 'Quản lý Danh hiệu',
   menu_settings: 'Cấu hình hệ thống',
   menu_all_settings: 'Tất cả cấu hình',

@@ -133,8 +133,16 @@ const CheckoutPage = () => {
             <span className="text-xs text-gray-400 ml-1">— {c.author}</span>
           )}
         </div>
-        <Tag color={c.condition === 'good' ? 'green' : c.condition === 'new' ? 'blue' : 'orange'} className="shrink-0 !text-xs">
-          {c.condition === 'good' ? 'Tốt' : c.condition === 'new' ? 'Mới' : c.condition}
+        <Tag
+          color={
+            c.condition === 'new' ? 'blue'
+            : c.condition === 'good' ? 'green'
+            : c.condition === 'heavy' ? 'red'
+            : 'orange'
+          }
+          className="shrink-0 !text-xs"
+        >
+          {{ new: 'Mới', good: 'Tốt', old: 'Cũ', light: 'Hỏng nhẹ', heavy: 'Hỏng nặng' }[c.condition] ?? c.condition}
         </Tag>
       </div>
     ),
@@ -243,8 +251,12 @@ const CheckoutPage = () => {
       key: 'condition',
       width: 100,
       render: (v: string) => {
-        const colorMap: Record<string, string> = { good: 'green', fair: 'orange', poor: 'red' };
-        const labelMap: Record<string, string> = { good: 'Tốt', fair: 'Bình thường', poor: 'Kém' };
+        const colorMap: Record<string, string> = {
+          new: 'blue', good: 'green', old: 'default', light: 'orange', heavy: 'red',
+        };
+        const labelMap: Record<string, string> = {
+          new: 'Mới', good: 'Tốt', old: 'Cũ', light: 'Hỏng nhẹ', heavy: 'Hỏng nặng',
+        };
         return <Tag color={colorMap[v] ?? 'default'}>{labelMap[v] ?? v}</Tag>;
       },
     },

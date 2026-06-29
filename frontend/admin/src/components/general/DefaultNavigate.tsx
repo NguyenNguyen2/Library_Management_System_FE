@@ -91,7 +91,7 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
         { label: t(getKey('return_title')), to: ROUTES.RETURN },
         { label: t(getKey('renew_title')), to: ROUTES.RENEW },
         { label: t(getKey('reservation_title')), to: ROUTES.RESERVATION },
-        { label: t(getKey('menu_transaction_history')), to: ROUTES.TRANSACTION_LOG },
+        { label: t(getKey('menu_user_list')), to: ROUTES.TRANSACTION_LOG },
       ],
     },
     {
@@ -159,7 +159,7 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
             <Flex align="center" gap={12} className="min-w-0">
               <BookOutlined style={{ fontSize: 24, color: '#60A5FA' }} className="shrink-0" />
               <span style={{ fontSize: '16px', fontWeight: 600 }} className="text-white truncate">
-                Thư Viện ABC
+                Thư Viện Sách Việt
               </span>
             </Flex>
             <Button

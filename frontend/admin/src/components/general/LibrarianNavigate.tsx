@@ -95,7 +95,7 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
         { label: 'Trả sách (Check-in)', to: ROUTES.RETURN },
         { label: 'Gia hạn', to: ROUTES.RENEW },
         { label: 'Đặt trước', to: ROUTES.RESERVATION },
-        { label: 'Lịch sử giao dịch', to: ROUTES.TRANSACTION_LOG },
+        { label: 'Danh sách người dùng', to: ROUTES.TRANSACTION_LOG },
       ],
     },
     {
@@ -184,7 +184,7 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
               <BookOutlined style={{ fontSize: 24, color: '#60A5FA' }} className="shrink-0" />
               <div>
                 <span style={{ fontSize: '15px', fontWeight: 600 }} className="text-white truncate block leading-none">
-                  Thư Viện ABC
+                  Thư Viện Sách Việt
                 </span>
                 <span className="text-[10px] text-[#60A5FA] mt-1.5 block leading-none">Thủ Thư</span>
               </div>
