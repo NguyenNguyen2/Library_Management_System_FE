@@ -25,6 +25,13 @@ const ChatWidget: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef<string>('');
+
+  useEffect(() => {
+    if (!sessionIdRef.current) {
+      sessionIdRef.current = crypto.randomUUID();
+    }
+  }, []);
 
   const mutation = useMutation({
     mutationFn: sendChatMessage,
@@ -61,7 +68,7 @@ const ChatWidget: React.FC = () => {
     setInput('');
 
     console.log('[AI DEBUG] ChatWidget mutation.mutate', { message: text, historyCount: messages.length });
-    mutation.mutate({ message: text, history: messages });
+    mutation.mutate({ message: text, history: messages, session_id: sessionIdRef.current });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

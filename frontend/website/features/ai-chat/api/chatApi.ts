@@ -8,6 +8,7 @@ export interface ChatMessage {
 export interface ChatRequest {
   message: string;
   history: ChatMessage[];
+  session_id?: string;
 }
 
 export interface ChatResponse {
