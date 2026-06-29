@@ -12,6 +12,7 @@ import {
   DownOutlined,
   UpOutlined,
   DeploymentUnitOutlined,
+  LineChartOutlined,
 } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -99,6 +100,12 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       label: t(getKey('menu_achievements')),
       icon: <CrownOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.ACHIEVEMENTS,
+    },
+    {
+      key: 'reports',
+      label: 'Báo cáo & Thống kê',
+      icon: <LineChartOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.REPORTS,
     },
     {
       key: 'settings',
