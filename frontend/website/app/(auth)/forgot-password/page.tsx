@@ -5,6 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Button, Input } from 'antd';
 import { CheckCircleOutlined, LockOutlined, WarningOutlined } from '@ant-design/icons';
 import { useResetPassword } from '@/features/auth/hooks/useAuth';
+import PasswordStrengthChecklist from '@/features/auth/components/PasswordStrengthChecklist';
+import { PASSWORD_PATTERN } from '@shared/constants/regex';
 import { APP_ROUTE } from '@/constants/routes';
 
 const extractErrorMessage = (err: unknown, fallback: string) => {
@@ -40,8 +42,8 @@ const ResetPasswordForm = () => {
       setError('Vui lòng điền đầy đủ thông tin');
       return;
     }
-    if (password.length < 8) {
-      setError('Mật khẩu phải có ít nhất 8 ký tự');
+    if (!PASSWORD_PATTERN.test(password)) {
+      setError('Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&).');
       return;
     }
     if (password !== passwordConfirmation) {
@@ -140,6 +142,7 @@ const ResetPasswordForm = () => {
             disabled={resetMutation.isPending}
             autoFocus
           />
+          <PasswordStrengthChecklist password={password} />
         </div>
 
         <div>
@@ -151,6 +154,11 @@ const ResetPasswordForm = () => {
             className="h-10 text-sm rounded-lg"
             disabled={resetMutation.isPending}
           />
+          {passwordConfirmation && (
+            <p className={`text-xs mt-1 px-1 ${password === passwordConfirmation ? 'text-green-600' : 'text-red-500'}`}>
+              {password === passwordConfirmation ? '✓ Mật khẩu khớp' : 'Mật khẩu chưa khớp'}
+            </p>
+          )}
         </div>
 
         {error && (
