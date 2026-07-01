@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
   bookApi,
   IBookSearchResult, IBookSearchParams, IBookFilterOptions, IBookDetail,
@@ -11,6 +11,7 @@ export const useSearchBooks = (params: IBookSearchParams) => {
     queryKey: ['books-search', params],
     queryFn: () => bookApi.search(params),
     staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 };
 
