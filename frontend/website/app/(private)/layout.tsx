@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import type { ReactNode } from 'react'
+import { useNotificationSync } from '@/features/notifications/hooks/useNotifications'
 
 // dynamic ssr:false — getCookie dùng document.cookie, không chạy được trên server
 const HeaderWithSideBar = dynamic(
@@ -14,9 +15,15 @@ const ChatWidget = dynamic(
   { ssr: false }
 )
 
+function NotificationSyncMount() {
+  useNotificationSync()
+  return null
+}
+
 const PrivateLayout = ({ children }: { children: ReactNode }) => {
   return (
     <div className='flex flex-col min-h-screen w-full bg-(--grayLightest)'>
+      <NotificationSyncMount />
       <HeaderWithSideBar />
       {/* 25px padding on every edge for all private pages; individual pages
           only control their inner layout, no outer padding needed. */}

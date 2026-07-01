@@ -8,6 +8,7 @@ import {
   BookOutlined,
   RightOutlined,
   ReloadOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons';
 import { useBorrowing, useRenewBorrowing } from '@/features/borrowing/hooks/useBorrowing';
 import { APP_ROUTE } from '@/constants/routes';
@@ -79,6 +80,16 @@ function BorrowedBookCard({
         </div>
       )}
 
+      {/* Pending renewal badge */}
+      {item.renewal_pending && (
+        <div className="bg-blue-50 border-b border-blue-100 px-4 py-2 flex items-center gap-2">
+          <LoadingOutlined className="text-blue-500 flex-shrink-0" spin />
+          <p className="text-blue-600 text-xs font-semibold">
+            Yêu cầu gia hạn đang chờ thư viện duyệt
+          </p>
+        </div>
+      )}
+
       <div className="flex gap-4 p-4">
         <div
           className="flex-shrink-0 w-20 h-28 rounded-lg overflow-hidden cursor-pointer bg-gray-100 flex items-center justify-center"
@@ -123,15 +134,22 @@ function BorrowedBookCard({
           </div>
 
           <div className="flex items-center gap-2 mt-3 flex-wrap">
-            <Button
-              size="small"
-              type="primary"
-              icon={<ReloadOutlined />}
-              disabled={isOverdue}
-              onClick={() => onRenew(item)}
-            >
-              Gia hạn
-            </Button>
+            {item.renewal_pending ? (
+              <span className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 font-semibold">
+                <LoadingOutlined spin />
+                Chờ duyệt gia hạn
+              </span>
+            ) : (
+              <Button
+                size="small"
+                type="primary"
+                icon={<ReloadOutlined />}
+                disabled={isOverdue}
+                onClick={() => onRenew(item)}
+              >
+                Gia hạn
+              </Button>
+            )}
 
             <button
               onClick={() => router.push(`${APP_ROUTE.courses}/${item.book_id}`)}
@@ -158,18 +176,18 @@ function BorrowedBooksContent() {
 
   const handleRenew = (item: IBorrowedBook) => {
     modal.confirm({
-      title: 'Gia hạn sách',
-      content: `Bạn có chắc muốn gia hạn "${item.title}" thêm 7 ngày không?`,
-      okText: 'Xác nhận gia hạn',
+      title: 'Gửi yêu cầu gia hạn',
+      content: `Gửi yêu cầu gia hạn "${item.title}" đến thư viện? Bạn sẽ nhận thông báo khi được duyệt.`,
+      okText: 'Gửi yêu cầu',
       cancelText: 'Hủy',
       okButtonProps: { type: 'primary' },
       onOk: async () => {
         const res = await renewMutation.mutateAsync(item.borrow_id).catch((err: any) => {
-          const msg = err?.response?.data?.message ?? 'Gia hạn thất bại. Vui lòng thử lại.';
+          const msg = err?.response?.data?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.';
           message.error(msg);
           throw err;
         });
-        message.success(res.message ?? 'Gia hạn thành công.');
+        message.success(res.message ?? 'Yêu cầu gia hạn đã được gửi.');
       },
     });
   };
