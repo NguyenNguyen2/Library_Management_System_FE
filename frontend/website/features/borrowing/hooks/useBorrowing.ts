@@ -1,5 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { borrowingApi, type IBorrowingResponse, type IRenewResponse, type IBorrowHistoryResponse } from '../api/borrowingApi';
+import {
+  borrowingApi,
+  type IBorrowingResponse,
+  type IBorrowRenewalRequestResponse,
+  type IBorrowHistoryResponse,
+} from '../api/borrowingApi';
 
 export const useBorrowing = () => {
   return useQuery<IBorrowingResponse>({
@@ -19,9 +24,10 @@ export const useBorrowHistory = () => {
 
 export const useRenewBorrowing = () => {
   const queryClient = useQueryClient();
-  return useMutation<IRenewResponse, Error, number>({
-    mutationFn: (borrowId: number) => borrowingApi.renewBorrowing(borrowId),
+  return useMutation<IBorrowRenewalRequestResponse, Error, number>({
+    mutationFn: (borrowId: number) => borrowingApi.submitRenewalRequest(borrowId),
     onSuccess: () => {
+      // Refresh danh sách để hiển thị trạng thái renewal_pending = true
       queryClient.invalidateQueries({ queryKey: ['my-borrowing'] });
     },
   });

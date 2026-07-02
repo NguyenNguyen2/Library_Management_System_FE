@@ -24,7 +24,11 @@ import {
   useUpdateProfile,
   useUploadAvatar,
 } from '@/features/profile/hooks/useProfile';
-import { useGetLibraryCard } from '@/features/library-card/hooks/useLibraryCard';
+import {
+  useGetLibraryCard,
+  useSubmitCardRenewal,
+  useGetMyCardRenewalRequests,
+} from '@/features/library-card/hooks/useLibraryCard';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { APP_ROUTE } from '@/constants/routes';
 import { setCookie } from '@shared/utils/cookie';
@@ -69,6 +73,22 @@ const ProfilePage = () => {
   const { mutate: updateProfile, isPending: isSaving } = useUpdateProfile();
   const { mutate: uploadAvatarMutation, isPending: isUploadingAvatar } = useUploadAvatar();
   const { data: libraryCard, isLoading: isCardLoading } = useGetLibraryCard(userId);
+  const { data: cardRenewalData } = useGetMyCardRenewalRequests();
+  const { mutate: submitCardRenewal, isPending: isSubmittingCardRenewal } = useSubmitCardRenewal();
+
+  const pendingCardRenewal = cardRenewalData?.data?.find((r) => r.status === 'pending');
+
+  const handleCardRenewalRequest = () => {
+    submitCardRenewal(undefined, {
+      onSuccess: (res) => {
+        message.success(res.message ?? 'Yêu cầu gia hạn thẻ đã được gửi.');
+      },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.';
+        message.error(msg);
+      },
+    });
+  };
 
   // Sync form state from fetched profile
   useEffect(() => {
@@ -429,6 +449,25 @@ const ProfilePage = () => {
                 >
                   {libraryCard.card_status}
                 </span>
+              </div>
+
+              {/* Nút gia hạn thẻ */}
+              <div className="pt-3">
+                {pendingCardRenewal ? (
+                  <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                    Yêu cầu gia hạn thẻ đang chờ thư viện duyệt
+                  </div>
+                ) : libraryCard.card_status !== 'Bị khóa' ? (
+                  <Button
+                    block
+                    loading={isSubmittingCardRenewal}
+                    onClick={handleCardRenewalRequest}
+                    className="border border-(--grayBorderMedium) rounded-lg text-(--blackSoft) font-medium text-sm h-10"
+                  >
+                    Gửi yêu cầu gia hạn thẻ
+                  </Button>
+                ) : null}
               </div>
             </div>
           )}
