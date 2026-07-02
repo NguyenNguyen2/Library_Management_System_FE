@@ -35,4 +35,12 @@ export const renewHooks = {
       queryFn: renewApi.getRenewList,
       staleTime: 30_000,
     }),
+
+  useRejectBook: () => {
+    const qc = useQueryClient();
+    return useMutation<{ message: string }, AxiosError, { requestId: number; reviewNote?: string }>({
+      mutationFn: ({ requestId, reviewNote }) => renewApi.rejectBook(requestId, reviewNote),
+      onSuccess: () => qc.invalidateQueries({ queryKey: ['renew-list'] }),
+    });
+  },
 };

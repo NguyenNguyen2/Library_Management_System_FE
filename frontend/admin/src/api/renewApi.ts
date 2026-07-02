@@ -24,6 +24,7 @@ export interface RenewBookResult {
 }
 
 export interface RenewListItem {
+  request_id: number;
   borrow_id: number;
   user_id: number;
   full_name: string;
@@ -65,5 +66,12 @@ export const renewApi = {
   renewBook: async (payload: RenewBookPayload): Promise<RenewBookResult> => {
     const res = await axiosInstance.post('/private/v1/checkout/renew', payload);
     return res.data?.results?.object;
+  },
+
+  rejectBook: async (requestId: number, reviewNote?: string): Promise<{ message: string }> => {
+    const res = await axiosInstance.post(`/private/v1/checkout/renew/${requestId}/reject`, {
+      review_note: reviewNote,
+    });
+    return res.data;
   },
 };
