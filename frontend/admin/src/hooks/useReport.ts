@@ -4,8 +4,12 @@ import { QueryKey } from '../constants/queryKey';
 import {
   TransactionReportParams,
   TopBooksParams,
+  TopAuthorsParams,
+  TopCategoriesParams,
   TopReadersParams,
   ReaderRegistrationParams,
+  OverdueBookParams,
+  FineRevenueParams,
 } from '../types/ReportType';
 
 export const reportHooks = {
@@ -25,6 +29,24 @@ export const reportHooks = {
       staleTime: 60_000,
     }),
 
+  // Phase 2 (mở rộng) — Top tác giả được mượn nhiều nhất
+  // queryKey chứa params → đổi limit/ngày = cache entry mới = fetch lại
+  useTopAuthors: (params: TopAuthorsParams) =>
+    useQuery({
+      queryKey: [QueryKey.reports.topAuthors, params],
+      queryFn:  () => reportApi.getTopAuthors(params),
+      staleTime: 60_000,
+    }),
+
+  // Phase 2 (mở rộng) — Top thể loại được mượn nhiều nhất
+  // queryKey chứa params → đổi limit/ngày = cache entry mới = fetch lại
+  useTopCategories: (params: TopCategoriesParams) =>
+    useQuery({
+      queryKey: [QueryKey.reports.topCategories, params],
+      queryFn:  () => reportApi.getTopCategories(params),
+      staleTime: 60_000,
+    }),
+
   // Phase 3A — Top độc giả mượn nhiều nhất
   // queryKey chứa params → đổi limit hoặc ngày = cache entry mới = fetch lại
   // staleTime 60s: báo cáo không cần realtime, 60s đủ cho user tương tác
@@ -41,6 +63,42 @@ export const reportHooks = {
     useQuery({
       queryKey: [QueryKey.reports.readerRegistrations, params],
       queryFn:  () => reportApi.getReaderRegistrations(params),
+      staleTime: 60_000,
+    }),
+
+  // Phase 4 — Danh sách bản sao sách đang quá hạn
+  // queryKey chứa params (date range + status) → đổi filter = invalidate cache = fetch lại
+  useOverdueBooks: (params: OverdueBookParams) =>
+    useQuery({
+      queryKey: [QueryKey.reports.overdueBooks, params],
+      queryFn:  () => reportApi.getOverdueBooks(params),
+      staleTime: 60_000,
+    }),
+
+  // Phase 4 — Thống kê quá hạn theo nhóm ngày (real-time snapshot)
+  // queryKey không chứa params vì endpoint không có filter — cache theo key cố định
+  useOverdueSummary: () =>
+    useQuery({
+      queryKey: [QueryKey.reports.overdueSummary],
+      queryFn:  () => reportApi.getOverdueSummary(),
+      staleTime: 60_000,
+    }),
+
+  // Phase 4 — Doanh thu tiền phạt theo tháng
+  // queryKey chứa params → đổi date range = cache miss = fetch lại với range mới
+  useFineRevenue: (params: FineRevenueParams) =>
+    useQuery({
+      queryKey: [QueryKey.reports.fineRevenue, params],
+      queryFn:  () => reportApi.getFineRevenue(params),
+      staleTime: 60_000,
+    }),
+
+  // Phase 4 — Thống kê nguyên nhân tiền phạt (all-time, không phụ thuộc date)
+  // queryKey cố định (không có params) → 60s cache dùng chung toàn bộ session
+  useFineReasons: () =>
+    useQuery({
+      queryKey: [QueryKey.reports.fineReasons],
+      queryFn:  () => reportApi.getFineReasons(),
       staleTime: 60_000,
     }),
 };

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { sendChatMessage } from '../api/chatApi';
 import type { ChatMessage } from '../api/chatApi';
 
@@ -25,12 +25,24 @@ const ChatWidget: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef<string>('');
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!sessionIdRef.current) {
+      sessionIdRef.current = crypto.randomUUID();
+    }
+  }, []);
 
   const mutation = useMutation({
     mutationFn: sendChatMessage,
     onSuccess: (data) => {
       console.log('[AI DEBUG] ChatWidget onSuccess', { reply: data.reply, replyLen: data.reply?.length });
       setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }]);
+      const r = data.reply?.toLowerCase() ?? '';
+      if (r.includes('đặt trước') && r.includes('thành công')) {
+        queryClient.invalidateQueries({ queryKey: ['my-reservations'] });
+      }
     },
     onError: (error: unknown) => {
       const err = error as { message?: string; response?: { status?: number; data?: unknown } };
@@ -61,7 +73,7 @@ const ChatWidget: React.FC = () => {
     setInput('');
 
     console.log('[AI DEBUG] ChatWidget mutation.mutate', { message: text, historyCount: messages.length });
-    mutation.mutate({ message: text, history: messages });
+    mutation.mutate({ message: text, history: messages, session_id: sessionIdRef.current });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
