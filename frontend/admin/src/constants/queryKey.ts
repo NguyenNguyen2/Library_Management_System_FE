@@ -30,4 +30,9 @@ export const QueryKey = {
     fineRevenue:         'reportFineRevenue',           // Phase 4 (fine)
     fineReasons:         'reportFineReasons',           // Phase 4 (fine)
   },
+  aiDemand: {
+    importSuggestions: 'aiImportSuggestions',
+    lowBorrowBooks:    'aiLowBorrowBooks',
+    seasonalDemand:    'aiSeasonalDemand',
+  },
 } as const;

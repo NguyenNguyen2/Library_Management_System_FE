@@ -4,6 +4,7 @@ import {
   CrownOutlined,
   LockOutlined,
   LogoutOutlined,
+  RobotOutlined,
   SettingOutlined,
   UserOutlined,
   BookOutlined,
@@ -106,6 +107,12 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       label: 'Báo cáo & Thống kê',
       icon: <LineChartOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.REPORTS,
+    },
+    {
+      key: 'ai-demand',
+      label: 'AI Phân tích nhu cầu',
+      icon: <RobotOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.AI_DEMAND,
     },
     {
       key: 'settings',
