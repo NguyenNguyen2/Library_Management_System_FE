@@ -50,7 +50,7 @@ export const useNotificationSync = () => {
   const initialized = useRef(false);
 
   const { data } = useQuery<INotificationsResponse>({
-    queryKey: ['my-notifications'],
+    queryKey: ['my-notifications-response'],
     queryFn: () => notificationApi.getMyNotifications(),
     staleTime: 0,
     refetchInterval: POLL_INTERVAL_MS,

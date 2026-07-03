@@ -42,8 +42,8 @@
     const isSupportLanguage = process.env.NEXT_PUBLIC_IS_SUPPORT_LANGUAGE === 'TRUE';
     const { mutate: logout } = useLogout();
     const { user } = useUser();
-    const { data: notifications = [] } = useNotifications();
-
+  const { data } = useNotifications();
+  const notifications = Array.isArray(data) ? data : [];
     const isProfilePage = pathname === APP_ROUTE.profile;
 
     const unreadCount = useMemo(

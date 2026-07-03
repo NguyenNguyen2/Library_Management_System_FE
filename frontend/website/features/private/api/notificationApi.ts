@@ -8,10 +8,15 @@ export interface INotification {
   created_at: string;
 }
 
+interface INotificationListResponse {
+  data: INotification[];
+  unread_count: number;
+}
+
 export const notificationApi = {
   getNotifications: async (): Promise<INotification[]> => {
-    const response = await axiosInstance.get('/v1/me/notifications');
-    return response.data?.results?.objects ?? [];
+    const response = await axiosInstance.get<INotificationListResponse>('/v1/me/notifications');
+    return response.data?.data ?? [];
   },
 
   markAsRead: async (notificationId: number): Promise<void> => {

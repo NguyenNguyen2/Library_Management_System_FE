@@ -12,7 +12,8 @@ export function NotificationsPage() {
   const router = useRouter();
   const { message } = App.useApp();
 
-  const { data: notifications = [], isLoading, error } = useNotifications();
+  const { data, isLoading, error } = useNotifications();
+  const notifications = Array.isArray(data) ? data : [];
   const markAsRead = useMarkNotificationAsRead();
   const markAll = useMarkAllNotificationsAsRead();
 
