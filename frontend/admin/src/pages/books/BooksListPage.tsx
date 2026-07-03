@@ -57,7 +57,8 @@ import {
   deleteBook,
   getBookByISBN,
   getFilterOptions,
-  getBookDetail
+  getBookDetail,
+  getFeaturedBooks
 } from '../../services/bookService';
 import {
   getCategories,
@@ -148,6 +149,13 @@ export function BooksListPage() {
   const [totalBooks, setTotalBooks] = useState(0);
   const [pageSize, setPageSize] = useState(20);
 
+  // Featured books — loaded independently from the whole DB (not derived from the main
+  // list's current page), so it stays accurate regardless of pagination/sort.
+  const [featuredBooks, setFeaturedBooks] = useState<Book[]>([]);
+  const [featuredBooksLoading, setFeaturedBooksLoading] = useState(false);
+  const [featuredBooksTotal, setFeaturedBooksTotal] = useState(0);
+  const [featuredBooksPage, setFeaturedBooksPage] = useState(1);
+
   // Quick ISBN Import
   const [isbnImportText, setIsbnImportText] = useState('');
   const [importingIsbn, setImportingIsbn] = useState(false);
@@ -156,6 +164,11 @@ export function BooksListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Book detail drawer (opened by clicking a book title)
+  const [isBookDetailOpen, setIsBookDetailOpen] = useState(false);
+  const [bookDetail, setBookDetail] = useState<any>(null);
+  const [bookDetailLoading, setBookDetailLoading] = useState(false);
 
   // Cover image upload state (Add/Edit Book modal) — kept outside the Form since it's a File, not a form value
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -431,6 +444,25 @@ export function BooksListPage() {
     }
   };
 
+  const loadFeaturedBooks = async (page = 1) => {
+    setFeaturedBooksLoading(true);
+    try {
+      const res = await getFeaturedBooks(page);
+      if (res && res.data) {
+        setFeaturedBooks(res.data);
+        setFeaturedBooksTotal(res.total || res.data.length);
+        setFeaturedBooksPage(res.current_page || 1);
+      } else {
+        setFeaturedBooks(res || []);
+      }
+    } catch (err) {
+      console.error(err);
+      message.error("Lỗi khi tải danh sách sách nổi bật!");
+    } finally {
+      setFeaturedBooksLoading(false);
+    }
+  };
+
   // Load dropdown options
   const loadFilterOptions = async () => {
     try {
@@ -461,7 +493,15 @@ export function BooksListPage() {
 
   useEffect(() => {
     loadFilterOptions();
+    loadFeaturedBooks(1); // also feeds the "Sách nổi bật" stat card on the main list tab
   }, []);
+
+  // Trigger loading the featured books list when its tab is opened
+  useEffect(() => {
+    if (activeTab === 'featured') {
+      loadFeaturedBooks(1);
+    }
+  }, [activeTab]);
 
   // Category and Author tab loaders
   const loadCategoriesData = async () => {
@@ -680,6 +720,21 @@ export function BooksListPage() {
     }
   };
 
+  // Show book detail drawer (triggered by clicking the book title)
+  const showBookDetail = async (record: Book) => {
+    setIsBookDetailOpen(true);
+    setBookDetailLoading(true);
+    try {
+      const res = await getBookDetail(record.book_id);
+      setBookDetail(res || null);
+    } catch (err) {
+      console.error(err);
+      message.error("Lỗi khi tải thông tin chi tiết sách!");
+    } finally {
+      setBookDetailLoading(false);
+    }
+  };
+
   // Load book edit history
   const showEditHistory = async (record: Book) => {
     setHistoryBookTitle(record.title);
@@ -843,6 +898,7 @@ export function BooksListPage() {
       closeBookModal();
       loadBooks(currentPage, searchText);
       loadFilterOptions();
+      loadFeaturedBooks(featuredBooksPage); // is_featured may have just changed
     } catch (err: any) {
       console.error(err);
       const errorMsg = err?.response?.data?.message || "Lỗi khi lưu sách! Vui lòng kiểm tra lại thông tin.";
@@ -858,6 +914,7 @@ export function BooksListPage() {
       const res = await deleteBook(id);
       message.success(res?.message || "Xóa sách thành công!");
       loadBooks(currentPage, searchText);
+      loadFeaturedBooks(featuredBooksPage);
     } catch (err: any) {
       console.error(err);
       const errMsg = err?.response?.data?.message || "Không thể xóa sách này!";
@@ -900,7 +957,10 @@ export function BooksListPage() {
       key: 'title',
       render: (title: string, record: Book) => (
         <div>
-          <div className="font-semibold text-navyDark text-sm hover:text-blue-600 cursor-pointer transition-colors duration-150">
+          <div
+            onClick={() => showBookDetail(record)}
+            className="font-semibold text-navyDark text-sm hover:text-blue-600 cursor-pointer transition-colors duration-150"
+          >
             {title}
           </div>
           <div className="text-[11px] text-gray-500 font-mono flex items-center gap-1 mt-1">
@@ -1163,7 +1223,7 @@ export function BooksListPage() {
   };
 
   const totalDistinctBooks = totalBooks;
-  const featuredBooksCount = books.filter(b => b.is_featured).length;
+  const featuredBooksCount = featuredBooksTotal;
 
   const isWarehouseTab = ['copies', 'add-copy', 'import', 'report'].includes(activeTab);
 
@@ -1481,9 +1541,15 @@ export function BooksListPage() {
           <Card className="!rounded-[12px] border border-gray-100 shadow-sm overflow-hidden" bodyStyle={{ padding: 0 }}>
             <Table
               columns={columns}
-              dataSource={books.filter(b => b.is_featured).map((b) => ({ ...b, key: b.book_id }))}
-              loading={loading}
-              pagination={{ pageSize: 10 }}
+              dataSource={featuredBooks.map((b) => ({ ...b, key: b.book_id }))}
+              loading={featuredBooksLoading}
+              pagination={{
+                current: featuredBooksPage,
+                pageSize: 20,
+                total: featuredBooksTotal,
+                onChange: (page) => loadFeaturedBooks(page),
+                showTotal: (total) => `Tổng số ${total} sách nổi bật`,
+              }}
               locale={{ emptyText: 'Chưa có sách nào được đánh dấu là nổi bật.' }}
             />
           </Card>
@@ -2576,6 +2642,118 @@ export function BooksListPage() {
                         title={<span className="font-semibold text-gray-800 text-xs">{book.title}</span>}
                         description={<span className="text-[10px] text-gray-400 font-mono">ISBN: {book.isbn || '—'}</span>}
                       />
+                    </List.Item>
+                  );
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </Drawer>
+
+      {/* BOOK DETAIL DRAWER — opened by clicking a book title in the list */}
+      <Drawer
+        title={
+          <div className="flex items-center gap-2 font-bold text-navyDark text-base">
+            <BookOpen size={18} className="text-blue-600" />
+            <span>Chi tiết sách</span>
+          </div>
+        }
+        open={isBookDetailOpen}
+        onClose={() => setIsBookDetailOpen(false)}
+        width={600}
+        loading={bookDetailLoading}
+      >
+        {bookDetail && (
+          <div className="space-y-6">
+            <div className="flex gap-4">
+              <div className="w-[100px] h-[140px] shrink-0 rounded-lg overflow-hidden shadow-sm bg-gray-100 flex items-center justify-center">
+                {resolveCoverImageUrl(bookDetail.cover_image) ? (
+                  <img
+                    src={resolveCoverImageUrl(bookDetail.cover_image) as string}
+                    alt={bookDetail.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <BookOpen size={28} className="text-gray-400" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <h3 className="font-bold text-navyDark text-lg leading-snug m-0">{bookDetail.title}</h3>
+                <div className="text-xs text-gray-500 font-mono flex items-center gap-1 mt-1">
+                  <Hash size={12} className="text-gray-400" />
+                  {bookDetail.isbn || '—'}
+                </div>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {(bookDetail.authors || []).map((a: Author) => (
+                    <Tag key={a.author_id} color="blue" className="!rounded-md border-0 font-medium text-xs">
+                      {a.author_name}
+                    </Tag>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {(bookDetail.categories || []).map((c: Category) => (
+                    <Tag key={c.category_id} color="purple" className="!rounded-md border-0 font-medium text-xs">
+                      {c.category_name}
+                    </Tag>
+                  ))}
+                  {bookDetail.is_featured ? (
+                    <Tag color="gold" className="!rounded-full border-0 text-xs">Nổi bật</Tag>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+
+            <Descriptions column={1} bordered size="small" className="custom-descriptions">
+              <Descriptions.Item label="Nhà xuất bản">{bookDetail.publisher?.name || 'Chưa cập nhật'}</Descriptions.Item>
+              <Descriptions.Item label="Ngày xuất bản">
+                {bookDetail.publish_date ? new Date(bookDetail.publish_date).toLocaleDateString('vi-VN') : (bookDetail.publish_year || 'Chưa cập nhật')}
+              </Descriptions.Item>
+              <Descriptions.Item label="Phiên bản">{bookDetail.edition || 'Chưa cập nhật'}</Descriptions.Item>
+              <Descriptions.Item label="Ngôn ngữ">{bookDetail.language ? bookDetail.language.toUpperCase() : 'Chưa cập nhật'}</Descriptions.Item>
+              <Descriptions.Item label="Số trang">{bookDetail.pages ?? 'Chưa cập nhật'}</Descriptions.Item>
+              <Descriptions.Item label="Kích thước">{bookDetail.dimensions || 'Chưa cập nhật'}</Descriptions.Item>
+              <Descriptions.Item label="Loại bìa">{bookDetail.cover_type || 'Chưa cập nhật'}</Descriptions.Item>
+              <Descriptions.Item label="Giá đền bù">
+                {bookDetail.replacement_cost ? `${Number(bookDetail.replacement_cost).toLocaleString('vi-VN')} đ` : 'Chưa cập nhật'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Đánh giá">
+                {bookDetail.avg_rating ? `${bookDetail.avg_rating}/5 (${bookDetail.total_reviews || 0} lượt)` : 'Chưa có đánh giá'}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <div className="space-y-2">
+              <h4 className="font-bold text-gray-800 text-sm">Mô tả</h4>
+              <p className="text-sm text-gray-600 leading-relaxed bg-gray-50/50 p-4 rounded-xl border border-gray-100 whitespace-pre-line">
+                {bookDetail.description || 'Chưa có mô tả.'}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-bold text-gray-800 text-sm flex items-center gap-2 border-b border-gray-100 pb-2">
+                <Layers size={16} className="text-blue-500" />
+                <span>Bản sao ({bookDetail.book_copies?.length || 0})</span>
+              </h4>
+              <List
+                dataSource={bookDetail.book_copies || []}
+                locale={{ emptyText: 'Sách này chưa có bản sao nào.' }}
+                renderItem={(copy: any) => {
+                  const statusMap: Record<string, { label: string; color: string }> = {
+                    available: { label: 'Có sẵn', color: 'green' },
+                    borrowed: { label: 'Đang mượn', color: 'blue' },
+                    reserved: { label: 'Đặt trước', color: 'orange' },
+                    maintenance: { label: 'Bảo trì', color: 'purple' },
+                    lost: { label: 'Mất/Hỏng', color: 'red' },
+                    liquidated: { label: 'Đã thanh lý', color: 'default' },
+                  };
+                  const s = statusMap[copy.status] || { label: copy.status, color: 'default' };
+                  return (
+                    <List.Item className="!py-2 border-b border-gray-100/50">
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <span className="font-mono text-xs text-gray-600">{copy.barcode}</span>
+                        <span className="text-xs text-gray-400">{copy.shelf_location || 'Chưa xếp kệ'}</span>
+                        <Tag color={s.color} className="!rounded-md border-0 text-xs">{s.label}</Tag>
+                      </div>
                     </List.Item>
                   );
                 }}

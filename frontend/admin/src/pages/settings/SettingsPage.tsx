@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import {
-  Alert,
   Button,
   Card,
   Flex,
@@ -13,46 +12,58 @@ import { ExclamationCircleFilled } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import CustomInput from '@shared/components/input/CustomInput';
 import { getKey } from '@shared/types/I18nKeyType';
-import {
-  IPlatformSettings,
-  IPlatformSettingsPayload,
-} from '../../api/settingsApi';
+import type { I18nKey } from '@shared/types/I18nKeyType';
+import { SystemSettingsPayload } from '../../api/settingsApi';
 import { useFetchSettings, useUpdateSettings } from '../../hooks/useSettings';
 
 const { confirm } = Modal;
 
-/** Coerce CustomInput's string value to number. Used in both submit + reset. */
-const coerce = (
-  values: IPlatformSettingsPayload
-): IPlatformSettingsPayload => ({
-  videoLockDays: Number(values.videoLockDays),
-  quizPassThreshold: Number(values.quizPassThreshold),
-  quizRetryLimit: Number(values.quizRetryLimit),
-  inactiveUserPasswordResetDays: Number(values.inactiveUserPasswordResetDays),
-});
+type SettingKey =
+  | 'card_regular_borrow_limit'
+  | 'card_regular_max_days'
+  | 'card_priority_borrow_limit'
+  | 'card_priority_max_days'
+  | 'fine_per_day'
+  | 'fine_cap_amount'
+  | 'max_renew_times'
+  | 'renew_extend_days'
+  | 'reservation_expiry_days';
+
+/** i18n label/hint keys per config_key — SystemSettingController::ALLOWED_KEYS is the source list. */
+const SETTING_META: Record<SettingKey, { labelKey: keyof I18nKey; hintKey: keyof I18nKey }> = {
+  card_regular_borrow_limit: { labelKey: 'settings_card_regular_borrow_limit_label', hintKey: 'settings_card_regular_borrow_limit_hint' },
+  card_regular_max_days: { labelKey: 'settings_card_regular_max_days_label', hintKey: 'settings_card_regular_max_days_hint' },
+  card_priority_borrow_limit: { labelKey: 'settings_card_priority_borrow_limit_label', hintKey: 'settings_card_priority_borrow_limit_hint' },
+  card_priority_max_days: { labelKey: 'settings_card_priority_max_days_label', hintKey: 'settings_card_priority_max_days_hint' },
+  fine_per_day: { labelKey: 'settings_fine_per_day_label', hintKey: 'settings_fine_per_day_hint' },
+  fine_cap_amount: { labelKey: 'settings_fine_cap_amount_label', hintKey: 'settings_fine_cap_amount_hint' },
+  max_renew_times: { labelKey: 'settings_max_renew_times_label', hintKey: 'settings_max_renew_times_hint' },
+  renew_extend_days: { labelKey: 'settings_renew_extend_days_label', hintKey: 'settings_renew_extend_days_hint' },
+  reservation_expiry_days: { labelKey: 'settings_reservation_expiry_days_label', hintKey: 'settings_reservation_expiry_days_hint' },
+};
 
 /**
- * Each setting lives in its own Card so the admin can scan, edit, save one
- * section at a time. Save is always a single PATCH — matches the singleton
- * settings row on the backend. Reset rolls the form back to whatever the API
- * currently stores, undoing any unsaved edits.
+ * Module 7 — Cài đặt hệ thống. Mỗi nhóm cấu hình một Card để admin dễ rà soát
+ * và lưu từng phần. Lưu luôn là 1 POST duy nhất (API hỗ trợ cập nhật nhiều
+ * config_key cùng lúc trong 1 transaction). Reset đưa form về đúng giá trị
+ * API đang trả, không cần gọi lại API.
  */
 const SettingsPage = () => {
   const { t } = useTranslation();
-  const [form] = Form.useForm<IPlatformSettingsPayload>();
+  const [form] = Form.useForm<Record<SettingKey, number>>();
 
   const { data, isLoading } = useFetchSettings();
   const { mutate: update, isPending: isSaving } = useUpdateSettings();
 
+  const toFormValues = (): Partial<Record<SettingKey, number>> =>
+    Object.fromEntries(
+      (data ?? []).map((s) => [s.config_key, Number(s.config_value)]),
+    );
+
   // Seed form with server values on first load (and whenever they refresh).
   useEffect(() => {
     if (data) {
-      form.setFieldsValue({
-        videoLockDays: data.videoLockDays,
-        quizPassThreshold: data.quizPassThreshold,
-        quizRetryLimit: data.quizRetryLimit,
-        inactiveUserPasswordResetDays: data.inactiveUserPasswordResetDays,
-      });
+      form.setFieldsValue(toFormValues());
     }
   }, [data, form]);
 
@@ -77,26 +88,21 @@ const SettingsPage = () => {
     message: t(getKey('mess_required')),
   };
 
-  const handleSubmit = (values: IPlatformSettingsPayload) => {
+  const handleSubmit = (values: Record<SettingKey, number>) => {
     confirm({
       title: t(getKey('settings_confirm_save_title')),
       content: t(getKey('settings_confirm_save_content')),
       icon: <ExclamationCircleFilled />,
       okText: t(getKey('confirm_btn')),
       cancelText: t(getKey('cancel_btn')),
-      onOk: () => update(coerce(values)),
+      onOk: () => update(values as SystemSettingsPayload),
     });
   };
 
   /** Reset pulls from the last-fetched server snapshot — no refetch needed. */
   const handleReset = () => {
     if (!data) return;
-    form.setFieldsValue({
-      videoLockDays: data.videoLockDays,
-      quizPassThreshold: data.quizPassThreshold,
-      quizRetryLimit: data.quizRetryLimit,
-      inactiveUserPasswordResetDays: data.inactiveUserPasswordResetDays,
-    } as IPlatformSettings);
+    form.setFieldsValue(toFormValues());
   };
 
   if (isLoading) {
@@ -107,7 +113,29 @@ const SettingsPage = () => {
     );
   }
 
-  const scheduleNote = t(getKey('settings_schedule_note'));
+  const numberField = (
+    key: SettingKey,
+    min: number,
+    max: number,
+    suffix?: string,
+  ) => (
+    <Form.Item
+      name={key}
+      label={
+        <h3 className="m-0 text-sm font-semibold leading-[20px] text-nearBlack">
+          {t(getKey(SETTING_META[key].labelKey))}
+        </h3>
+      }
+      extra={
+        <span className="text-xs text-grayDark">
+          {t(getKey(SETTING_META[key].hintKey))}
+        </span>
+      }
+      rules={[requiredRule, positiveIntegerRule]}
+    >
+      <CustomInput type="number" min={min} max={max} step={1} suffix={suffix} />
+    </Form.Item>
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -121,117 +149,57 @@ const SettingsPage = () => {
         </p>
       </div>
 
-      <Form<IPlatformSettingsPayload>
+      <Form<Record<SettingKey, number>>
         form={form}
         layout="vertical"
         onFinish={handleSubmit}
         requiredMark={false}
         className="flex flex-col gap-6"
       >
-        {/* 2-column × 2-row grid on md+ screens, stacks on mobile. */}
         <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
-          {/* Card 1 — video lock */}
+          {/* Card 1 — hạn mức mượn theo loại thẻ */}
           <Card className="!rounded-[10px] border border-gray-200 shadow-sm">
-            <h3 className="m-0 mb-1 text-lg font-semibold leading-[24px] text-nearBlack">
-              {t(getKey('settings_video_lock_days_label'))}
+            <h3 className="m-0 mb-3 text-lg font-semibold leading-[24px] text-nearBlack">
+              Hạn mức mượn theo loại thẻ
             </h3>
-            <p className="m-0 mb-3 text-sm text-grayDark">
-              {t(getKey('settings_video_lock_days_hint'))}
-            </p>
-            <Alert
-              type="info"
-              showIcon
-              className="!mb-4"
-              message={scheduleNote}
-            />
-            <Form.Item
-              name="videoLockDays"
-              rules={[requiredRule, positiveIntegerRule]}
-              className="!mb-0"
-            >
-              <CustomInput
-                type="number"
-                min={0}
-                max={3650}
-                step={1}
-                suffix={t(getKey('unit_day'))}
-              />
-            </Form.Item>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {numberField('card_regular_borrow_limit', 1, 100, t(getKey('unit_book')))}
+              {numberField('card_regular_max_days', 1, 365, t(getKey('unit_day')))}
+              {numberField('card_priority_borrow_limit', 1, 100, t(getKey('unit_book')))}
+              {numberField('card_priority_max_days', 1, 365, t(getKey('unit_day')))}
+            </div>
           </Card>
 
-          {/* Card 2 — inactive-user password reset */}
+          {/* Card 2 — phí trễ hạn */}
           <Card className="!rounded-[10px] border border-gray-200 shadow-sm">
-            <h3 className="m-0 mb-1 text-lg font-semibold leading-[24px] text-nearBlack">
-              {t(getKey('settings_inactive_reset_days_label'))}
+            <h3 className="m-0 mb-3 text-lg font-semibold leading-[24px] text-nearBlack">
+              Phí trễ hạn
             </h3>
-            <p className="m-0 mb-3 text-sm text-grayDark">
-              {t(getKey('settings_inactive_reset_days_hint'))}
-            </p>
-            <Alert
-              type="info"
-              showIcon
-              className="!mb-4"
-              message={scheduleNote}
-            />
-            <Form.Item
-              name="inactiveUserPasswordResetDays"
-              rules={[requiredRule, positiveIntegerRule]}
-              className="!mb-0"
-            >
-              <CustomInput
-                type="number"
-                min={1}
-                max={3650}
-                step={1}
-                suffix={t(getKey('unit_day'))}
-              />
-            </Form.Item>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {numberField('fine_per_day', 0, 1000000, t(getKey('unit_time')))}
+              {numberField('fine_cap_amount', 0, 100000000, t(getKey('unit_time')))}
+            </div>
           </Card>
 
-          {/* Card 3 — quiz pass threshold */}
+          {/* Card 3 — số lần gia hạn */}
           <Card className="!rounded-[10px] border border-gray-200 shadow-sm">
-            <h3 className="m-0 mb-1 text-lg font-semibold leading-[24px] text-nearBlack">
-              {t(getKey('settings_quiz_pass_threshold_label'))}
+            <h3 className="m-0 mb-3 text-lg font-semibold leading-[24px] text-nearBlack">
+              Gia hạn mượn sách
             </h3>
-            <p className="m-0 mb-3 text-sm text-grayDark">
-              {t(getKey('settings_quiz_pass_threshold_hint'))}
-            </p>
-            <Form.Item
-              name="quizPassThreshold"
-              rules={[requiredRule, positiveIntegerRule]}
-              className="!mb-0"
-            >
-              <CustomInput
-                type="number"
-                min={1}
-                max={100}
-                step={1}
-                suffix="%"
-              />
-            </Form.Item>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {numberField('max_renew_times', 0, 20, t(getKey('unit_times')))}
+              {numberField('renew_extend_days', 1, 90, t(getKey('unit_day')))}
+            </div>
           </Card>
 
-          {/* Card 4 — quiz retry limit */}
+          {/* Card 4 — thời gian giữ sách đặt trước */}
           <Card className="!rounded-[10px] border border-gray-200 shadow-sm">
-            <h3 className="m-0 mb-1 text-lg font-semibold leading-[24px] text-nearBlack">
-              {t(getKey('settings_quiz_retry_limit_label'))}
+            <h3 className="m-0 mb-3 text-lg font-semibold leading-[24px] text-nearBlack">
+              Đặt trước sách
             </h3>
-            <p className="m-0 mb-3 text-sm text-grayDark">
-              {t(getKey('settings_quiz_retry_limit_hint'))}
-            </p>
-            <Form.Item
-              name="quizRetryLimit"
-              rules={[requiredRule, positiveIntegerRule]}
-              className="!mb-0"
-            >
-              <CustomInput
-                type="number"
-                min={0}
-                max={100}
-                step={1}
-                suffix={t(getKey('unit_time'))}
-              />
-            </Form.Item>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {numberField('reservation_expiry_days', 1, 30, t(getKey('unit_day')))}
+            </div>
           </Card>
         </div>
 
