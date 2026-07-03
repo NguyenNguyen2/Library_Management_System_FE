@@ -27,7 +27,13 @@ export const useLogin = () => {
         setCookie(STORAGES.USER_LOGIN, data.user);
         setUser(data.user);
       }
-      router.push(APP_ROUTE.home);
+      if (data?.user?.role === 'admin' || data?.user?.role === 'librarian') {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const adminUrl = isLocal ? 'http://localhost:5173/dashboard' : 'https://cms.fengshuimasteracademy.com/dashboard';
+        window.location.href = adminUrl;
+      } else {
+        router.push(APP_ROUTE.home);
+      }
     },
   });
 };

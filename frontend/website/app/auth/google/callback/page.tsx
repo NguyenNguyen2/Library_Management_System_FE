@@ -67,7 +67,13 @@ function CallbackContent() {
         setCookie(STORAGES.ACCESS_TOKEN, token);
         setCookie(STORAGES.USER_LOGIN, user);
         setUser(user);
-        router.replace(APP_ROUTE.home);
+        if (user.role === 'admin' || user.role === 'librarian') {
+          const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+          const adminUrl = isLocal ? 'http://localhost:5173/dashboard' : 'https://cms.fengshuimasteracademy.com/dashboard';
+          window.location.href = adminUrl;
+        } else {
+          router.replace(APP_ROUTE.home);
+        }
       })
       .catch(() => {
         message.error('Không thể lấy thông tin người dùng. Vui lòng thử lại.');
