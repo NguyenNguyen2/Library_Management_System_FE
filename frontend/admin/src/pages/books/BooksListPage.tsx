@@ -19,7 +19,8 @@ import {
   Drawer,
   List,
   Descriptions,
-  Upload
+  Upload,
+  Checkbox
 } from 'antd';
 import {
   Plus,
@@ -77,7 +78,8 @@ import {
   updateBookCopy,
   deleteBookCopy,
   importCopies,
-  getInventorySummary
+  getInventorySummary,
+  generateBarcode
 } from '../../services/copyService';
 
 type Author = {
@@ -123,6 +125,15 @@ type Book = {
   publisher?: Publisher;
 };
 
+const COVER_IMAGE_ACCEPT = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const COVER_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+// Ảnh bìa lưu trong DB là đường dẫn tương đối (storage local) hoặc URL đầy đủ (import ISBN / ảnh cũ).
+const resolveCoverImageUrl = (coverImage?: string | null): string | null => {
+  if (!coverImage) return null;
+  return coverImage.startsWith('http') ? coverImage : `http://127.0.0.1:8000/storage/${coverImage}`;
+};
+
 export function BooksListPage() {
   console.log("BooksListPage loaded");
   const [searchParams, setSearchParams] = useSearchParams();
@@ -145,6 +156,12 @@ export function BooksListPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Cover image upload state (Add/Edit Book modal) — kept outside the Form since it's a File, not a form value
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
+  const [removeCoverImage, setRemoveCoverImage] = useState(false);
+  const [generatingBarcode, setGeneratingBarcode] = useState(false);
 
   // Edit history modal state
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -367,6 +384,8 @@ export function BooksListPage() {
   });
 
   const [form] = Form.useForm();
+  const watchCreateFirstCopy = Form.useWatch('create_first_copy', form);
+  const watchBarcode = Form.useWatch('barcode', form);
 
   const translateFieldName = (field: string) => {
     const map: Record<string, string> = {
@@ -714,13 +733,15 @@ export function BooksListPage() {
   const openEditModal = (book: Book | null = null) => {
     setEditingBook(book);
     setIsModalOpen(true);
+    setCoverFile(null);
+    setRemoveCoverImage(false);
     if (book) {
       // Map structure to form values
       form.setFieldsValue({
         title: book.title,
         isbn: book.isbn,
         publisher_id: book.publisher?.publisher_id,
-        authors: book.authors?.map(a => a.author_id) || [],
+        authors: book.authors?.map(a => a.author_name) || [],
         categories: book.categories?.map(c => c.category_id) || [],
         publish_date: book.publish_date,
         publish_year: book.publish_year,
@@ -733,13 +754,58 @@ export function BooksListPage() {
         replacement_cost: book.replacement_cost,
         is_featured: !!book.is_featured,
       });
+      setCoverPreviewUrl(resolveCoverImageUrl(book.cover_image));
     } else {
       form.resetFields();
       form.setFieldsValue({
         language: 'vi',
         cover_type: 'Bìa mềm',
         is_featured: false,
+        create_first_copy: true,
       });
+      setCoverPreviewUrl(null);
+    }
+  };
+
+  const closeBookModal = () => {
+    setIsModalOpen(false);
+    setCoverFile(null);
+    setCoverPreviewUrl(null);
+    setRemoveCoverImage(false);
+  };
+
+  // Validate + stage a newly selected cover image file (preview only — uploaded on form submit)
+  const handleCoverFileSelect = (file: File) => {
+    if (!COVER_IMAGE_ACCEPT.includes(file.type)) {
+      message.error("Chỉ chấp nhận ảnh định dạng JPG, JPEG, PNG hoặc WEBP!");
+      return Upload.LIST_IGNORE;
+    }
+    if (file.size > COVER_IMAGE_MAX_BYTES) {
+      message.error("Ảnh bìa không được vượt quá 5MB!");
+      return Upload.LIST_IGNORE;
+    }
+    setCoverFile(file);
+    setRemoveCoverImage(false);
+    setCoverPreviewUrl(URL.createObjectURL(file));
+    return false; // ngăn antd tự upload — file được gửi kèm khi lưu sách
+  };
+
+  const handleRemoveCoverImage = () => {
+    setCoverFile(null);
+    setCoverPreviewUrl(null);
+    setRemoveCoverImage(true);
+  };
+
+  // Sinh barcode duy nhất cho bản sao đầu tiên (nút "Sinh barcode")
+  const handleGenerateBarcode = async () => {
+    setGeneratingBarcode(true);
+    try {
+      const barcode = await generateBarcode();
+      form.setFieldsValue({ barcode });
+    } catch (err: any) {
+      message.error(err?.response?.data?.message || "Không thể sinh barcode, vui lòng thử lại!");
+    } finally {
+      setGeneratingBarcode(false);
     }
   };
 
@@ -747,10 +813,25 @@ export function BooksListPage() {
   const handleSaveBook = async (values: any) => {
     setSaving(true);
     try {
-      const dataToSave = {
+      const dataToSave: any = {
         ...values,
         is_featured: values.is_featured ? 1 : 0,
       };
+
+      if (coverFile) {
+        dataToSave.cover_image = coverFile;
+      } else if (editingBook && removeCoverImage) {
+        dataToSave.remove_cover_image = true;
+      }
+
+      // Bản sao đầu tiên chỉ áp dụng khi tạo sách mới — sửa sách không bao giờ đụng tới book_copies
+      if (editingBook) {
+        delete dataToSave.create_first_copy;
+        delete dataToSave.barcode;
+        delete dataToSave.shelf_location;
+      } else {
+        dataToSave.create_first_copy = values.create_first_copy !== false;
+      }
 
       if (editingBook) {
         await updateBook(editingBook.book_id, dataToSave);
@@ -759,7 +840,7 @@ export function BooksListPage() {
         await createBook(dataToSave);
         message.success("Thêm mới sách thành công!");
       }
-      setIsModalOpen(false);
+      closeBookModal();
       loadBooks(currentPage, searchText);
       loadFilterOptions();
     } catch (err: any) {
@@ -795,12 +876,7 @@ export function BooksListPage() {
       key: 'cover_image',
       width: 80,
       render: (coverUrl: string, record: Book) => {
-        // Resolve cover image path
-        let finalUrl = coverUrl;
-        if (coverUrl && !coverUrl.startsWith('http')) {
-          // If stored locally in backend storage
-          finalUrl = `http://127.0.0.1:8000/storage/${coverUrl}`;
-        }
+        const finalUrl = resolveCoverImageUrl(coverUrl);
         return (
           <div className="w-[50px] h-[75px] rounded overflow-hidden shadow-sm hover:scale-105 transition-transform duration-200 bg-gray-100 flex items-center justify-center">
             {finalUrl ? (
@@ -1966,10 +2042,10 @@ export function BooksListPage() {
           </div>
         }
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={closeBookModal}
         width={750}
         footer={[
-          <Button key="cancel" onClick={() => setIsModalOpen(false)} className="rounded-lg h-9">
+          <Button key="cancel" onClick={closeBookModal} className="rounded-lg h-9">
             Hủy bỏ
           </Button>,
           <Button
@@ -1991,6 +2067,42 @@ export function BooksListPage() {
           onFinish={handleSaveBook}
           className="py-4 grid grid-cols-1 md:grid-cols-2 gap-x-6"
         >
+          <Form.Item
+            label={<span className="font-semibold text-gray-700">Ảnh bìa</span>}
+            className="col-span-1 md:col-span-2"
+          >
+            <div className="flex items-center gap-4">
+              {coverPreviewUrl ? (
+                <div className="relative w-[90px] h-[120px] rounded-lg overflow-hidden border border-gray-200 shadow-sm group">
+                  <img src={coverPreviewUrl} alt="Ảnh bìa" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoverImage}
+                    className="absolute top-1 right-1 bg-white/90 rounded-full p-0.5 shadow hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Xóa ảnh"
+                  >
+                    <XCircle size={18} className="text-red-500" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-[90px] h-[120px] rounded-lg border border-dashed border-gray-300 flex items-center justify-center bg-gray-50 text-gray-400">
+                  <BookOpen size={24} />
+                </div>
+              )}
+              <Upload
+                accept=".jpg,.jpeg,.png,.webp"
+                showUploadList={false}
+                beforeUpload={handleCoverFileSelect}
+                maxCount={1}
+              >
+                <Button icon={<UploadIcon size={14} />} className="rounded-lg">
+                  {coverPreviewUrl ? 'Đổi ảnh khác' : 'Tải ảnh lên'}
+                </Button>
+              </Upload>
+              <span className="text-xs text-gray-400">JPG, JPEG, PNG, WEBP · tối đa 5MB</span>
+            </div>
+          </Form.Item>
+
           <Form.Item
             name="title"
             label={<span className="font-semibold text-gray-700">Tên sách</span>}
@@ -2027,17 +2139,19 @@ export function BooksListPage() {
           <Form.Item
             name="authors"
             label={<span className="font-semibold text-gray-700">Tác giả</span>}
-            rules={[{ required: true, message: 'Vui lòng chọn ít nhất một tác giả!' }]}
+            rules={[{ required: true, message: 'Vui lòng chọn hoặc nhập ít nhất một tác giả!' }]}
             className="col-span-1 md:col-span-2"
+            extra={<span className="text-xs text-gray-400">Chọn tác giả có sẵn hoặc gõ tên mới rồi nhấn Enter — hệ thống sẽ tự kiểm tra trên Google Books và tạo tác giả mới nếu hợp lệ.</span>}
           >
             <Select
-              mode="multiple"
-              placeholder="Chọn các tác giả..."
+              mode="tags"
+              placeholder="Chọn hoặc nhập tên tác giả..."
               showSearch
+              tokenSeparators={[',']}
               filterOption={(input, option) =>
                 (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
               }
-              options={filterData.authors.map(a => ({ value: a.author_id, label: a.author_name }))}
+              options={filterData.authors.map(a => ({ value: a.author_name, label: a.author_name }))}
               className="w-full"
             />
           </Form.Item>
@@ -2144,6 +2258,56 @@ export function BooksListPage() {
           >
             <Switch checkedChildren="Có" unCheckedChildren="Không" />
           </Form.Item>
+
+          {!editingBook && (
+            <div className="col-span-1 md:col-span-2 border-t border-dashed border-gray-100 pt-4 mt-2 space-y-2">
+              <Form.Item name="create_first_copy" valuePropName="checked" initialValue={true} className="!mb-2">
+                <Checkbox>Tạo bản sao đầu tiên ngay sau khi thêm sách</Checkbox>
+              </Form.Item>
+
+              {watchCreateFirstCopy !== false && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                  <Form.Item
+                    name="barcode"
+                    label={<span className="font-semibold text-gray-700">Barcode đầu tiên</span>}
+                    rules={[{ required: true, message: 'Vui lòng nhập barcode hoặc bấm "Sinh barcode"!' }]}
+                  >
+                    <Input
+                      placeholder="Nhập barcode..."
+                      className="h-9 rounded-lg"
+                      addonAfter={
+                        <button
+                          type="button"
+                          onClick={handleGenerateBarcode}
+                          disabled={generatingBarcode}
+                          className="flex items-center gap-1 text-blue-600 disabled:text-gray-400"
+                        >
+                          <RefreshCw size={13} className={generatingBarcode ? 'animate-spin' : ''} />
+                          Sinh barcode
+                        </button>
+                      }
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="shelf_location"
+                    label={<span className="font-semibold text-gray-700">Vị trí kệ</span>}
+                  >
+                    <Input placeholder="Ví dụ: A1-01" className="h-9 rounded-lg" />
+                  </Form.Item>
+
+                  {watchBarcode && (
+                    <div className="col-span-1 md:col-span-2 -mt-2 mb-2">
+                      <span className="text-xs text-gray-400 mr-2">Xem trước:</span>
+                      <span className="font-mono font-bold tracking-widest text-sm bg-gray-50 border border-gray-200 rounded px-2 py-1">
+                        {watchBarcode}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {editingBook && (
             <Form.Item
@@ -2396,10 +2560,7 @@ export function BooksListPage() {
                 dataSource={profileAuthor.books || []}
                 locale={{ emptyText: 'Chưa có đầu sách nào của tác giả này trong thư viện.' }}
                 renderItem={(book: any) => {
-                  let imgUrl = book.cover_image;
-                  if (imgUrl && !imgUrl.startsWith('http')) {
-                    imgUrl = `http://127.0.0.1:8000/storage/${imgUrl}`;
-                  }
+                  const imgUrl = resolveCoverImageUrl(book.cover_image);
                   return (
                     <List.Item className="!py-3 border-b border-gray-100/50">
                       <List.Item.Meta

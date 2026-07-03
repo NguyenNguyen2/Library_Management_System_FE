@@ -90,7 +90,6 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
       label: 'Giao dịch mượn trả',
       icon: <LockOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.TRANSACTIONS,
-      badge: 12,
       children: [
         { label: 'Mượn sách (Check-out)', to: ROUTES.TRANSACTIONS },
         { label: 'Trả sách (Check-in)', to: ROUTES.RETURN },

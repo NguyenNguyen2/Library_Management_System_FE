@@ -7,14 +7,48 @@ export const getBooks = async (page = 1, q = "") => {
     return response.data;
 };
 
-// Thêm sách
+// Chuyển object dữ liệu sách (có thể chứa File ảnh bìa) thành multipart FormData
+const buildBookFormData = (data: Record<string, any>): FormData => {
+    const formData = new FormData();
+    Object.entries(data).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        if (value instanceof File) {
+            formData.append(key, value);
+        } else if (Array.isArray(value)) {
+            value.forEach((item) => formData.append(`${key}[]`, String(item)));
+        } else if (typeof value === "boolean") {
+            formData.append(key, value ? "1" : "0");
+        } else {
+            formData.append(key, String(value));
+        }
+    });
+    return formData;
+};
+
+// Thêm sách (multipart — hỗ trợ upload ảnh bìa, barcode, tạo bản sao đầu tiên)
 export const createBook = async (data: any) => {
-    const response = await axiosInstance.post("/v1/books", data);
+    const formData = buildBookFormData(data);
+    const response = await axiosInstance.post("/v1/books", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+    });
     return response.data;
 };
 
-// Cập nhật sách
+// Cập nhật sách. Nếu có ảnh mới hoặc yêu cầu xóa ảnh thì gửi multipart (kèm _method=PUT
+// vì PHP không tự đọc được file từ request PUT thật); các trường hợp còn lại giữ nguyên PUT JSON.
 export const updateBook = async (id: number, data: any) => {
+    const hasNewCover = data?.cover_image instanceof File;
+    const hasRemoveFlag = data?.remove_cover_image === true;
+
+    if (hasNewCover || hasRemoveFlag) {
+        const formData = buildBookFormData(data);
+        formData.append("_method", "PUT");
+        const response = await axiosInstance.post(`/v1/books/${id}`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        return response.data;
+    }
+
     const response = await axiosInstance.put(`/v1/books/${id}`, data);
     return response.data;
 };

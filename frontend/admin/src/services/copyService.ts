@@ -24,6 +24,12 @@ export const deleteBookCopy = async (id: number, data?: any) => {
     return response.data;
 };
 
+// Sinh barcode mới, chưa tồn tại trong kho, để gợi ý cho ô nhập barcode
+export const generateBarcode = async (): Promise<string> => {
+    const response = await axiosInstance.get(`/v1/book-copies/generate-barcode`);
+    return response.data.barcode;
+};
+
 // Nhập kho hàng loạt từ file Excel/CSV
 export const importCopies = async (file: File) => {
     const formData = new FormData();
