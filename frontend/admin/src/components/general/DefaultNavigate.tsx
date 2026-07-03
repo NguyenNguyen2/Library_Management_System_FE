@@ -87,7 +87,6 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       label: t(getKey('menu_transactions')),
       icon: <LockOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.TRANSACTIONS,
-      badge: 47,
       children: [
         { label: t(getKey('checkout_title')), to: ROUTES.TRANSACTIONS },
         { label: t(getKey('return_title')), to: ROUTES.RETURN },

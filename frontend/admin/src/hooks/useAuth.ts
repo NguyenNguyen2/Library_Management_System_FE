@@ -29,7 +29,7 @@ export const useLogin = () => {
       setUser(userClone);
       setCookie(STORAGES.USER_LOGIN, userClone);
       setCookie(STORAGES.ACCESS_TOKEN, data?.accessToken);
-      navigate(ROUTES.USERS);
+      navigate(ROUTES.DASHBOARD);
     },
   });
 };
@@ -48,7 +48,7 @@ export const useVerify2FA = () => {
       setUser(userClone);
       setCookie(STORAGES.USER_LOGIN, userClone);
       setCookie(STORAGES.ACCESS_TOKEN, data?.accessToken);
-      navigate(ROUTES.USERS);
+      navigate(ROUTES.DASHBOARD);
     },
   });
 };
