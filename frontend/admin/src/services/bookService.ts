@@ -7,6 +7,12 @@ export const getBooks = async (page = 1, q = "") => {
     return response.data;
 };
 
+// Lấy danh sách sách nổi bật (phân trang từ toàn bộ DB, không giới hạn ở trang đang tải của danh sách chính)
+export const getFeaturedBooks = async (page = 1) => {
+    const response = await axiosInstance.get(`/v1/books?page=${page}&is_featured=1`);
+    return response.data;
+};
+
 // Chuyển object dữ liệu sách (có thể chứa File ảnh bìa) thành multipart FormData
 const buildBookFormData = (data: Record<string, any>): FormData => {
     const formData = new FormData();
