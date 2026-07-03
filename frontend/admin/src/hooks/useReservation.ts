@@ -31,7 +31,11 @@ export const reservationHooks = {
     const qc = useQueryClient();
     return useMutation<CreateReservationResult, AxiosError, CreateReservationPayload>({
       mutationFn: reservationApi.createReservation,
-      onSuccess: () => qc.invalidateQueries({ queryKey: ['reservations'] }),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['reservations'] });
+        qc.invalidateQueries({ queryKey: ['reportTodayReport'] });
+        qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      },
     });
   },
 
@@ -39,7 +43,11 @@ export const reservationHooks = {
     const qc = useQueryClient();
     return useMutation<ConfirmReservationResult, AxiosError, ConfirmReservationPayload>({
       mutationFn: reservationApi.confirmReservation,
-      onSuccess: () => qc.invalidateQueries({ queryKey: ['reservations'] }),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['reservations'] });
+        qc.invalidateQueries({ queryKey: ['reportTodayReport'] });
+        qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      },
     });
   },
 
@@ -47,7 +55,11 @@ export const reservationHooks = {
     const qc = useQueryClient();
     return useMutation<void, AxiosError, number>({
       mutationFn: reservationApi.cancelReservation,
-      onSuccess: () => qc.invalidateQueries({ queryKey: ['reservations'] }),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['reservations'] });
+        qc.invalidateQueries({ queryKey: ['reportTodayReport'] });
+        qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      },
     });
   },
 };

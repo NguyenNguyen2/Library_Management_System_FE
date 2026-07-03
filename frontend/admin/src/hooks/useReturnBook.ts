@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import {
   returnApi,
@@ -25,8 +25,15 @@ export const returnHooks = {
       mutationFn: returnApi.validateCopy,
     }),
 
-  useConfirmReturn: () =>
-    useMutation<ConfirmReturnResult, AxiosError, ConfirmReturnPayload>({
+  useConfirmReturn: () => {
+    const qc = useQueryClient();
+    return useMutation<ConfirmReturnResult, AxiosError, ConfirmReturnPayload>({
       mutationFn: returnApi.confirmReturn,
-    }),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['reportTodayReport'] });
+        qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+        qc.invalidateQueries({ queryKey: ['dashboard-overdue'] });
+      },
+    });
+  },
 };

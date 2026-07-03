@@ -18,6 +18,7 @@ import {
   FineRevenueItem,
   FineRevenueParams,
   FineReasonItem,
+  TodayReportData,
 } from '../types/ReportType';
 
 export const reportApi = {
@@ -79,5 +80,11 @@ export const reportApi = {
   getFineReasons: async (): Promise<FineReasonItem[]> => {
     const res = await axiosInstance.get('/private/v1/reports/fine-reasons');
     return res?.data?.results?.objects ?? [];
+  },
+
+  // Báo cáo hoạt động hôm nay (mượn, trả, đặt trước)
+  getTodayReport: async (): Promise<TodayReportData> => {
+    const res = await axiosInstance.get('/private/v1/reports/today');
+    return res?.data?.results?.object;
   },
 };

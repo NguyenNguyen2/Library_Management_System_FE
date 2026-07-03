@@ -1,4 +1,4 @@
-import { Badge, Button, Card, Flex, Segmented, Table, TableColumnsType, Tag, Tooltip, Typography } from 'antd';
+import { Badge, Button, Card, Col, Flex, Modal, Row, Segmented, Skeleton, Space, Statistic, Table, TableColumnsType, Tabs, Tag, Tooltip, Typography } from 'antd';
 import {
   ArrowRightOutlined,
   BarChartOutlined,
@@ -8,7 +8,10 @@ import {
   DollarOutlined,
   ExclamationCircleOutlined,
   FieldTimeOutlined,
+  FileExcelOutlined,
+  FilePdfOutlined,
   RiseOutlined,
+  SwapOutlined,
   TeamOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
@@ -18,6 +21,7 @@ import dayjs from 'dayjs';
 import LineChart from '@shared/components/chart/LineChart';
 import PieChart from '@shared/components/chart/PieChart';
 import { dashboardHooks } from '../../hooks/useDashboard';
+import { reportHooks } from '../../hooks/useReport';
 import { formatNumber } from '@shared/utils/numberUtils';
 import { useGlobalVariable } from '../../hooks/GlobalVariableProvider';
 import { cn } from '@shared/constants/commonConst';
@@ -33,11 +37,182 @@ const SEVERITY_TAG: Record<string, { color: string; label: string }> = {
   heavy:  { color: 'red', label: '>10 ngày' },
 };
 
+const TODAY_BORROWS_COLUMNS = [
+  {
+    title: 'Mã phiếu',
+    dataIndex: 'borrow_id',
+    key: 'borrow_id',
+    width: 90,
+    render: (id: number) => <span className="text-gray-400">#{id}</span>,
+  },
+  {
+    title: 'Độc giả',
+    dataIndex: 'reader_name',
+    key: 'reader_name',
+    render: (name: string, record: any) => (
+      <div>
+        <div className="font-semibold text-sm">{name}</div>
+        <div className="text-gray-400 text-xs">{record.reader_email}</div>
+      </div>
+    ),
+  },
+  {
+    title: 'Sách mượn',
+    dataIndex: 'books',
+    key: 'books',
+    render: (books: string) => <span className="font-medium text-gray-700">{books || '—'}</span>,
+  },
+  {
+    title: 'Hạn trả',
+    dataIndex: 'due_date',
+    key: 'due_date',
+    render: (d: string) => <span>{dayjs(d).format('DD/MM/YYYY')}</span>,
+  },
+  {
+    title: 'Trạng thái',
+    dataIndex: 'status',
+    key: 'status',
+    render: (status: string) => {
+      const isBorrowing = status === 'borrowing';
+      return (
+        <Tag color={isBorrowing ? 'blue' : 'green'}>
+          {isBorrowing ? 'Đang mượn' : 'Đã trả'}
+        </Tag>
+      );
+    },
+  },
+];
+
+const TODAY_RETURNS_COLUMNS = [
+  {
+    title: 'Mã phiếu',
+    dataIndex: 'borrow_id',
+    key: 'borrow_id',
+    width: 90,
+    render: (id: number) => <span className="text-gray-400">#{id}</span>,
+  },
+  {
+    title: 'Độc giả',
+    dataIndex: 'reader_name',
+    key: 'reader_name',
+    render: (name: string, record: any) => (
+      <div>
+        <div className="font-semibold text-sm">{name}</div>
+        <div className="text-gray-400 text-xs">{record.reader_email}</div>
+      </div>
+    ),
+  },
+  {
+    title: 'Tên sách',
+    dataIndex: 'book_title',
+    key: 'book_title',
+    render: (title: string) => <span className="font-medium text-gray-700">{title}</span>,
+  },
+  {
+    title: 'Giờ trả',
+    dataIndex: 'return_date',
+    key: 'return_date',
+    render: (d: string) => <span>{dayjs(d).format('HH:mm')}</span>,
+  },
+  {
+    title: 'Phí phạt',
+    dataIndex: 'fine_amount',
+    key: 'fine_amount',
+    align: 'right' as const,
+    render: (v: number) =>
+      v > 0 ? (
+        <Tag color="red" className="font-semibold">
+          {v.toLocaleString('vi-VN')}đ
+        </Tag>
+      ) : (
+        <span className="text-gray-400">—</span>
+      ),
+  },
+];
+
+const TODAY_RESERVATIONS_COLUMNS = [
+  {
+    title: 'Mã đặt trước',
+    dataIndex: 'reservation_id',
+    key: 'reservation_id',
+    width: 100,
+    render: (id: number) => <span className="text-gray-400">#{id}</span>,
+  },
+  {
+    title: 'Độc giả',
+    dataIndex: 'reader_name',
+    key: 'reader_name',
+    render: (name: string, record: any) => (
+      <div>
+        <div className="font-semibold text-sm">{name}</div>
+        <div className="text-gray-400 text-xs">{record.reader_email}</div>
+      </div>
+    ),
+  },
+  {
+    title: 'Tên sách',
+    dataIndex: 'book_title',
+    key: 'book_title',
+    render: (title: string) => <span className="font-medium text-gray-700">{title}</span>,
+  },
+  {
+    title: 'Giờ đặt',
+    dataIndex: 'created_at',
+    key: 'created_at',
+    render: (d: string) => <span>{dayjs(d).format('HH:mm')}</span>,
+  },
+  {
+    title: 'Hàng chờ',
+    dataIndex: 'queue_position',
+    key: 'queue_position',
+    align: 'center' as const,
+    render: (pos: number) => <Tag color="blue" className="font-semibold">{pos}</Tag>,
+  },
+  {
+    title: 'Trạng thái',
+    dataIndex: 'status',
+    key: 'status',
+    render: (status: string) => {
+      const colorMap: Record<string, string> = {
+        waiting: 'orange',
+        ready: 'cyan',
+        completed: 'green',
+        cancelled: 'red',
+        expired: 'default',
+      };
+      const labelMap: Record<string, string> = {
+        waiting: 'Đang chờ',
+        ready: 'Sẵn sàng',
+        completed: 'Đã nhận',
+        cancelled: 'Đã hủy',
+        expired: 'Hết hạn',
+      };
+      return (
+        <Tag color={colorMap[status] ?? 'default'}>
+          {labelMap[status] ?? status}
+        </Tag>
+      );
+    },
+  },
+];
+
 const DashboardPage = () => {
   const { user } = useGlobalVariable();
   const navigate = useNavigate();
   const [borrowRange, setBorrowRange] = useState<'7d' | '30d' | '90d'>('30d');
   const [topTab, setTopTab] = useState<'borrowed' | 'reserved'>('borrowed');
+  const [isTodayModalOpen, setIsTodayModalOpen] = useState<boolean>(false);
+  const { data: todayReportData, isLoading: todayReportLoading } = reportHooks.useTodayReport();
+
+  const buildTodayPdfUrl = (): string => {
+    const base = import.meta.env.VITE_API_URL as string;
+    return `${base}/private/v1/reports/export/today-pdf`;
+  };
+
+  const buildTodayCsvUrl = (): string => {
+    const base = import.meta.env.VITE_API_URL as string;
+    return `${base}/private/v1/reports/export/today-csv`;
+  };
 
   // ─── Data ─────────────────────────────────────────────────────────────
   const { data: legacyData, isLoading: legacyLoading } = dashboardHooks.useFetchDashboard();
@@ -198,7 +373,10 @@ const DashboardPage = () => {
           </h1>
           <p className="m-0 mt-1 text-sm text-grayDark">{today}</p>
         </div>
-        <button className="inline-flex items-center justify-center rounded-lg text-sm font-medium bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 h-10 shadow cursor-pointer border-0 transition-colors">
+        <button
+          onClick={() => setIsTodayModalOpen(true)}
+          className="inline-flex items-center justify-center rounded-lg text-sm font-medium bg-[#2563EB] hover:bg-[#1D4ED8] text-white px-4 h-10 shadow cursor-pointer border-0 transition-colors"
+        >
           <BarChartOutlined className="mr-2" /> Tạo báo cáo hôm nay
         </button>
       </div>
@@ -481,6 +659,150 @@ const DashboardPage = () => {
           }
         />
       </Card>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          MODAL BÁO CÁO HÔM NAY (MƯỢN, TRẢ, ĐẶT TRƯỚC HÔM NAY)
+      ═══════════════════════════════════════════════════════════════════ */}
+      <Modal
+        title={
+          <div className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <RiseOutlined className="text-blue-600" />
+            Báo cáo hoạt động ngày hôm nay ({dayjs().format('DD/MM/YYYY')})
+          </div>
+        }
+        open={isTodayModalOpen}
+        onCancel={() => setIsTodayModalOpen(false)}
+        width={900}
+        footer={[
+          <Button
+            key="pdf"
+            icon={<FilePdfOutlined />}
+            onClick={() => window.open(buildTodayPdfUrl(), '_blank')}
+            className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100"
+          >
+            Xuất PDF
+          </Button>,
+          <Button
+            key="csv"
+            icon={<FileExcelOutlined />}
+            onClick={() => window.open(buildTodayCsvUrl(), '_blank')}
+            style={{ color: '#16a34a', borderColor: '#16a34a', background: '#f0fdf4' }}
+            className="hover:bg-green-100"
+          >
+            Xuất Excel
+          </Button>,
+          <Button key="close" onClick={() => setIsTodayModalOpen(false)}>
+            Đóng
+          </Button>
+        ]}
+        className="rounded-lg overflow-hidden"
+      >
+        {todayReportLoading ? (
+          <Skeleton active paragraph={{ rows: 10 }} />
+        ) : (
+          <div className="flex flex-col gap-6 py-4">
+            {/* Summary Cards */}
+            <Row gutter={[16, 16]}>
+              <Col xs={24} sm={8}>
+                <Card
+                  bordered={false}
+                  className="bg-blue-50 border-t-4 border-blue-500 rounded-lg shadow-sm"
+                  bodyStyle={{ padding: '16px' }}
+                >
+                  <Statistic
+                    title={<span className="text-blue-700 font-medium">Lượt mượn hôm nay</span>}
+                    value={todayReportData?.summary?.total_borrows ?? 0}
+                    valueStyle={{ color: '#1d4ed8', fontWeight: 700 }}
+                    prefix={<RiseOutlined />}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Card
+                  bordered={false}
+                  className="bg-green-50 border-t-4 border-green-500 rounded-lg shadow-sm"
+                  bodyStyle={{ padding: '16px' }}
+                >
+                  <Statistic
+                    title={<span className="text-green-700 font-medium">Lượt trả hôm nay</span>}
+                    value={todayReportData?.summary?.total_returns ?? 0}
+                    valueStyle={{ color: '#047857', fontWeight: 700 }}
+                    prefix={<SwapOutlined />}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={8}>
+                <Card
+                  bordered={false}
+                  className="bg-amber-50 border-t-4 border-amber-500 rounded-lg shadow-sm"
+                  bodyStyle={{ padding: '16px' }}
+                >
+                  <Statistic
+                    title={<span className="text-amber-700 font-medium">Đặt trước hôm nay</span>}
+                    value={todayReportData?.summary?.total_reservations ?? 0}
+                    valueStyle={{ color: '#b45309', fontWeight: 700 }}
+                    prefix={<BookOutlined />}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
+            {/* Tabs for details */}
+            <Tabs
+              defaultActiveKey="borrows"
+              type="card"
+              items={[
+                {
+                  key: 'borrows',
+                  label: `Lượt mượn (${todayReportData?.summary?.total_borrows ?? 0})`,
+                  children: (
+                    <Table
+                      dataSource={todayReportData?.details?.borrows ?? []}
+                      columns={TODAY_BORROWS_COLUMNS}
+                      rowKey="borrow_id"
+                      pagination={{ pageSize: 5 }}
+                      size="small"
+                      bordered={false}
+                      locale={{ emptyText: 'Không có lượt mượn nào trong ngày hôm nay' }}
+                    />
+                  ),
+                },
+                {
+                  key: 'returns',
+                  label: `Lượt trả (${todayReportData?.summary?.total_returns ?? 0})`,
+                  children: (
+                    <Table
+                      dataSource={todayReportData?.details?.returns ?? []}
+                      columns={TODAY_RETURNS_COLUMNS}
+                      rowKey={(record) => `${record.borrow_id}-${record.book_title}`}
+                      pagination={{ pageSize: 5 }}
+                      size="small"
+                      bordered={false}
+                      locale={{ emptyText: 'Không có lượt trả nào trong ngày hôm nay' }}
+                    />
+                  ),
+                },
+                {
+                  key: 'reservations',
+                  label: `Đặt trước (${todayReportData?.summary?.total_reservations ?? 0})`,
+                  children: (
+                    <Table
+                      dataSource={todayReportData?.details?.reservations ?? []}
+                      columns={TODAY_RESERVATIONS_COLUMNS}
+                      rowKey="reservation_id"
+                      pagination={{ pageSize: 5 }}
+                      size="small"
+                      bordered={false}
+                      locale={{ emptyText: 'Không có lượt đặt trước nào trong ngày hôm nay' }}
+                    />
+                  ),
+                },
+              ]}
+            />
+          </div>
+        )}
+      </Modal>
+
     </div>
   );
 };

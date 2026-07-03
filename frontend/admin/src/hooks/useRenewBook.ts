@@ -25,7 +25,11 @@ export const renewHooks = {
     const qc = useQueryClient();
     return useMutation<RenewBookResult, AxiosError, RenewBookPayload>({
       mutationFn: renewApi.renewBook,
-      onSuccess: () => qc.invalidateQueries({ queryKey: ['renew-list'] }),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['renew-list'] });
+        qc.invalidateQueries({ queryKey: ['reportTodayReport'] });
+        qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      },
     });
   },
 

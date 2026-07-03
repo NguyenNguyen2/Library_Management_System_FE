@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import {
   checkoutApi,
@@ -31,8 +31,14 @@ export const checkoutHooks = {
   },
 
   useCheckout: () => {
+    const qc = useQueryClient();
     return useMutation<CheckoutResult, AxiosError, CheckoutPayload>({
       mutationFn: checkoutApi.checkout,
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['reportTodayReport'] });
+        qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+        qc.invalidateQueries({ queryKey: ['dashboard-overdue'] });
+      },
     });
   },
 };

@@ -40,6 +40,8 @@ export const feesHooks = {
         qc.invalidateQueries({ queryKey: [KEYS.fines] });
         qc.invalidateQueries({ queryKey: [KEYS.history] });
         qc.invalidateQueries({ queryKey: [KEYS.revenue] });
+        qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+        qc.invalidateQueries({ queryKey: ['dashboard-overdue'] });
       },
     });
   },
@@ -51,6 +53,7 @@ export const feesHooks = {
       mutationFn: feesApi.createDamageFine,
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: [KEYS.fines] });
+        qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
       },
     });
   },

@@ -29,6 +29,7 @@ export const QueryKey = {
     overdueSummary:      'reportOverdueSummary',       // Phase 4 (overdue)
     fineRevenue:         'reportFineRevenue',           // Phase 4 (fine)
     fineReasons:         'reportFineReasons',           // Phase 4 (fine)
+    todayReport:         'reportTodayReport',
   },
   aiDemand: {
     importSuggestions: 'aiImportSuggestions',

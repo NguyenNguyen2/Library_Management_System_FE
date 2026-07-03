@@ -156,3 +156,50 @@ export interface FineReasonItem {
   fine_count:   number; // số lần phát sinh trong nhóm này
   total_amount: number; // tổng tiền phạt trong nhóm (bao gồm cả chưa thu)
 }
+
+// ── Báo cáo hoạt động hôm nay ─────────────────────────────────────────────
+
+export interface TodayBorrow {
+  borrow_id:    number;
+  borrow_date:  string;
+  due_date:     string;
+  reader_name:  string;
+  reader_email: string;
+  card_number:  string | null;
+  status:       string;
+  books:        string | null;
+}
+
+export interface TodayReturn {
+  borrow_id:    number;
+  book_title:   string;
+  return_date:  string;
+  reader_name:  string;
+  reader_email: string;
+  fine_amount:  number;
+}
+
+export interface TodayReservation {
+  reservation_id: number;
+  created_at:     string;
+  reader_name:    string;
+  reader_email:   string;
+  book_title:     string;
+  queue_position: number;
+  status:         string;
+}
+
+export interface TodaySummary {
+  total_borrows:      number;
+  total_returns:      number;
+  total_reservations: number;
+}
+
+export interface TodayReportData {
+  summary: TodaySummary;
+  details: {
+    borrows:      TodayBorrow[];
+    returns:      TodayReturn[];
+    reservations: TodayReservation[];
+  };
+}

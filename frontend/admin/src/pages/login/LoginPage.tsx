@@ -20,6 +20,7 @@ const LoginPage = () => {
       {
         onSuccess: () => {
           message.success('Xác thực 2FA thành công!');
+          navigate(ROUTES.DASHBOARD);
         },
         onError: (err: any) => {
           message.error(err?.response?.data?.message || 'Mã OTP không chính xác.');

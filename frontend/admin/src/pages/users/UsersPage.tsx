@@ -21,6 +21,7 @@ import {
 import { ROUTES } from '../../constants/routers';
 import FilterTable from '@shared/components/table/FilterTable';
 import { userHooks } from '../../hooks/useUsers';
+import { useGlobalVariable } from '../../hooks/GlobalVariableProvider';
 import {
   ICreateUser,
   IDetailUser,
@@ -858,6 +859,17 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
         },
       },
       {
+        title: 'Số thẻ',
+        dataIndex: 'card_number',
+        key: 'card_number',
+        width: 120,
+        render: (cardNumber: string | undefined) => (
+          <span className="font-mono text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
+            {cardNumber || '—'}
+          </span>
+        ),
+      },
+      {
         title: 'Trạng thái',
         dataIndex: 'status',
         key: 'status',
@@ -1074,8 +1086,11 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
 };
 
 const UsersPage = () => {
+  const { user } = useGlobalVariable();
+  const isAdmin = user?.role === 'admin';
+
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get('tab') || 'readers';
+  const activeTab = isAdmin ? (searchParams.get('tab') || 'readers') : 'readers';
   const [readerAddTrigger, setReaderAddTrigger] = useState(0);
   const [librarianAddTrigger, setLibrarianAddTrigger] = useState(0);
 
@@ -1104,16 +1119,18 @@ const UsersPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
-          <Segmented
-            options={[
-              { label: 'Độc giả', value: 'readers' },
-              { label: 'Thủ thư', value: 'librarians' },
-              { label: 'Nhật ký truy cập', value: 'audit' },
-            ]}
-            value={activeTab}
-            onChange={handleTabChange}
-            className="p-1 bg-gray-100 rounded-lg text-sm font-medium"
-          />
+          {isAdmin && (
+            <Segmented
+              options={[
+                { label: 'Độc giả', value: 'readers' },
+                { label: 'Thủ thư', value: 'librarians' },
+                { label: 'Nhật ký truy cập', value: 'audit' },
+              ]}
+              value={activeTab}
+              onChange={handleTabChange}
+              className="p-1 bg-gray-100 rounded-lg text-sm font-medium"
+            />
+          )}
           {activeTab === 'readers' && (
             <Button
               type="primary"

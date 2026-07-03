@@ -73,6 +73,15 @@ const ModalCreateEditUser = ({ detail }: IModalCreateEditUser) => {
         {t(getKey('add_user_desc'))}
       </p>
 
+      {isEditMode && detail?.card_number && (
+        <Flex gap={16} className="mb-4 bg-blue-50/50 p-3 rounded-lg border border-blue-100 items-center justify-between">
+          <span className="text-sm font-semibold text-navyDark">Số thẻ thư viện:</span>
+          <span className="font-mono text-sm font-bold text-blue-600 bg-white border border-blue-200 px-2.5 py-0.5 rounded select-all shadow-sm">
+            {detail.card_number}
+          </span>
+        </Flex>
+      )}
+
       {/* Edit mode: reset-password action row — red note on the left, button on the right */}
       {isEditMode && (
         <Flex align="center" justify="space-between" className="mb-4">

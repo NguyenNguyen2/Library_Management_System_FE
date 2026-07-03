@@ -10,6 +10,7 @@ import {
   ReaderRegistrationParams,
   OverdueBookParams,
   FineRevenueParams,
+  TodayReportData,
 } from '../types/ReportType';
 
 export const reportHooks = {
@@ -100,5 +101,13 @@ export const reportHooks = {
       queryKey: [QueryKey.reports.fineReasons],
       queryFn:  () => reportApi.getFineReasons(),
       staleTime: 60_000,
+    }),
+
+  // Báo cáo hôm nay (mượn, trả, đặt trước)
+  useTodayReport: () =>
+    useQuery<TodayReportData>({
+      queryKey: [QueryKey.reports.todayReport],
+      queryFn:  () => reportApi.getTodayReport(),
+      staleTime: 10_000,
     }),
 };
