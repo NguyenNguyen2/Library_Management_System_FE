@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Empty, Input, Spin, message } from "antd";
 import {
@@ -34,6 +34,7 @@ import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
 import type { IHomeBook } from '@/features/books/api/bookApi';
 import { useRecommendations } from '@/features/recommendations/hooks/useRecommendations';
 import { useCollaborativeRecommendations } from '@/features/recommendations/hooks/useCollaborativeRecommendations';
+import { BookSlideshow } from './components/BookSlideshow';
 
 function HomeBookCard({
   book,
@@ -231,6 +232,28 @@ export default function HomePage() {
     available_copies: r.available_copies,
   }));
 
+  const slideshowBooks = useMemo(() => {
+    const pool = new Map<number, IHomeBook>();
+    const addAll = (arr?: IHomeBook[]) => {
+      arr?.forEach((b) => {
+        if (b.cover_image && !pool.has(b.book_id)) pool.set(b.book_id, b);
+      });
+    };
+    addAll(recommendedBooks);
+    addAll(collaborativeBooks);
+    addAll(homeBooks?.featured);
+    addAll(homeBooks?.new_books);
+    addAll(homeBooks?.most_borrowed);
+
+    const shuffled = Array.from(pool.values());
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, 10);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recommendationsData, collaborativeData, homeBooks]);
+
   const handleBookClick = (bookId: number) => {
     router.push(`${APP_ROUTE.courses}/${bookId}`);
   };
@@ -335,6 +358,13 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+
+          {/* Book Slideshow */}
+          {!debouncedQ && slideshowBooks.length > 0 && (
+            <div className="mt-8">
+              <BookSlideshow books={slideshowBooks} onBookClick={handleBookClick} />
+            </div>
+          )}
         </div>
       </section>
 
