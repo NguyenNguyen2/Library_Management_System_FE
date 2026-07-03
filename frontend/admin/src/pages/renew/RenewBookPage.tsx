@@ -12,14 +12,17 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  CreditCardOutlined,
   SyncOutlined,
 } from '@ant-design/icons';
 import { useState } from 'react';
 import dayjs from 'dayjs';
 import { renewHooks } from '../../hooks/useRenewBook';
 import { reservationHooks } from '../../hooks/useReservation';
+import { libraryCardRenewalHooks } from '../../hooks/useLibraryCardRenewal';
 import { RenewListItem } from '../../api/renewApi';
 import { ReservationRecord } from '../../api/reservationApi';
+import { CardRenewalRequestItem } from '../../api/libraryCardRenewalApi';
 
 const FMT = 'YYYY-MM-DD';
 
@@ -54,17 +57,119 @@ const RESERVATION_STATUS: Record<string, { color: string; label: string }> = {
 };
 
 const RenewBookPage = () => {
-  const [activeTab, setActiveTab] = useState<'renew' | 'reservation'>('renew');
+  const [activeTab, setActiveTab] = useState<'renew' | 'reservation' | 'card'>('renew');
 
   const { data: renewData, isLoading: renewLoading } = renewHooks.useRenewList();
   const renewMutation = renewHooks.useRenewBook();
+  const rejectMutation = renewHooks.useRejectBook();
 
   const { data: reservationData, isLoading: resLoading } =
     reservationHooks.useListReservations({ page: 1, per_page: 50 });
 
+  const { data: cardRequests, isLoading: cardLoading } = libraryCardRenewalHooks.useRequests();
+  const cardApproveMutation = libraryCardRenewalHooks.useApprove();
+  const cardRejectMutation = libraryCardRenewalHooks.useReject();
+
   const renewList = renewData?.objects ?? [];
   const maxRenewTimes = renewData?.meta.max_renew_times ?? 2;
   const reservationList = reservationData?.objects ?? [];
+  const cardRequestList = cardRequests ?? [];
+
+  // ─── Card renewal approve/reject ──────────────────────────────────────
+  const handleCardApprove = (row: CardRenewalRequestItem) => {
+    cardApproveMutation.mutate(
+      { id: row.request_id },
+      {
+        onSuccess: () => message.success(`Đã duyệt gia hạn thẻ cho "${row.full_name}"`),
+        onError: (err) => {
+          const msg = (err.response?.data as { message?: string })?.message;
+          message.error(msg ?? 'Duyệt thất bại.');
+        },
+      }
+    );
+  };
+
+  const handleCardReject = (row: CardRenewalRequestItem) => {
+    cardRejectMutation.mutate(
+      { id: row.request_id },
+      {
+        onSuccess: () => message.success(`Đã từ chối yêu cầu gia hạn thẻ của "${row.full_name}"`),
+        onError: (err) => {
+          const msg = (err.response?.data as { message?: string })?.message;
+          message.error(msg ?? 'Từ chối thất bại.');
+        },
+      }
+    );
+  };
+
+  const cardCols: TableColumnsType<CardRenewalRequestItem> = [
+    {
+      title: 'ĐỘC GIẢ',
+      key: 'reader',
+      render: (_: unknown, r: CardRenewalRequestItem) => (
+        <div>
+          <p className="m-0 text-sm font-medium text-gray-800">{r.full_name}</p>
+          <p className="m-0 text-xs text-gray-400 font-mono">{r.card_number}</p>
+        </div>
+      ),
+    },
+    {
+      title: 'HẾT HẠN HIỆN TẠI',
+      dataIndex: 'current_expiry_date',
+      key: 'current_expiry_date',
+      width: 140,
+      render: (v: string) => <span className="text-gray-500">{dayjs(v).format(FMT)}</span>,
+    },
+    {
+      title: 'HẾT HẠN MỚI (YÊU CẦU)',
+      dataIndex: 'requested_expiry_date',
+      key: 'requested_expiry_date',
+      width: 160,
+      render: (v: string) => <span className="text-blue-600 font-medium">{dayjs(v).format(FMT)}</span>,
+    },
+    {
+      title: 'NGÀY YÊU CẦU',
+      dataIndex: 'requested_at',
+      key: 'requested_at',
+      width: 140,
+      render: (v: string) => <span className="text-gray-500">{dayjs(v).format(FMT)}</span>,
+    },
+    {
+      title: 'THAO TÁC',
+      key: 'action',
+      width: 200,
+      align: 'right',
+      render: (_: unknown, r: CardRenewalRequestItem) => (
+        <div className="flex gap-2 justify-end">
+          <Button
+            size="small"
+            icon={<CheckCircleOutlined />}
+            loading={cardApproveMutation.isPending}
+            onClick={() => handleCardApprove(r)}
+            style={{
+              background: '#16a34a',
+              borderColor: '#16a34a',
+              color: '#fff',
+              fontWeight: 600,
+              borderRadius: 6,
+            }}
+          >
+            Duyệt
+          </Button>
+          <Button
+            size="small"
+            danger
+            icon={<CloseCircleOutlined />}
+            loading={cardRejectMutation.isPending}
+            onClick={() => handleCardReject(r)}
+            style={{ fontWeight: 600, borderRadius: 6 }}
+          >
+            Từ chối
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   // ─── Renew per row ────────────────────────────────────────────────────
   const handleApprove = (row: RenewListItem) => {
@@ -75,6 +180,19 @@ const RenewBookPage = () => {
         onError: (err) => {
           const msg = (err.response?.data as { message?: string })?.message;
           message.error(msg ?? 'Gia hạn thất bại.');
+        },
+      }
+    );
+  };
+
+  const handleReject = (row: RenewListItem) => {
+    rejectMutation.mutate(
+      { requestId: row.request_id },
+      {
+        onSuccess: () => message.success(`Đã từ chối yêu cầu gia hạn của "${row.full_name}"`),
+        onError: (err) => {
+          const msg = (err.response?.data as { message?: string })?.message;
+          message.error(msg ?? 'Từ chối thất bại.');
         },
       }
     );
@@ -138,41 +256,40 @@ const RenewBookPage = () => {
     {
       title: 'THAO TÁC',
       key: 'action',
-      width: 160,
+      width: 220,
       align: 'right',
-      render: (_: unknown, r: RenewListItem) => {
-        if (r.can_renew) {
-          return (
+      render: (_: unknown, r: RenewListItem) => (
+        <div className="flex gap-2 justify-end">
+          <Tooltip title={!r.can_renew ? (r.deny_reason ?? 'Không thể gia hạn') : undefined}>
             <Button
               size="small"
               icon={<CheckCircleOutlined />}
+              disabled={!r.can_renew}
               loading={renewMutation.isPending}
               onClick={() => handleApprove(r)}
               style={{
-                background: '#16a34a',
-                borderColor: '#16a34a',
-                color: '#fff',
+                background: r.can_renew ? '#16a34a' : undefined,
+                borderColor: r.can_renew ? '#16a34a' : undefined,
+                color: r.can_renew ? '#fff' : undefined,
                 fontWeight: 600,
                 borderRadius: 6,
               }}
             >
               Duyệt +7 ngày
             </Button>
-          );
-        }
-        return (
-          <Tooltip title={r.deny_reason ?? 'Không thể gia hạn'}>
-            <Button
-              size="small"
-              danger
-              icon={<CloseCircleOutlined />}
-              style={{ fontWeight: 600, borderRadius: 6 }}
-            >
-              Từ chối
-            </Button>
           </Tooltip>
-        );
-      },
+          <Button
+            size="small"
+            danger
+            icon={<CloseCircleOutlined />}
+            loading={rejectMutation.isPending}
+            onClick={() => handleReject(r)}
+            style={{ fontWeight: 600, borderRadius: 6 }}
+          >
+            Từ chối
+          </Button>
+        </div>
+      ),
     },
   ];
 
@@ -298,6 +415,28 @@ const RenewBookPage = () => {
             </span>
           )}
         </button>
+
+        <button
+          onClick={() => setActiveTab('card')}
+          className={[
+            'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold border transition-colors cursor-pointer',
+            activeTab === 'card'
+              ? 'bg-green-50 border-green-200 text-green-600'
+              : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50',
+          ].join(' ')}
+          style={{ outline: 'none' }}
+        >
+          <CreditCardOutlined />
+          Gia hạn thẻ
+          {cardRequestList.length > 0 && (
+            <span className={[
+              'text-xs px-1.5 py-0.5 rounded-full font-bold',
+              activeTab === 'card' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500',
+            ].join(' ')}>
+              {cardRequestList.length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* Content card */}
@@ -315,7 +454,7 @@ const RenewBookPage = () => {
                 rowKey={(r) => `${r.borrow_id}-${r.copy_id}`}
                 pagination={{ pageSize: 10, showSizeChanger: false }}
                 size="middle"
-                locale={{ emptyText: 'Không có sách nào đang mượn' }}
+                locale={{ emptyText: 'Không có yêu cầu gia hạn sách nào' }}
                 rowClassName={(r) =>
                   !r.can_renew ? 'opacity-60' : ''
                 }
@@ -350,6 +489,29 @@ const RenewBookPage = () => {
             {waitingResCount > 0 && !resLoading && (
               <p className="m-0 mt-3 text-xs text-purple-500">
                 {waitingResCount} phiếu đang chờ / sẵn sàng được xử lý
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Tab 3: Gia hạn thẻ */}
+        {activeTab === 'card' && (
+          <div className="p-5">
+            {cardLoading ? (
+              <div className="flex justify-center py-12"><Spin size="large" /></div>
+            ) : (
+              <Table<CardRenewalRequestItem>
+                dataSource={cardRequestList}
+                columns={cardCols}
+                rowKey="request_id"
+                pagination={{ pageSize: 10, showSizeChanger: false }}
+                size="middle"
+                locale={{ emptyText: 'Không có yêu cầu gia hạn thẻ nào' }}
+              />
+            )}
+            {cardRequestList.length > 0 && !cardLoading && (
+              <p className="m-0 mt-3 text-xs text-gray-400">
+                {cardRequestList.length} yêu cầu đang chờ duyệt
               </p>
             )}
           </div>

@@ -1,9 +1,10 @@
 import { Button, Flex } from 'antd';
 import {
   BarChartOutlined,
-  CrownOutlined,
+  CreditCardOutlined,
   LockOutlined,
   LogoutOutlined,
+  RobotOutlined,
   SettingOutlined,
   UserOutlined,
   BookOutlined,
@@ -95,17 +96,24 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
         { label: t(getKey('menu_user_list')), to: ROUTES.TRANSACTION_LOG },
       ],
     },
+
     {
-      key: 'achievements',
-      label: t(getKey('menu_achievements')),
-      icon: <CrownOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.ACHIEVEMENTS,
+      key: 'fees',
+      label: 'Quản lý phí & Thanh toán',
+      icon: <CreditCardOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.FEES,
     },
     {
       key: 'reports',
       label: 'Báo cáo & Thống kê',
       icon: <LineChartOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.REPORTS,
+    },
+    {
+      key: 'ai-demand',
+      label: 'AI Phân tích nhu cầu',
+      icon: <RobotOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.AI_DEMAND,
     },
     {
       key: 'settings',

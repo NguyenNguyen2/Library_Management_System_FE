@@ -5,6 +5,7 @@ import { Button, Flex } from 'antd';
 import {
   BarChartOutlined,
   LogoutOutlined,
+  RobotOutlined,
   UserOutlined,
   BookOutlined,
   MenuFoldOutlined,
@@ -121,10 +122,10 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
       ],
     },
     {
-      key: 'aianalytics',
-      label: 'AI Analytics',
-      icon: <BarChartOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.REPORTS,
+      key: 'ai-demand',
+      label: 'AI Phân tích nhu cầu',
+      icon: <RobotOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.AI_DEMAND,
     },
   ];
 

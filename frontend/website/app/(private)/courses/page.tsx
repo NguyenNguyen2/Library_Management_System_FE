@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input, InputNumber, Select, Spin, message } from 'antd';
 import { SearchOutlined, BookOutlined, HeartOutlined, HeartFilled } from '@ant-design/icons';
@@ -49,6 +49,19 @@ function CoursesPageContent() {
 
   const { data: books, isLoading, isFetching } = useSearchBooks(params);
 
+  // Delay showing the loading state by 150ms to prevent flicker on fast responses
+  const [showFetching, setShowFetching] = useState(false);
+  const fetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (isFetching) {
+      fetchTimerRef.current = setTimeout(() => setShowFetching(true), 150);
+    } else {
+      if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current);
+      setShowFetching(false);
+    }
+    return () => { if (fetchTimerRef.current) clearTimeout(fetchTimerRef.current); };
+  }, [isFetching]);
+
   const { data: readingListData } = useReadingList();
   const { mutate: addItem } = useAddToReadingList();
   const { mutate: removeItem } = useRemoveFromReadingList();
@@ -72,7 +85,7 @@ function CoursesPageContent() {
     setOnlyAvailable(false);
   };
 
-  if (isLoading || isFetching) {
+  if (isLoading) {
     return (
       <div className="flex justify-center py-24">
         <Spin size="large" />
@@ -171,14 +184,16 @@ function CoursesPageContent() {
         </div>
       </div>
 
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-gray-500 mb-4 flex items-center gap-2">
         {debouncedSearch || hasActiveFilters ? (
           <>Tìm thấy <span className="font-semibold text-gray-900">{filtered.length}</span> kết quả</>
         ) : (
           <>Hiển thị <span className="font-semibold text-gray-900">{filtered.length}</span> cuốn sách</>
         )}
+        {showFetching && <Spin size="small" />}
       </p>
 
+      <div className={`transition-opacity duration-150 ${showFetching ? 'opacity-75' : ''}`}>
       {filtered.length === 0 ? (
         <div className="text-center py-16">
           <BookOutlined className="text-5xl text-gray-300 mb-4" />
@@ -252,6 +267,7 @@ function CoursesPageContent() {
           })}
         </div>
       )}
+      </div>
     </div>
   );
 }

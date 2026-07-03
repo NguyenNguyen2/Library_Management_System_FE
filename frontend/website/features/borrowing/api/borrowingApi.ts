@@ -10,23 +10,17 @@ export interface IBorrowedBook {
   due_date: string;
   days_remaining: number;
   warning_color: 'green' | 'yellow' | 'red';
+  renewal_pending: boolean;
 }
 
 export interface IBorrowingResponse {
   data: IBorrowedBook[];
 }
 
-export interface IRenewResult {
-  borrowId: number;
-  renewCount: number;
-  newDueDate: string;
-}
-
-export interface IRenewResponse {
-  results: {
-    object: IRenewResult;
-  };
+export interface IBorrowRenewalRequestResponse {
   message: string;
+  request_id: number;
+  pending: boolean;
 }
 
 export interface IBorrowReturnStatus {
@@ -58,7 +52,7 @@ export const borrowingApi = {
     return response.data;
   },
 
-  renewBorrowing: async (borrowId: number): Promise<IRenewResponse> => {
+  submitRenewalRequest: async (borrowId: number): Promise<IBorrowRenewalRequestResponse> => {
     const response = await axiosInstance.post(`/v1/me/borrowing/${borrowId}/renew`);
     return response.data;
   },

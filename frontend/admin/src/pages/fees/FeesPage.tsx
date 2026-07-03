@@ -1,288 +1,475 @@
-import { useState } from 'react';
-import { Card, Table, Tag, Input, Button, Badge, Modal, Form, Select, message, Typography, Space, Row, Col, Statistic, Flex } from 'antd';
-import { SearchOutlined, CreditCardOutlined, DollarOutlined, HistoryOutlined, CheckCircleOutlined, ClockCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import {
+  Badge, Button, Card, Col, DatePicker, Form, Input,
+  Modal, Row, Select, Skeleton, Space, Statistic,
+  Table, TablePaginationConfig, Tabs, Tag, Typography, message,
+} from 'antd';
+import {
+  CreditCardOutlined, DollarOutlined, ExclamationCircleOutlined,
+  HistoryOutlined, LineChartOutlined, SearchOutlined, ToolOutlined, DownloadOutlined,
+} from '@ant-design/icons';
+import { useMemo, useState } from 'react';
+import dayjs from 'dayjs';
+import ColumnChart from '@shared/components/chart/ColumnChart';
+import { feesHooks } from '../../hooks/useFees';
+import { Fine, FineType, HistoryFine, PaymentMethod } from '../../api/feesApi';
 
 const { Text } = Typography;
+const { RangePicker } = DatePicker;
 
-type Fee = {
-  id: string;
-  reader: string;
-  book: string;
-  type: 'late' | 'damage' | 'lost';
-  amount: number;
-  createdAt: string;
-  status: 'unpaid' | 'paid' | 'partial';
-  method?: 'cash' | 'card' | 'momo';
+const TYPE_TAG: Record<string, { label: string; color: string }> = {
+  late:   { label: 'Trễ hạn',   color: 'orange'  },
+  damage: { label: 'Hư hỏng',   color: 'volcano' },
+  lost:   { label: 'Mất sách',  color: 'red'     },
 };
 
-const INITIAL_FEES: Fee[] = [
-  { id: 'PH-5021', reader: 'Nguyễn Văn An', book: 'Đắc Nhân Tâm', type: 'late', amount: 60000, createdAt: '2026-06-01', status: 'unpaid' },
-  { id: 'PH-5020', reader: 'Trần Thị Bình', book: 'Sapiens', type: 'late', amount: 40000, createdAt: '2026-06-02', status: 'paid', method: 'momo' },
-  { id: 'PH-5019', reader: 'Phạm Minh Đức', book: 'Tuổi Trẻ Đáng Giá', type: 'damage', amount: 24000, createdAt: '2026-06-02', status: 'paid', method: 'cash' },
-  { id: 'PH-5018', reader: 'Lê Hoàng Cường', book: 'Nhà Giả Kim', type: 'lost', amount: 120000, createdAt: '2026-05-30', status: 'partial' },
-  { id: 'PH-5017', reader: 'Vũ Thanh Mai', book: 'Cây Cam Ngọt Của Tôi', type: 'late', amount: 15000, createdAt: '2026-05-29', status: 'unpaid' },
-  { id: 'PH-5016', reader: 'Đỗ Văn Khải', book: 'Mắt Biếc', type: 'damage', amount: 36000, createdAt: '2026-05-28', status: 'paid', method: 'card' },
-];
+const METHOD_LABEL: Record<string, string> = {
+  cash:     'Tiền mặt',
+  transfer: 'Chuyển khoản',
+  momo:     'Ví MoMo',
+};
 
-const TYPE_CONFIG = {
-  late: { label: 'Trễ hạn', color: 'orange' },
-  damage: { label: 'Hư hỏng', color: 'volcano' },
-  lost: { label: 'Mất sách', color: 'red' },
-} as const;
+const STATUS_BADGE: Record<string, { status: 'error' | 'warning' | 'success'; label: string }> = {
+  unpaid:  { status: 'error',   label: 'Chưa thu'   },
+  partial: { status: 'warning', label: 'Trả 1 phần' },
+  paid:    { status: 'success', label: 'Đã thu'     },
+};
 
-const METHOD_LABELS = {
-  cash: 'Tiền mặt',
-  card: 'Thẻ ngân hàng',
-  momo: 'Ví MoMo',
-} as const;
-
-export function FeesPage() {
-  const [fees, setFees] = useState<Fee[]>(INITIAL_FEES);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | Fee['status']>('all');
-  
-  const [paymentModal, setPaymentModal] = useState<{ open: boolean; fee: Fee | null }>({
-    open: false,
-    fee: null,
-  });
+// ── Tab 1: Danh sách phí chưa thu ───────────────────────────────────────────
+const FineListTab = () => {
+  const [search, setSearch]         = useState('');
+  const [typeFilter, setTypeFilter] = useState<FineType | ''>('');
+  const [page, setPage]             = useState(1);
+  const [payModal, setPayModal]     = useState<{ open: boolean; fine: Fine | null }>({ open: false, fine: null });
   const [form] = Form.useForm();
 
-  const handlePayFeeClick = (fee: Fee) => {
-    setPaymentModal({ open: true, fee });
+  const { data, isLoading } = feesHooks.useFines({ search: search || undefined, type: typeFilter || undefined, page });
+  const recordPayment = feesHooks.useRecordPayment();
+
+  const fines = data?.data ?? [];
+  const meta  = data?.meta;
+
+  const handlePay = (fine: Fine) => {
+    setPayModal({ open: true, fine });
     form.setFieldsValue({ method: 'cash' });
   };
 
-  const handlePaymentSubmit = (values: { method: 'cash' | 'card' | 'momo' }) => {
-    if (!paymentModal.fee) return;
-    
-    setFees(prev =>
-      prev.map(f =>
-        f.id === paymentModal.fee?.id
-          ? { ...f, status: 'paid', method: values.method }
-          : f
-      )
-    );
-
-    message.success(`Đã thu thành công ${paymentModal.fee.amount.toLocaleString('vi-VN')}đ bằng hình thức ${METHOD_LABELS[values.method]}!`);
-    setPaymentModal({ open: false, fee: null });
+  const handlePaySubmit = async (values: { method: PaymentMethod }) => {
+    if (!payModal.fine) return;
+    try {
+      await recordPayment.mutateAsync({ fineId: payModal.fine.fine_id, method: values.method });
+      message.success(`Đã thu ${payModal.fine.amount.toLocaleString('vi-VN')}đ thành công!`);
+      setPayModal({ open: false, fine: null });
+    } catch {
+      message.error('Có lỗi xảy ra, vui lòng thử lại.');
+    }
   };
 
-  const filteredFees = fees.filter(f => {
-    const matchesSearch =
-      f.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.reader.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      f.book.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesFilter = filterStatus === 'all' || f.status === filterStatus;
-    
-    return matchesSearch && matchesFilter;
-  });
-
-  const totalAmount = fees.reduce((sum, f) => sum + f.amount, 0);
-  const collectedAmount = fees.filter(f => f.status === 'paid').reduce((sum, f) => sum + f.amount, 0);
-  const unpaidAmount = fees.filter(f => f.status === 'unpaid').reduce((sum, f) => sum + f.amount, 0);
-  const collectionRate = totalAmount > 0 ? Math.round((collectedAmount / totalAmount) * 100) : 0;
+  const pagination: TablePaginationConfig = {
+    current:  page,
+    pageSize: meta?.per_page ?? 15,
+    total:    meta?.total    ?? 0,
+    onChange: (p) => setPage(p),
+    showTotal: (t) => `Tổng ${t} khoản phí`,
+  };
 
   const columns = [
+    { title: 'Mã phí', dataIndex: 'fine_id', width: 80, render: (v: number) => <Text className="font-mono text-xs">PH-{v}</Text> },
+    { title: 'Độc giả', dataIndex: 'reader_name', render: (v: string) => <Text strong>{v}</Text> },
+    { title: 'Sách', dataIndex: 'book_title' },
     {
-      title: 'Mã phí',
-      dataIndex: 'id',
-      key: 'id',
-      render: (id: string) => <Text className="font-mono text-xs">{id}</Text>,
+      title: 'Loại phí', dataIndex: 'type', width: 110,
+      render: (v: FineType) => <Tag color={TYPE_TAG[v]?.color}>{TYPE_TAG[v]?.label}</Tag>,
     },
     {
-      title: 'Độc giả',
-      dataIndex: 'reader',
-      key: 'reader',
-      render: (name: string) => <Text className="font-semibold">{name}</Text>,
+      title: 'Số tiền', dataIndex: 'amount', align: 'right' as const, width: 120,
+      render: (v: number) => <Text strong>{v.toLocaleString('vi-VN')}đ</Text>,
     },
+    { title: 'Ngày phát sinh', dataIndex: 'created_at', width: 130 },
     {
-      title: 'Sách',
-      dataIndex: 'book',
-      key: 'book',
-    },
-    {
-      title: 'Loại phí',
-      dataIndex: 'type',
-      key: 'type',
-      render: (type: keyof typeof TYPE_CONFIG) => {
-        const config = TYPE_CONFIG[type];
-        return <Tag color={config.color}>{config.label}</Tag>;
+      title: 'Trạng thái', dataIndex: 'status', width: 120,
+      render: (v: string) => {
+        const cfg = STATUS_BADGE[v];
+        return <Badge status={cfg?.status} text={cfg?.label} />;
       },
     },
     {
-      title: 'Số tiền',
-      dataIndex: 'amount',
-      key: 'amount',
-      align: 'right' as const,
-      render: (amount: number) => <Text className="font-semibold text-navyDark">{amount.toLocaleString('vi-VN')}đ</Text>,
-    },
-    {
-      title: 'Ngày phát sinh',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: Fee['status'], record: Fee) => {
-        if (status === 'paid' && record.method) {
-          return (
-            <Badge status="success" text={`Đã thu (${METHOD_LABELS[record.method]})`} />
-          );
-        } else if (status === 'partial') {
-          return <Badge status="warning" text="Trả 1 phần" />;
-        } else {
-          return <Badge status="error" text="Chưa thu" />;
-        }
-      },
-    },
-    {
-      title: 'Thao tác',
-      key: 'actions',
-      align: 'right' as const,
-      render: (_: unknown, record: Fee) => {
-        if (record.status !== 'paid') {
-          return (
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => handlePayFeeClick(record)}
-            >
-              Thu phí
-            </Button>
-          );
-        }
-        return <Button size="small">Biên lai</Button>;
-      },
+      title: 'Thao tác', key: 'action', align: 'right' as const, width: 110,
+      render: (_: unknown, record: Fine) =>
+        record.status !== 'paid'
+          ? <Button type="primary" size="small" onClick={() => handlePay(record)}>Thu phí</Button>
+          : <Button size="small" disabled>Đã thu</Button>,
     },
   ];
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Title */}
-      <div>
-        <h1 className="m-0 text-[30px] font-bold leading-[36px] text-navyDark">Quản lý phí & thanh toán</h1>
-        <p className="m-0 mt-1 text-base leading-6 text-gray-500">Theo dõi phí trễ hạn, phạt hỏng/mất sách và ghi nhận thanh toán tại quầy</p>
-      </div>
+    <>
+      <Card bordered={false}>
+        <div className="flex flex-wrap gap-3 mb-4">
+          <Input
+            placeholder="Tìm mã phí, độc giả, sách..."
+            prefix={<SearchOutlined />}
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            className="max-w-xs"
+          />
+          <Select
+            value={typeFilter}
+            onChange={v => { setTypeFilter(v); setPage(1); }}
+            style={{ width: 140 }}
+            options={[
+              { value: '',       label: 'Tất cả loại' },
+              { value: 'late',   label: 'Trễ hạn'     },
+              { value: 'damage', label: 'Hư hỏng'     },
+              { value: 'lost',   label: 'Mất sách'    },
+            ]}
+          />
+        </div>
+        {isLoading
+          ? <Skeleton active paragraph={{ rows: 8 }} />
+          : <Table dataSource={fines} columns={columns} rowKey="fine_id" size="small" pagination={pagination} bordered={false} />
+        }
+      </Card>
 
-      {/* Cards */}
-      <Row gutter={[16, 16]}>
-        <Col xs={12} sm={6}>
-          <Card bordered={false} className="shadow-sm rounded-[10px]">
-            <Statistic
-              title="Tổng phí phát sinh"
-              value={totalAmount}
-              suffix="đ"
-              valueStyle={{ fontWeight: 700 }}
-            />
+      {/* Modal Thu phí */}
+      <Modal
+        title={`Thu phí — PH-${payModal.fine?.fine_id}`}
+        open={payModal.open}
+        onCancel={() => setPayModal({ open: false, fine: null })}
+        footer={null}
+        destroyOnClose
+      >
+        <Form form={form} layout="vertical" onFinish={handlePaySubmit}>
+          <div className="bg-gray-50 p-4 rounded-lg mb-4 space-y-1 border border-gray-100">
+            <div><Text type="secondary">Độc giả: </Text><Text strong>{payModal.fine?.reader_name}</Text></div>
+            <div><Text type="secondary">Sách: </Text><Text>{payModal.fine?.book_title}</Text></div>
+            <div><Text type="secondary">Lý do: </Text><Text>{payModal.fine?.reason}</Text></div>
+            <div><Text type="secondary">Số tiền: </Text><Text strong className="text-lg text-[#1E2A3B]">{payModal.fine?.amount.toLocaleString('vi-VN')}đ</Text></div>
+          </div>
+          <Form.Item name="method" label="Hình thức thanh toán" rules={[{ required: true }]}>
+            <Select>
+              <Select.Option value="cash"><DollarOutlined /> Tiền mặt</Select.Option>
+              <Select.Option value="transfer"><CreditCardOutlined /> Chuyển khoản</Select.Option>
+              <Select.Option value="momo"><HistoryOutlined /> Ví MoMo</Select.Option>
+            </Select>
+          </Form.Item>
+          <div className="text-right">
+            <Space>
+              <Button onClick={() => setPayModal({ open: false, fine: null })}>Hủy</Button>
+              <Button type="primary" htmlType="submit" loading={recordPayment.isPending}>Xác nhận thu phí</Button>
+            </Space>
+          </div>
+        </Form>
+      </Modal>
+    </>
+  );
+};
+
+// ── Tab 2: Lịch sử thu phí ──────────────────────────────────────────────────
+const FeeHistoryTab = () => {
+  const [search, setSearch]   = useState('');
+  const [method, setMethod]   = useState('');
+  const [dates, setDates]     = useState<[string, string] | []>([]);
+  const [page, setPage]       = useState(1);
+
+  const params = {
+    search:    search    || undefined,
+    method:    method    || undefined,
+    date_from: dates[0]  || undefined,
+    date_to:   dates[1]  || undefined,
+    page,
+  };
+  const { data, isLoading } = feesHooks.useHistory(params);
+
+  const history = data?.data ?? [];
+  const meta    = data?.meta;
+
+  const columns = [
+    { title: 'Mã phí', dataIndex: 'fine_id', width: 80, render: (v: number) => <Text className="font-mono text-xs">PH-{v}</Text> },
+    { title: 'Độc giả', dataIndex: 'reader_name', render: (v: string) => <Text strong>{v}</Text> },
+    { title: 'Sách', dataIndex: 'book_title' },
+    {
+      title: 'Loại phí', dataIndex: 'type', width: 110,
+      render: (v: FineType) => <Tag color={TYPE_TAG[v]?.color}>{TYPE_TAG[v]?.label}</Tag>,
+    },
+    {
+      title: 'Số tiền', dataIndex: 'amount', align: 'right' as const, width: 120,
+      render: (v: number) => <Text strong className="text-green-700">{v.toLocaleString('vi-VN')}đ</Text>,
+    },
+    {
+      title: 'Phương thức', dataIndex: 'payment_method', width: 130,
+      render: (v: string) => <Tag color="blue">{METHOD_LABEL[v] ?? v}</Tag>,
+    },
+    { title: 'Ngày thu', dataIndex: 'paid_at', width: 150 },
+  ];
+
+  return (
+    <Card bordered={false}>
+      <div className="flex flex-wrap gap-3 mb-4">
+        <Input
+          placeholder="Tìm độc giả, sách..."
+          prefix={<SearchOutlined />}
+          value={search}
+          onChange={e => { setSearch(e.target.value); setPage(1); }}
+          className="max-w-xs"
+        />
+        <Select
+          value={method}
+          onChange={v => { setMethod(v); setPage(1); }}
+          style={{ width: 150 }}
+          options={[
+            { value: '',         label: 'Tất cả PT'   },
+            { value: 'cash',     label: 'Tiền mặt'    },
+            { value: 'transfer', label: 'Chuyển khoản' },
+            { value: 'momo',     label: 'Ví MoMo'     },
+          ]}
+        />
+        <RangePicker
+          onChange={(_, strs) => { setDates(strs as [string, string]); setPage(1); }}
+          placeholder={['Từ ngày', 'Đến ngày']}
+        />
+      </div>
+      {isLoading
+        ? <Skeleton active paragraph={{ rows: 8 }} />
+        : <Table
+            dataSource={history}
+            columns={columns}
+            rowKey="fine_id"
+            size="small"
+            pagination={{
+              current: page,
+              pageSize: meta?.per_page ?? 15,
+              total: meta?.total ?? 0,
+              onChange: setPage,
+              showTotal: (t) => `Tổng ${t} giao dịch`,
+            }}
+            bordered={false}
+          />
+      }
+    </Card>
+  );
+};
+
+// ── Tab 3: Báo cáo doanh thu ────────────────────────────────────────────────
+const FeeRevenueTab = () => {
+  const currentYear = new Date().getFullYear();
+  const [year, setYear]     = useState(currentYear);
+  const [groupBy, setGroupBy] = useState<'month' | 'day'>('month');
+
+  const { data, isLoading } = feesHooks.useRevenue(year, groupBy);
+
+  const { categories, series } = useMemo(() => {
+    if (!data?.series?.length) return { categories: [], series: [] };
+
+    if (groupBy === 'month') {
+      const labels = ['Th.1','Th.2','Th.3','Th.4','Th.5','Th.6','Th.7','Th.8','Th.9','Th.10','Th.11','Th.12'];
+      const amounts = new Array(12).fill(0);
+      data.series.forEach(s => { amounts[(s.period as number) - 1] = s.total; });
+      return {
+        categories: labels,
+        series: [{ name: 'Doanh thu (đ)', data: amounts }],
+      };
+    } else {
+      return {
+        categories: data.series.map(s => String(s.period)),
+        series: [{ name: 'Doanh thu (đ)', data: data.series.map(s => s.total) }],
+      };
+    }
+  }, [data, groupBy]);
+
+  const yearOptions = Array.from({ length: 5 }, (_, i) => ({ label: `Năm ${currentYear - i}`, value: currentYear - i }));
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Summary cards */}
+      <Row gutter={16}>
+        <Col span={8}>
+          <Card size="small" className="text-center">
+            <Text type="secondary">Tổng doanh thu năm {year}</Text>
+            <div className="text-2xl font-bold text-[#389e0d] mt-1">
+              {isLoading ? '...' : (data?.total_revenue ?? 0).toLocaleString('vi-VN')}đ
+            </div>
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
-          <Card bordered={false} className="shadow-sm rounded-[10px]">
-            <Statistic
-              title="Đã thu"
-              value={collectedAmount}
-              suffix="đ"
-              valueStyle={{ color: '#389e0d', fontWeight: 700 }}
-            />
+        <Col span={8}>
+          <Card size="small" className="text-center">
+            <Text type="secondary">Số giao dịch</Text>
+            <div className="text-2xl font-bold text-[#1E2A3B] mt-1">
+              {isLoading ? '...' : data?.total_count ?? 0}
+            </div>
           </Card>
         </Col>
-        <Col xs={12} sm={6}>
-          <Card bordered={false} className="shadow-sm rounded-[10px]">
-            <Statistic
-              title="Chưa thu"
-              value={unpaidAmount}
-              suffix="đ"
-              valueStyle={{ color: '#cf1322', fontWeight: 700 }}
-            />
-          </Card>
-        </Col>
-        <Col xs={12} sm={6}>
-          <Card bordered={false} className="shadow-sm rounded-[10px]">
-            <Statistic
-              title="Tỷ lệ hoàn thành"
-              value={collectionRate}
-              suffix="%"
-              valueStyle={{ color: '#096dd9', fontWeight: 700 }}
-            />
+        <Col span={8}>
+          <Card size="small" className="text-center">
+            <Text type="secondary">TB mỗi giao dịch</Text>
+            <div className="text-2xl font-bold text-[#096dd9] mt-1">
+              {isLoading || !data?.total_count ? '...' : Math.round((data.total_revenue / data.total_count)).toLocaleString('vi-VN')}đ
+            </div>
           </Card>
         </Col>
       </Row>
 
-      {/* Table block */}
-      <Card bordered={false} className="shadow-sm rounded-[10px] p-2">
-        <Flex justify="space-between" align="center" className="mb-4" wrap="wrap" gap={12}>
-          <Input
-            placeholder="Tìm theo mã phí, độc giả, sách..."
-            prefix={<SearchOutlined />}
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full max-w-sm rounded-lg"
-          />
+      {/* Chart */}
+      <Card
+        title={<Space><LineChartOutlined style={{ color: '#2563EB' }} />Biểu đồ doanh thu</Space>}
+        extra={
           <Space>
-            {(['all', 'unpaid', 'partial', 'paid'] as const).map(status => (
-              <Button
-                key={status}
-                type={filterStatus === status ? 'primary' : 'default'}
-                onClick={() => setFilterStatus(status)}
-                className="rounded-lg"
-              >
-                {status === 'all' ? 'Tất cả' : status === 'unpaid' ? 'Chưa thu' : status === 'partial' ? 'Trả 1 phần' : 'Đã thu'}
-              </Button>
-            ))}
+            <Select value={groupBy} onChange={setGroupBy} style={{ width: 120 }}
+              options={[{ value: 'month', label: 'Theo tháng' }, { value: 'day', label: 'Theo ngày' }]}
+            />
+            <Select value={year} onChange={setYear} style={{ width: 110 }} options={yearOptions} />
+            <Button
+              type="primary"
+              ghost
+              icon={<DownloadOutlined />}
+              onClick={() => {
+                const baseUrl = import.meta.env.VITE_API_URL || '';
+                window.open(`${baseUrl}/private/v1/reports/export/fine-report-csv?from_date=${year}-01-01&to_date=${year}-12-31`, '_blank');
+              }}
+            >
+              Xuất Excel
+            </Button>
           </Space>
-        </Flex>
-
-        <Table
-          dataSource={filteredFees}
-          columns={columns}
-          rowKey="id"
-          pagination={{ pageSize: 8 }}
-          bordered={false}
-          className="rounded-lg"
-        />
+        }
+        bordered={false}
+      >
+        {isLoading
+          ? <Skeleton active paragraph={{ rows: 8 }} />
+          : <ColumnChart categories={categories} series={series} height={320} />
+        }
       </Card>
 
-      {/* Payment Modal */}
-      <Modal
-        title={`Thu phí giao dịch: ${paymentModal.fee?.id}`}
-        open={paymentModal.open}
-        onCancel={() => setPaymentModal({ open: false, fee: null })}
-        footer={null}
-        destroyOnClose
-        className="rounded-xl overflow-hidden"
-      >
-        <Form form={form} layout="vertical" onFinish={handlePaymentSubmit}>
-          <div className="bg-gray-50 p-4 rounded-lg mb-4 space-y-2 border border-gray-100">
-            <div><Text className="text-gray-500">Độc giả: </Text><Text className="font-semibold">{paymentModal.fee?.reader}</Text></div>
-            <div><Text className="text-gray-500">Sách: </Text><Text className="font-medium">{paymentModal.fee?.book}</Text></div>
-            <div><Text className="text-gray-500">Số tiền cần nộp: </Text><Text className="font-bold text-lg text-navyDark">{paymentModal.fee?.amount.toLocaleString('vi-VN')}đ</Text></div>
-          </div>
+      {/* Breakdown by type */}
+      {!isLoading && data && data.breakdown && data.breakdown.length > 0 && (
+        <Card title="Phân loại theo lý do" size="small" bordered={false}>
+          <Row gutter={16}>
+            {data.breakdown.map(b => (
+              <Col key={b.type} span={8}>
+                <div className="p-3 rounded-lg border border-gray-100 text-center">
+                  <Tag color={TYPE_TAG[b.type]?.color}>{TYPE_TAG[b.type]?.label}</Tag>
+                  <div className="font-bold mt-2">{b.total.toLocaleString('vi-VN')}đ</div>
+                  <Text type="secondary" className="text-xs">{b.count} giao dịch</Text>
+                </div>
+              </Col>
+            ))}
+          </Row>
+        </Card>
+      )}
+    </div>
+  );
+};
 
-          <Form.Item
-            name="method"
-            label={<Text className="font-semibold text-gray-700">Hình thức thanh toán</Text>}
-            rules={[{ required: true, message: 'Vui lòng chọn hình thức thanh toán!' }]}
-          >
-            <Select className="h-10 rounded-lg">
-              <Select.Option value="cash"><DollarOutlined className="mr-1.5" /> Tiền mặt</Select.Option>
-              <Select.Option value="card"><CreditCardOutlined className="mr-1.5" /> Chuyển khoản ngân hàng</Select.Option>
-              <Select.Option value="momo"><HistoryOutlined className="mr-1.5" /> Ví điện tử MoMo</Select.Option>
-            </Select>
-          </Form.Item>
+// ── Summary Cards (dùng chung) ───────────────────────────────────────────────
+const SummaryCards = () => {
+  const { data } = feesHooks.useFines({ per_page: 100 } as any);
+  const fines = data?.data ?? [];
+  const total     = fines.reduce((s, f) => s + f.amount, 0);
+  const unpaid    = fines.filter(f => f.status === 'unpaid').reduce((s, f) => s + f.amount, 0);
+  const partial   = fines.filter(f => f.status === 'partial').reduce((s, f) => s + f.amount, 0);
+  const countUnpaid = fines.filter(f => f.status !== 'paid').length;
 
-          <Form.Item className="mb-0 text-right">
-            <Space>
-              <Button onClick={() => setPaymentModal({ open: false, fee: null })} className="rounded-lg">Hủy</Button>
-              <Button type="primary" htmlType="submit" className="rounded-lg">Xác nhận thanh toán</Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Modal>
+  return (
+    <Row gutter={[16, 16]} className="mb-4">
+      {[
+        { title: 'Tổng phí chưa thu', value: total,    color: '#cf1322', suffix: 'đ' },
+        { title: 'Chưa thu',          value: unpaid,   color: '#cf1322', suffix: 'đ' },
+        { title: 'Trả 1 phần',        value: partial,  color: '#d46b08', suffix: 'đ' },
+        { title: 'Số khoản cần thu',  value: countUnpaid, color: '#096dd9', suffix: '' },
+      ].map(({ title, value, color, suffix }) => (
+        <Col xs={12} sm={6} key={title}>
+          <Card bordered={false} className="shadow-sm rounded-[10px]">
+            <Statistic title={title} value={value} suffix={suffix}
+              valueStyle={{ color, fontWeight: 700 }}
+              formatter={suffix === 'đ' ? (v) => `${Number(v).toLocaleString('vi-VN')}` : undefined}
+            />
+          </Card>
+        </Col>
+      ))}
+    </Row>
+  );
+};
+
+// ── Main Page ────────────────────────────────────────────────────────────────
+export function FeesPage() {
+  const tabs = [
+    {
+      key: 'list',
+      label: <Space><ExclamationCircleOutlined />Phí chưa thu</Space>,
+      children: <FineListTab />,
+    },
+    {
+      key: 'damage',
+      label: <Space><ToolOutlined />Tạo phí hỏng/mất</Space>,
+      children: <DamageFineTab />,
+    },
+    {
+      key: 'history',
+      label: <Space><HistoryOutlined />Lịch sử thu phí</Space>,
+      children: <FeeHistoryTab />,
+    },
+    {
+      key: 'revenue',
+      label: <Space><LineChartOutlined />Báo cáo doanh thu</Space>,
+      children: <FeeRevenueTab />,
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <h1 className="m-0 text-[28px] font-bold leading-[36px] text-navyDark">Quản lý phí & thanh toán</h1>
+        <p className="m-0 mt-1 text-sm text-gray-500">Theo dõi phí trễ hạn, phạt hỏng/mất sách và ghi nhận thanh toán tại quầy</p>
+      </div>
+      <SummaryCards />
+      <Tabs items={tabs} size="large" />
     </div>
   );
 }
+
+// ── Tab: Tạo phí hỏng / mất ─────────────────────────────────────────────────
+const DamageFineTab = () => {
+  const [form] = Form.useForm();
+  const createDamage = feesHooks.useCreateDamageFine();
+
+  const handleSubmit = async (values: { user_id: number; copy_id: number; damage_level: 'minor' | 'heavy' | 'lost' }) => {
+    try {
+      const res = await createDamage.mutateAsync(values);
+      message.success(`Đã tạo phí ${res.data.amount.toLocaleString('vi-VN')}đ cho sách "${res.data.book_title}"`);
+      form.resetFields();
+    } catch {
+      message.error('Có lỗi xảy ra. Vui lòng kiểm tra lại thông tin.');
+    }
+  };
+
+  return (
+    <Card bordered={false} title={<Space><ToolOutlined />Tạo phí bồi thường sách hỏng / mất</Space>}>
+      <div className="max-w-lg">
+        <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4 text-sm text-blue-700">
+          Phí được tính tự động: <strong>Hỏng nhẹ 20%</strong> · <strong>Hỏng nặng 50%</strong> · <strong>Mất sách 100%</strong> giá trị thay thế sách
+        </div>
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item name="user_id" label="ID Độc giả" rules={[{ required: true, message: 'Nhập ID độc giả' }]}>
+            <Input type="number" placeholder="VD: 42" />
+          </Form.Item>
+          <Form.Item name="copy_id" label="ID Bản sao sách" rules={[{ required: true, message: 'Nhập ID bản sao' }]}>
+            <Input type="number" placeholder="VD: 15" />
+          </Form.Item>
+          <Form.Item name="borrow_id" label="ID Giao dịch mượn (tùy chọn)">
+            <Input type="number" placeholder="Bỏ trống nếu không có" />
+          </Form.Item>
+          <Form.Item name="damage_level" label="Mức độ hư hỏng" rules={[{ required: true }]}>
+            <Select placeholder="Chọn mức độ">
+              <Select.Option value="minor"><Tag color="orange">Hỏng nhẹ — 20%</Tag></Select.Option>
+              <Select.Option value="heavy"><Tag color="volcano">Hỏng nặng — 50%</Tag></Select.Option>
+              <Select.Option value="lost"><Tag color="red">Mất sách — 100%</Tag></Select.Option>
+            </Select>
+          </Form.Item>
+          <Button type="primary" htmlType="submit" loading={createDamage.isPending}>
+            Tạo khoản phí
+          </Button>
+        </Form>
+      </div>
+    </Card>
+  );
+};
 
 export default FeesPage;
