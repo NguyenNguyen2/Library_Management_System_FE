@@ -96,12 +96,7 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
         { label: t(getKey('menu_user_list')), to: ROUTES.TRANSACTION_LOG },
       ],
     },
-    {
-      key: 'achievements',
-      label: t(getKey('menu_achievements')),
-      icon: <CrownOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.ACHIEVEMENTS,
-    },
+
     {
       key: 'reports',
       label: 'Báo cáo & Thống kê',

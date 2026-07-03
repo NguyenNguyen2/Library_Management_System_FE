@@ -1,6 +1,7 @@
 import axiosInstance from './axiosInstance';
 
 export type ImportSuggestion = {
+  book_id?: number;
   keyword: string;
   search_count: number;
   source: 'search_log' | 'wishlist';

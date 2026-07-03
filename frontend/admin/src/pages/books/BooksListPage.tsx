@@ -503,6 +503,32 @@ export function BooksListPage() {
     }
   }, [activeTab, summaryCategoryId]);
 
+  // Trigger actions from URL query parameters (e.g., from AI demand page)
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'create-book') {
+      const title = searchParams.get('title');
+      if (title) {
+        openEditModal(null);
+        form.setFieldsValue({ title: title });
+        setSearchParams({ tab: activeTab });
+      }
+    } else if (action === 'create-copy') {
+      const bookId = searchParams.get('book_id');
+      const bookTitle = searchParams.get('book_title') || 'Đầu sách gợi ý';
+      if (bookId) {
+        const idNum = Number(bookId);
+        setSelectBooks((prev) => {
+          if (prev.some(b => b.book_id === idNum)) return prev;
+          return [...prev, { book_id: idNum, title: bookTitle } as any];
+        });
+        openCopyModal(null);
+        copyForm.setFieldsValue({ book_id: idNum });
+        setSearchParams({ tab: activeTab });
+      }
+    }
+  }, [searchParams]);
+
   // View Author Profile Page (Drawer)
   const viewAuthorProfile = async (id: number) => {
     setIsAuthorProfileOpen(true);

@@ -11,7 +11,9 @@ import {
   Tag,
   Tooltip,
   Typography,
+  Button,
 } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import {
   BulbOutlined,
   DeleteOutlined,
@@ -61,6 +63,7 @@ function buildSeasonalSeries(rows: SeasonalDemand[]): { categories: string[]; se
 // ── Tab 1: Gợi ý nhập sách ───────────────────────────────────────────────────
 const ImportSuggestionsTab = () => {
   const { data = [], isLoading } = aiDemandHooks.useImportSuggestions();
+  const navigate = useNavigate();
 
   const columns = [
     {
@@ -109,6 +112,34 @@ const ImportSuggestionsTab = () => {
         </Space>
       ),
     },
+    {
+      title: 'Hành động',
+      key: 'action',
+      width: 160,
+      render: (_: unknown, record: any) => {
+        if (record.source === 'wishlist') {
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => navigate(`/books?tab=copies&action=create-copy&book_id=${record.book_id}&book_title=${encodeURIComponent(record.keyword)}`)}
+            >
+              Nhập thêm bản sao
+            </Button>
+          );
+        } else {
+          return (
+            <Button
+              type="dashed"
+              size="small"
+              onClick={() => navigate(`/books?tab=list&action=create-book&title=${encodeURIComponent(record.keyword)}`)}
+            >
+              Tạo đầu sách mới
+            </Button>
+          );
+        }
+      },
+    },
   ];
 
   return (
@@ -140,6 +171,7 @@ const ImportSuggestionsTab = () => {
 // ── Tab 2: Sách ít mượn ──────────────────────────────────────────────────────
 const LowBorrowBooksTab = () => {
   const { data = [], isLoading } = aiDemandHooks.useLowBorrowBooks();
+  const navigate = useNavigate();
 
   const thanhlySach  = data.filter((b) => b.suggestion === 'Thanh lý').length;
   const chuyenKhoSach = data.filter((b) => b.suggestion === 'Chuyển kho').length;
@@ -183,6 +215,21 @@ const LowBorrowBooksTab = () => {
           </Tag>
         );
       },
+    },
+    {
+      title: 'Hành động',
+      key: 'action',
+      width: 160,
+      render: (_: unknown, record: any) => (
+        <Button
+          type="primary"
+          ghost
+          size="small"
+          onClick={() => navigate(`/books?tab=copies&q=${encodeURIComponent(record.book_name)}`)}
+        >
+          Xử lý bản sao
+        </Button>
+      ),
     },
   ];
 
@@ -237,16 +284,21 @@ const LowBorrowBooksTab = () => {
 // ── Tab 3: Dự báo nhu cầu theo mùa ──────────────────────────────────────────
 const SeasonalDemandTab = () => {
   const currentYear = new Date().getFullYear();
-  const [year, setYear] = useState(currentYear - 1);
+  const [year, setYear] = useState(currentYear + 1);
 
   const { data = [], isLoading } = aiDemandHooks.useSeasonalDemand(year);
 
   const { categories, series } = useMemo(() => buildSeasonalSeries(data), [data]);
 
-  const yearOptions = Array.from({ length: 5 }, (_, i) => {
-    const y = currentYear - i;
-    return { label: `Năm ${y}`, value: y };
-  });
+  const yearOptions = [
+    { label: `Năm ${currentYear + 1} (Dự báo AI)`, value: currentYear + 1 },
+    ...Array.from({ length: 5 }, (_, i) => {
+      const y = currentYear - i;
+      return { label: `Năm ${y}`, value: y };
+    }),
+  ];
+
+  const isForecast = year > currentYear;
 
   // Top month
   const topMonth = useMemo(() => {
@@ -265,7 +317,7 @@ const SeasonalDemandTab = () => {
         title={
           <Space>
             <FundOutlined style={{ color: '#2563EB', fontSize: 18 }} />
-            <span>Biểu đồ nhu cầu mượn sách theo thể loại</span>
+            <span>Biểu đồ nhu cầu mượn sách theo thể loại {isForecast && '(Dự báo AI)'}</span>
           </Space>
         }
         extra={
@@ -273,7 +325,7 @@ const SeasonalDemandTab = () => {
             value={year}
             onChange={setYear}
             options={yearOptions}
-            style={{ width: 120 }}
+            style={{ width: 180 }}
           />
         }
       >
@@ -286,8 +338,7 @@ const SeasonalDemandTab = () => {
                 <Space>
                   <BulbOutlined style={{ color: '#2563EB' }} />
                   <Text>
-                    <Text strong>AI nhận xét:</Text> Tháng {topMonth.month} có nhu cầu mượn cao nhất
-                    năm {year} với tổng <Text strong style={{ color: '#2563EB' }}>{topMonth.count}</Text> lượt mượn.
+                    <Text strong>{isForecast ? 'Dự báo AI:' : 'AI nhận xét:'}</Text> Dự kiến tháng {topMonth.month} {isForecast ? 'năm sau' : `năm ${year}`} sẽ có nhu cầu mượn cao nhất với tổng khoảng <Text strong style={{ color: '#2563EB' }}>{topMonth.count}</Text> lượt mượn.
                   </Text>
                 </Space>
               </div>
