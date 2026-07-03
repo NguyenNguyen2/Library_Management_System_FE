@@ -12,6 +12,7 @@ import {
 import { useBorrowHistory } from '@/features/borrowing/hooks/useBorrowing';
 import { APP_ROUTE } from '@/constants/routes';
 import { formatDateVN } from '@/lib/utils/date';
+import { toCoverImageUrl } from '@/lib/utils/image';
 import type { IBorrowHistory } from '@/features/borrowing/api/borrowingApi';
 
 const STATUS_BADGE: Record<'on_time' | 'late', { label: string; className: string; icon: React.ReactNode }> = {
@@ -39,7 +40,7 @@ function HistoryCard({ record }: { record: IBorrowHistory }) {
           onClick={() => router.push(`${APP_ROUTE.courses}/${record.book_id}`)}
         >
           {record.cover_image ? (
-            <img src={record.cover_image} alt={record.title} className="w-full h-full object-cover hover:scale-105 transition-transform" />
+            <img src={toCoverImageUrl(record.cover_image) ?? undefined} alt={record.title} className="w-full h-full object-cover hover:scale-105 transition-transform" />
           ) : (
             <span className="text-3xl text-gray-300">📖</span>
           )}

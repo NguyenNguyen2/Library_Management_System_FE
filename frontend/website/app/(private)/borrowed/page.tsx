@@ -14,6 +14,7 @@ import { useBorrowing, useRenewBorrowing } from '@/features/borrowing/hooks/useB
 import { APP_ROUTE } from '@/constants/routes';
 import { READER_BORROW_LIMIT } from '@/lib/mock/mockData';
 import { formatDateVN } from '@/lib/utils/date';
+import { toCoverImageUrl } from '@/lib/utils/image';
 import type { IBorrowedBook } from '@/features/borrowing/api/borrowingApi';
 
 function getDayStatus(daysRemaining: number) {
@@ -97,7 +98,7 @@ function BorrowedBookCard({
         >
           {item.cover_image ? (
             <img
-              src={item.cover_image}
+              src={toCoverImageUrl(item.cover_image) ?? undefined}
               alt={item.title}
               className="w-full h-full object-cover hover:scale-105 transition-transform"
             />

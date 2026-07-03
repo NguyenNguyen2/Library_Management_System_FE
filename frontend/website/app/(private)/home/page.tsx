@@ -29,6 +29,7 @@ import {
 } from '@/features/reading-list/hooks/useReadingList';
 import { useReservations } from '@/features/reservations/hooks/useReservations';
 import { READER_BORROW_LIMIT } from '@/lib/mock/mockData';
+import { toCoverImageUrl } from '@/lib/utils/image';
 import { APP_ROUTE } from '@/constants/routes';
 import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
 import type { IHomeBook } from '@/features/books/api/bookApi';
@@ -55,7 +56,7 @@ function HomeBookCard({
         <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden flex items-center justify-center">
           {book.cover_image ? (
             <img
-              src={book.cover_image}
+              src={toCoverImageUrl(book.cover_image) ?? undefined}
               alt={book.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             />
@@ -388,7 +389,7 @@ export default function HomePage() {
                       <div className="relative aspect-[3/4] bg-gray-100 flex items-center justify-center overflow-hidden">
                         {book.cover_image ? (
                           <img
-                            src={book.cover_image}
+                            src={toCoverImageUrl(book.cover_image) ?? undefined}
                             alt={book.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />

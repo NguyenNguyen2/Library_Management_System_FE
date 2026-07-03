@@ -19,6 +19,7 @@ import {
   useRemoveFromReadingList,
 } from '@/features/reading-list/hooks/useReadingList';
 import { APP_ROUTE } from '@/constants/routes';
+import { toCoverImageUrl } from '@/lib/utils/image';
 import type { IReadingListItem, IReadingListStatus } from '@/features/reading-list/api/readingListApi';
 
 type TabKey = Exclude<IReadingListStatus, 'favorite'>;
@@ -254,7 +255,7 @@ export default function ReadingListPage() {
                   >
                     {item.cover_image ? (
                       <img
-                        src={item.cover_image}
+                        src={toCoverImageUrl(item.cover_image) ?? undefined}
                         alt={item.title}
                         className="w-full h-full object-cover hover:scale-105 transition-transform"
                       />

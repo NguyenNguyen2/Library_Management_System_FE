@@ -28,6 +28,7 @@ import {
 } from '@/features/reading-list/hooks/useReadingList';
 import { favoritesShareApi } from '@/features/favorites/api/favoritesShareApi';
 import { APP_ROUTE } from '@/constants/routes';
+import { toCoverImageUrl } from '@/lib/utils/image';
 
 export default function FavoritesPage() {
   const router = useRouter();
@@ -269,7 +270,7 @@ export default function FavoritesPage() {
                     >
                       {item.cover_image ? (
                         <img
-                          src={item.cover_image}
+                          src={toCoverImageUrl(item.cover_image) ?? undefined}
                           alt={item.title}
                           className="w-full h-full object-cover hover:scale-105 transition-transform"
                         />

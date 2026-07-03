@@ -18,6 +18,7 @@ import {
 import { useReservations, useCancelReservation } from '@/features/reservations/hooks/useReservations';
 import { APP_ROUTE } from '@/constants/routes';
 import { formatDateVN } from '@/lib/utils/date';
+import { toCoverImageUrl } from '@/lib/utils/image';
 import type { IReservation } from '@/features/reservations/api/reservationApi';
 
 const STATUS_CONFIG: Record<IReservation['status'], { label: string; icon: React.ReactNode; bg: string; text: string; border: string }> = {
@@ -194,7 +195,7 @@ export default function ReservationsPage() {
                   >
                     {reservation.cover_image ? (
                       <img
-                        src={reservation.cover_image}
+                        src={toCoverImageUrl(reservation.cover_image) ?? undefined}
                         alt={reservation.title}
                         className="w-full h-full object-cover hover:scale-105 transition-transform"
                       />

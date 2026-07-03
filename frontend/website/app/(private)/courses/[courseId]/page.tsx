@@ -14,6 +14,7 @@
   } from '@/features/books/hooks/useBooks';
   import type { IRelatedBook } from '@/features/books/api/bookApi';
   import { APP_ROUTE } from '@/constants/routes';
+  import { toCoverImageUrl } from '@/lib/utils/image';
   import type { IReadingListStatus } from '@/features/reading-list/api/readingListApi';
   import {
     useReadingList,
@@ -223,7 +224,7 @@
             <div className="w-full aspect-[3/4] rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center shadow-md">
               {book.cover_image ? (
                 <img
-                  src={book.cover_image}
+                  src={toCoverImageUrl(book.cover_image) ?? undefined}
                   alt={book.title}
                   className="w-full h-full object-cover"
                 />
@@ -517,7 +518,7 @@
               <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
                 {b.cover_image ? (
                   <img
-                    src={b.cover_image}
+                    src={toCoverImageUrl(b.cover_image) ?? undefined}
                     alt={b.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />

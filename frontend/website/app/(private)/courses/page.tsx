@@ -7,6 +7,7 @@ import { SearchOutlined, BookOutlined, HeartOutlined, HeartFilled } from '@ant-d
 import { useSearchBooks, useBookFilterOptions } from '@/features/books/hooks/useBooks';
 import { IBookSearchParams } from '@/features/books/api/bookApi';
 import { APP_ROUTE } from '@/constants/routes';
+import { toCoverImageUrl } from '@/lib/utils/image';
 import {
   useReadingList,
   useAddToReadingList,
@@ -213,7 +214,7 @@ function CoursesPageContent() {
               <div className="relative aspect-[3/4] bg-gray-100 flex items-center justify-center overflow-hidden">
                 {book.cover_image ? (
                   <img
-                    src={book.cover_image}
+                    src={toCoverImageUrl(book.cover_image) ?? undefined}
                     alt={book.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />

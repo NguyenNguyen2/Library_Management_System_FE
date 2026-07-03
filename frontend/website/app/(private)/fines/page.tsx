@@ -13,6 +13,7 @@ import {
 import { useFines } from '@/features/fines/hooks/useFines';
 import { APP_ROUTE } from '@/constants/routes';
 import { formatDateVN } from '@/lib/utils/date';
+import { toCoverImageUrl } from '@/lib/utils/image';
 import type { IFine } from '@/features/fines/api/fineApi';
 
 function formatCurrency(amount: number): string {
@@ -55,7 +56,7 @@ function FineCard({ fine }: { fine: IFine }) {
             >
               {fine.cover_image ? (
                 <img
-                  src={fine.cover_image}
+                  src={toCoverImageUrl(fine.cover_image) ?? undefined}
                   alt={fine.title}
                   className="w-full h-full object-cover rounded-lg hover:scale-105 transition-transform"
                 />

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { Spin } from 'antd';
 import { BookOutlined, HeartFilled, StarFilled } from '@ant-design/icons';
 import { favoritesShareApi, type ISharedFavoritesData } from '@/features/favorites/api/favoritesShareApi';
+import { toCoverImageUrl } from '@/lib/utils/image';
 
 export default function SharedFavoritesPage() {
   const params = useParams<{ token: string }>();
@@ -86,7 +87,7 @@ export default function SharedFavoritesPage() {
                   <div className="flex-shrink-0 w-16 h-24 rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center">
                     {book.cover_image ? (
                       <img
-                        src={book.cover_image}
+                        src={toCoverImageUrl(book.cover_image) ?? undefined}
                         alt={book.title}
                         className="w-full h-full object-cover"
                       />
