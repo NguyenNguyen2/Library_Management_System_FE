@@ -1,7 +1,7 @@
 import { Button, Flex } from 'antd';
 import {
   BarChartOutlined,
-  CrownOutlined,
+  CreditCardOutlined,
   LockOutlined,
   LogoutOutlined,
   RobotOutlined,
@@ -97,6 +97,12 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       ],
     },
 
+    {
+      key: 'fees',
+      label: 'Quản lý phí & Thanh toán',
+      icon: <CreditCardOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.FEES,
+    },
     {
       key: 'reports',
       label: 'Báo cáo & Thống kê',
