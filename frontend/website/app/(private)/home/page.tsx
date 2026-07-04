@@ -166,8 +166,17 @@ function BookSection({
 export default function HomePage() {
   const router = useRouter();
   const [searchQ, setSearchQ] = useState("");
+  const [user, setUser] = useState<IDetailUser | undefined>(undefined);
+  const [isUserLoaded, setIsUserLoaded] = useState(false);
 
-  const user = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
+  useEffect(() => {
+    const storedUser = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
+    if (storedUser) {
+      setUser(storedUser);
+    }
+    setIsUserLoaded(true);
+  }, []);
+
   const userName = user?.name ?? "Độc giả";
 
   const { data: borrowingData } = useBorrowing();
@@ -285,7 +294,7 @@ export default function HomePage() {
             {/* Left content */}
             <div>
               <div className="inline-flex items-center gap-2 bg-white/15 border border-white/25 rounded-full px-4 py-1.5 text-sm mb-4">
-                👋 Xin chào, <span className="font-semibold">{userName}</span>
+                👋 Xin chào{isUserLoaded ? `, ${userName}` : ''}
               </div>
               <h1 className="text-4xl lg:text-5xl leading-tight drop-shadow">
                 Khám phá hàng ngàn<br />đầu sách hay

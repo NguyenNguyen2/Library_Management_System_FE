@@ -27,4 +27,6 @@ export enum APP_ROUTE {
   history = '/history',
   /** Fine payment history */
   fines = '/fines',
+  /** Notifications */
+  notifications = '/notifications',  
 }

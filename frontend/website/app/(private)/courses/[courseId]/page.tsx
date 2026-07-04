@@ -2,7 +2,7 @@
   import axiosInstance from '@/lib/axios/axios-client';
   import { Button, Card, Dropdown, Input, Pagination, Rate, Spin, Tag, message } from 'antd';
   import { ArrowLeftOutlined, BookOutlined, CheckOutlined, DownOutlined, HeartFilled, HeartOutlined } from '@ant-design/icons';
-  import { use, useState } from 'react';
+import { use, useEffect, useState } from 'react';
   import { useRouter } from 'next/navigation';
   import { useQueryClient } from '@tanstack/react-query';
   import { getCookie } from '@shared/utils/cookie';
@@ -37,18 +37,26 @@
     const bookId = Number(courseId);
     const router = useRouter();
     const queryClient = useQueryClient();
+  const [user, setUser] = useState<IDetailUser | undefined>(undefined);
+  const [isUserLoaded, setIsUserLoaded] = useState(false);
 
-    const user = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
-    const userId = Number(user?.id ?? '0');
+  useEffect(() => {
+    const storedUser = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
+    if (storedUser) {
+      setUser(storedUser);
+    }
+    setIsUserLoaded(true);
+  }, []);
 
+    const [reviewContent, setReviewContent] = useState('');
     const [reviewPage, setReviewPage] = useState(1);
     const [reviewRating, setReviewRating] = useState(0);
-    const [reviewContent, setReviewContent] = useState('');
+    const userId = user?.id ? Number(user.id) : undefined;
 
     const { data: book, isLoading, isError } = useBookDetail(bookId);
     const { data: related } = useRelatedBooks(bookId);
     const { data: reviewsData, isLoading: isReviewsLoading, refetch: refetchReviews } = useBookReviews(bookId, reviewPage);
-    const { data: permissionData } = useReviewPermission(bookId, userId);
+    const { data: permissionData } = useReviewPermission(bookId, userId ?? 0);
     const submitReviewMutation = useSubmitReview();
 
     const { data: readingListData } = useReadingList();
