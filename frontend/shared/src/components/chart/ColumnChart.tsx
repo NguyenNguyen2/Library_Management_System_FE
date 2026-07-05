@@ -32,10 +32,16 @@ export type ColumnChartProps = {
   columnWidth?: string;
 };
 
+const PALETTE = [
+  '#4285F4', '#34A853', '#F9AB00', '#A142F4', '#FF6D01',
+  '#00BCD4', '#FF5722', '#9C27B0', '#795548', '#607D8B',
+  '#E91E63', '#009688', '#FF9800', '#3F51B5', '#8BC34A',
+];
+
 const ColumnChart: React.FC<ColumnChartProps> = ({
   title,
   subtitle,
-  
+
   categories,
   series,
   height = 360,
@@ -48,11 +54,17 @@ const ColumnChart: React.FC<ColumnChartProps> = ({
   yLabelFormatter = (v) => formatNumber(v),
   tooltipValueFormatter = (v) => formatNumber(v),
 }) => {
-  // Palette màu giống các chart khác
+  // distributed: true khi horizontal + 1 series → mỗi bar một màu riêng
+  const isDistributed = horizontal && series.length === 1;
+
+  // Palette màu: distributed → mỗi bar một màu; nhiều series → mỗi series một màu
   const colors = useMemo(() => {
-    const palette = ['#4285F4', '#34A853', '#F9AB00', '#A142F4', '#FF6D01'];
-    return series?.map((s, i) => palette[i % palette.length]);
-  }, [series]);
+    if (isDistributed) {
+      const dataLen = series[0]?.data.length ?? 0;
+      return Array.from({ length: dataLen }, (_, i) => PALETTE[i % PALETTE.length]);
+    }
+    return series.map((_, i) => PALETTE[i % PALETTE.length]);
+  }, [series, isDistributed]);
 
   // Options của ApexCharts — tối ưu cho column chart
   const options: ApexOptions = useMemo(() => ({
@@ -68,12 +80,14 @@ const ColumnChart: React.FC<ColumnChartProps> = ({
         horizontal: horizontal,
         columnWidth,
         borderRadius: 2,
+        // distributed: mỗi bar nhận màu riêng từ mảng colors
+        distributed: isDistributed,
         dataLabels: {
           position: 'top',
         },
       },
     },
-    dataLabels: { 
+    dataLabels: {
       enabled: false,  // tắt label trên cột để gọn gàng
     },
     stroke: {
@@ -94,19 +108,22 @@ const ColumnChart: React.FC<ColumnChartProps> = ({
     },
     yaxis: {
       labels: {
-        formatter: (val) => yLabelFormatter(val),
+        // horizontal: trục Y hiển thị tên (string) — không qua numeral formatter
+        // vertical: trục Y hiển thị số — dùng yLabelFormatter bình thường
+        formatter: horizontal ? (val: string | number) => String(val) : (val) => yLabelFormatter(val as number),
       },
     },
     legend: {
-      show: showLegend,
+      // distributed với 10+ bar sẽ tạo legend rất dài → tắt, dùng màu bar để phân biệt
+      show: isDistributed ? false : showLegend,
       position: legendPosition,
       horizontalAlign: legendPosition === 'bottom' ? 'center' : 'left',
       markers: { size: 4, offsetX: -2, radius: 2 },
       itemMargin: { horizontal: 10, vertical: 4 },
     },
     tooltip: {
-      shared: true,
-      intersect: false,
+      shared: !isDistributed,
+      intersect: isDistributed,
       y: {
         formatter: (val) => (val == null ? NotAvailable : tooltipValueFormatter(val)),
       },
@@ -129,7 +146,7 @@ const ColumnChart: React.FC<ColumnChartProps> = ({
         },
       },
     ],
-  }), [categories, colors, columnWidth, horizontal, legendPosition, showLegend, stacked, tooltipValueFormatter, yLabelFormatter]);
+  }), [categories, colors, columnWidth, horizontal, isDistributed, legendPosition, showLegend, stacked, tooltipValueFormatter, yLabelFormatter]);
 
   const isNoData = series.length === 0 || categories.length === 0;
   

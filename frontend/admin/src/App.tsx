@@ -15,16 +15,35 @@ import { COLORS } from '@shared/constants/color';
 import { ROUTES } from './constants/routers';
 
 const DefaultLayout = lazy(() => import('./components/layout/DefaultLayout'));
+const LibrarianLayout = lazy(() => import('./components/layout/LibrarianLayout'));
 const AuthLayout = lazy(() => import('./components/layout/AuthLayout'));
 const Login = lazy(() => import('./pages/login/LoginPage'));
 const NotFound = lazy(() => import('./components/general/PageNotFound'));
 const Dashboard = lazy(() => import('./pages/dashboard/DashboardPage'));
 const Users = lazy(() => import('./pages/users/UsersPage'));
-const Courses = lazy(() => import('./pages/courses/CoursesPage'));
-const Codes = lazy(() => import('./pages/codes/CodesPage'));
+const Books = lazy(() => import('./pages/books/BooksListPage').then(module => ({ default: module.BooksListPage })));
+const Checkout = lazy(() => import('./pages/checkout/CheckoutPage'));
+const Return = lazy(() => import('./pages/return/ReturnBookPage'));
+const Renew = lazy(() => import('./pages/renew/RenewBookPage'));
+const Reservation = lazy(() => import('./pages/reservation/ReservationPage'));
 const ForgotPassword = lazy(() => import('./pages/login/components/ForgotPassword'));
 const Achievements = lazy(() => import('./pages/achievements/AchievementsPage'));
 const Settings = lazy(() => import('./pages/settings/SettingsPage'));
+const Fees = lazy(() => import('./pages/fees/FeesPage'));
+const Reports = lazy(() => import('./pages/reports/ReportsPage'));
+const UserHistory = lazy(() => import('./pages/history/UserHistoryPage'));
+const TransactionHistory = lazy(() => import('./pages/history/TransactionHistoryPage'));
+const AIDemand = lazy(() => import('./pages/ai-demand/AIDemandPage'));
+
+import { useGlobalVariable } from './hooks/GlobalVariableProvider';
+
+const DynamicRoleLayout = () => {
+  const { user } = useGlobalVariable();
+  if (user?.role === 'librarian') {
+    return <LibrarianLayout />;
+  }
+  return <DefaultLayout />;
+};
 
 function App() {
   
@@ -64,16 +83,24 @@ function App() {
               <Route
                 element={
                   <PrivateRoute>
-                    <DefaultLayout />
+                    <DynamicRoleLayout />
                   </PrivateRoute>
                 }
               >
                 <Route path={ROUTES.DASHBOARD} element={<Dashboard />} />
                 <Route path={ROUTES.USERS} element={<Users />} />
-                <Route path={ROUTES.COURSES} element={<Courses />} />
-                <Route path={ROUTES.CODES} element={<Codes />} />
+                <Route path={ROUTES.BOOKS} element={<Books />} />
+                <Route path={ROUTES.FEES} element={<Fees />} />
+                <Route path={ROUTES.REPORTS} element={<Reports />} />
+                <Route path={ROUTES.TRANSACTIONS} element={<Checkout />} />
+                <Route path={ROUTES.RETURN} element={<Return />} />
+                <Route path={ROUTES.RENEW} element={<Renew />} />
+                <Route path={ROUTES.RESERVATION} element={<Reservation />} />
+                <Route path={ROUTES.USER_HISTORY} element={<UserHistory />} />
+                <Route path={ROUTES.TRANSACTION_LOG} element={<TransactionHistory />} />
                 <Route path={ROUTES.ACHIEVEMENTS} element={<Achievements />} />
                 <Route path={ROUTES.SETTINGS} element={<Settings />} />
+                <Route path={ROUTES.AI_DEMAND} element={<AIDemand />} />
               </Route>
               {/* Những route cần bọc Auth Layout */}
               <Route

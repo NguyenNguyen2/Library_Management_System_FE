@@ -16,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Phong Thủy Academy",
-  description: "Hệ thống quản lý khóa học phong thủy",
+  title: "The Library Dashboard",
+  description: "Hệ thống quản lý thư viện và độc giả thông minh",
 };
 
 export default async function RootLayout({

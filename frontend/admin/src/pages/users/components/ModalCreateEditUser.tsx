@@ -1,4 +1,4 @@
-import { Button, Flex, Form, Modal } from 'antd';
+import { Button, Flex, Form, Modal, Table, Tag, Select } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { getKey } from '@shared/types/I18nKeyType';
 import CustomInput from '@shared/components/input/CustomInput';
@@ -9,6 +9,7 @@ import { SearchSelect } from '@shared/components/select/SearchSelect';
 import { achievementHooks } from '../../../hooks/useAchievements';
 import { userHooks } from '../../../hooks/useUsers';
 import { IDetailUser } from '@shared/types/UserType';
+import dayjs from 'dayjs';
 
 interface IModalCreateEditUser {
   /** Injected by FilterTable via cloneElement when opening update/detail modal. */
@@ -22,6 +23,25 @@ const ModalCreateEditUser = ({ detail }: IModalCreateEditUser) => {
 
   const { mutate: resetUserPassword, isPending: isResetting } =
     userHooks.useResetUserPassword();
+
+  const { data: borrowHistory, isLoading: isHistoryLoading } =
+    userHooks.useFetchReaderBorrowHistory(detail?.id || '', !!detail?.id);
+
+  const historyColumns = [
+    { title: 'Tên sách', dataIndex: 'book_title', key: 'book_title', ellipsis: true },
+    { title: 'Mã vạch', dataIndex: 'copy_barcode', key: 'copy_barcode', width: 100 },
+    { title: 'Ngày mượn', dataIndex: 'borrow_date', key: 'borrow_date', render: (d: string) => d ? dayjs(d).format('DD/MM/YYYY') : '—', width: 90 },
+    { title: 'Hạn trả', dataIndex: 'due_date', key: 'due_date', render: (d: string) => d ? dayjs(d).format('DD/MM/YYYY') : '—', width: 90 },
+    { title: 'Ngày trả', dataIndex: 'return_date', key: 'return_date', render: (d: string) => d ? dayjs(d).format('DD/MM/YYYY') : '—', width: 90 },
+    { title: 'Trạng thái', dataIndex: 'status', key: 'status', width: 90, render: (s: string, record: any) => {
+        const isReturned = !!record.return_date;
+        let color = 'blue';
+        let label = 'Đang mượn';
+        if (isReturned) { color = 'green'; label = 'Đã trả'; }
+        else if (s === 'overdue') { color = 'red'; label = 'Quá hạn'; }
+        return <Tag color={color} className="!rounded">{label}</Tag>;
+    }},
+  ];
 
   const handleGenerateRandomPassword = () => {
     form?.setFieldValue('password', generateRandomPassword(10));
@@ -52,6 +72,15 @@ const ModalCreateEditUser = ({ detail }: IModalCreateEditUser) => {
       <p className="mb-6 text-sm leading-5 text-grayMedium">
         {t(getKey('add_user_desc'))}
       </p>
+
+      {isEditMode && detail?.card_number && (
+        <Flex gap={16} className="mb-4 bg-blue-50/50 p-3 rounded-lg border border-blue-100 items-center justify-between">
+          <span className="text-sm font-semibold text-navyDark">Số thẻ thư viện:</span>
+          <span className="font-mono text-sm font-bold text-blue-600 bg-white border border-blue-200 px-2.5 py-0.5 rounded select-all shadow-sm">
+            {detail.card_number}
+          </span>
+        </Flex>
+      )}
 
       {/* Edit mode: reset-password action row — red note on the left, button on the right */}
       {isEditMode && (
@@ -126,19 +155,64 @@ const ModalCreateEditUser = ({ detail }: IModalCreateEditUser) => {
         </Form.Item>
       )}
 
-      <Form.Item label={t(getKey('achievement_optional'))} name="achievement">
-        {/* Achievement is persisted as `{ value, label }` — SearchSelect must emit the full object. */}
-        <SearchSelect
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          useQueryHook={achievementHooks.useFetchListAchievements as any}
-          fieldNames={{ label: 'name', value: 'id' }}
-          labelInValue
-          placeholder={t(getKey('no_achievement'))}
-        />
-      </Form.Item>
+      {isEditMode ? (
+        <Flex gap={16}>
+          <Form.Item
+            label={t(getKey('achievement_optional'))}
+            name="achievement"
+            className="flex-1"
+          >
+            <SearchSelect
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              useQueryHook={achievementHooks.useFetchListAchievements as any}
+              fieldNames={{ label: 'name', value: 'id' }}
+              labelInValue
+              placeholder={t(getKey('no_achievement'))}
+            />
+          </Form.Item>
+          <Form.Item
+            label="Trạng thái tài khoản"
+            name="status"
+            className="flex-1"
+            rules={[{ required: true, message: 'Vui lòng chọn trạng thái tài khoản' }]}
+          >
+            <Select size="large">
+              <Select.Option value="1">Hoạt động</Select.Option>
+              <Select.Option value="0">Đang khóa</Select.Option>
+            </Select>
+          </Form.Item>
+        </Flex>
+      ) : (
+        <Form.Item label={t(getKey('achievement_optional'))} name="achievement">
+          <SearchSelect
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            useQueryHook={achievementHooks.useFetchListAchievements as any}
+            fieldNames={{ label: 'name', value: 'id' }}
+            labelInValue
+            placeholder={t(getKey('no_achievement'))}
+          />
+        </Form.Item>
+      )}
       <p className="-mt-4 mb-4 text-xs text-grayMedium">
         {t(getKey('achievement_note'))}
       </p>
+
+      {isEditMode && (
+        <div className="mt-6 border-t pt-4">
+          <h3 className="text-[14px] font-semibold leading-[20px] mb-3 text-blackSoft">
+            Lịch sử mượn/trả sách
+          </h3>
+          <Table
+            dataSource={borrowHistory}
+            columns={historyColumns}
+            rowKey="id"
+            loading={isHistoryLoading}
+            size="small"
+            pagination={{ pageSize: 5, showSizeChanger: false }}
+            locale={{ emptyText: 'Chưa có lịch sử mượn trả' }}
+          />
+        </div>
+      )}
     </>
   );
 };

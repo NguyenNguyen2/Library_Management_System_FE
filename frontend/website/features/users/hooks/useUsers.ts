@@ -11,9 +11,16 @@ export const useUpdateUser = () => {
   });
 };
 
-/** Change current user's password (requires proving the current one). */
-export const useChangePassword = () => {
+/** Step 1 — verify current password and request OTP email. */
+export const useRequestChangePassword = () => {
   return useMutation({
-    mutationFn: changePasswordApi.changePassword,
+    mutationFn: changePasswordApi.requestOtp,
+  });
+};
+
+/** Step 2 — verify OTP and apply the new password. */
+export const useVerifyChangePasswordOtp = () => {
+  return useMutation({
+    mutationFn: changePasswordApi.verifyOtp,
   });
 };

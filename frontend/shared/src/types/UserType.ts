@@ -9,6 +9,7 @@ export interface IBaseUser {
   name: string;
   role: string;
   phone?: string;
+  address?: string;
   avatar?: string;
   achievement?: IValueLabel;
 }
@@ -19,6 +20,7 @@ export interface IDetailUser extends IBaseUser {
   completedCourses?: number;
   createdAt?: string;
   updatedAt?: string;
+  card_number?: string;
 }
 
 export interface IListUser extends IBaseUser {
@@ -26,6 +28,7 @@ export interface IListUser extends IBaseUser {
   status?: IValueLabel;
   createdAt?: string;
   updatedAt?: string;
+  card_number?: string;
 }
 
 export interface ICreateUser extends IBaseUser {

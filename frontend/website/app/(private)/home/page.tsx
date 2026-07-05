@@ -1,417 +1,521 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Card, Button, Tag, Input, Progress, Spin } from 'antd';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button, Empty, Input, Spin, message } from "antd";
+import {
+  SearchOutlined,
+  BookOutlined,
+  HeartOutlined,
+  HeartFilled,
+  ReadOutlined,
+  WarningOutlined,
+  ClockCircleOutlined,
+  ThunderboltOutlined,
+  FireOutlined,
+  TrophyOutlined,
+  RightOutlined,
+  StarOutlined,
+  TeamOutlined,
+} from "@ant-design/icons";
 import { getCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
-import { IDetailUser } from '@shared/types/user-type';
-import { formatNumber } from '@shared/utils/numberUtils';
+import type { IDetailUser } from '@shared/types/UserType';
+import { useBorrowing } from '@/features/borrowing/hooks/useBorrowing';
 import {
-  ACHIEVEMENT_STATUS,
-  type AchievementStatusType,
-} from '@/constants/status';
-import { useAchievements } from '@/features/achievements/hooks/useAchievements';
-import { StatsBarChartIcon } from '../_icons/StatsBarChartIcon';
-import { ActivateKeyIcon } from '../_icons/ActivateKeyIcon';
-import { AchievementTrophyIcon } from '../_icons/AchievementTrophyIcon';
-import { AchievementMedalIcon } from '../_icons/AchievementMedalIcon';
-import { WelcomeTrophyIcon } from '../_icons/WelcomeTrophyIcon';
-import { useTranslations } from 'next-intl';
-import { cn } from '@shared/constants/commonConst';
-import { HOVER_CLICKABLE } from '@shared/constants/animation';
-import { IListAchievement } from '@/features/shared/types/AchievementType';
-import { useUser } from '@shared/provider/UserProvider';
-import Image from 'next/image';
-import { IListCourse } from '@shared/types/CourseType';
+  useReadingList,
+  useAddToReadingList,
+  useRemoveFromReadingList,
+} from '@/features/reading-list/hooks/useReadingList';
+import { useReservations } from '@/features/reservations/hooks/useReservations';
+import { READER_BORROW_LIMIT } from '@/lib/mock/mockData';
+import { toCoverImageUrl } from '@/lib/utils/image';
 import { APP_ROUTE } from '@/constants/routes';
+import { useSearchBooks, useHomeBooks } from '@/features/books/hooks/useBooks';
+import type { IHomeBook } from '@/features/books/api/bookApi';
+import { useRecommendations } from '@/features/recommendations/hooks/useRecommendations';
+import { useCollaborativeRecommendations } from '@/features/recommendations/hooks/useCollaborativeRecommendations';
+import { BookSlideshow } from './components/BookSlideshow';
 
-// ===== Types =====
-interface AchievementItem {
-  id: string;
-  name: string;
-  requiredCourses: number;
-  status: AchievementStatusType;
+function HomeBookCard({
+  book,
+  onClick,
+  isFavorite,
+  onHeartClick,
+}: {
+  book: IHomeBook;
+  onClick: () => void;
+  isFavorite: boolean;
+  onHeartClick: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <div
+      className="flex-shrink-0 w-40 snap-start group cursor-pointer"
+      onClick={onClick}
+    >
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all h-full">
+        <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden flex items-center justify-center">
+          {book.cover_image ? (
+            <img
+              src={toCoverImageUrl(book.cover_image) ?? undefined}
+              alt={book.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <BookOutlined style={{ fontSize: 36 }} className="text-gray-300" />
+          )}
+          <span
+            className={`absolute top-2 left-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white ${
+              book.available_copies > 0 ? "bg-emerald-500" : "bg-orange-400"
+            }`}
+          >
+            {book.available_copies > 0 ? "Có sẵn" : "Đặt trước"}
+          </span>
+          <button
+            onClick={onHeartClick}
+            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/85 hover:bg-white flex items-center justify-center shadow-sm transition-all"
+            title={isFavorite ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
+          >
+            {isFavorite
+              ? <HeartFilled className="text-red-500 text-xs" />
+              : <HeartOutlined className="text-gray-400 text-xs" />
+            }
+          </button>
+        </div>
+        <div className="p-3">
+          <p className="text-xs text-gray-900 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors font-semibold">
+            {book.title}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-// ===== Constants =====
-// Card border + background colors mapped per achievement status
-const achievementCardClassByStatus: Record<AchievementStatusType, string> = {
-  [ACHIEVEMENT_STATUS.COMPLETED]: 'border-(--greenMedium) bg-(--greenPale)',
-  [ACHIEVEMENT_STATUS.CURRENT]: 'border-(--yellowGold) bg-(--yellowPale)',
-  [ACHIEVEMENT_STATUS.PENDING]: 'border-(--grayBorder) bg-(--grayLightest)',
-};
+function StatPill({
+  icon,
+  label,
+  value,
+  onClick,
+  accent = "text-white/80",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string | number;
+  onClick?: () => void;
+  accent?: string;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className="bg-white/15 backdrop-blur border border-white/20 rounded-xl p-4 h-full hover:bg-white/20 transition-colors cursor-pointer"
+    >
+      <div className={`flex items-center gap-2 text-xs ${accent}`}>
+        {icon}
+        <span>{label}</span>
+      </div>
+      <div className="text-2xl mt-1 text-white">{value}</div>
+    </div>
+  );
+}
 
-const achievementIconClassByStatus: Record<AchievementStatusType, string> = {
-  [ACHIEVEMENT_STATUS.COMPLETED]: 'bg-(--greenMedium)',
-  [ACHIEVEMENT_STATUS.CURRENT]: 'bg-(--yellowGold)',
-  [ACHIEVEMENT_STATUS.PENDING]: 'bg-(--grayBorder)',
-};
+function BookSection({
+  title,
+  icon,
+  books,
+  onBookClick,
+  makeHeartProps,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  books: IHomeBook[];
+  onBookClick: (bookId: number) => void;
+  makeHeartProps: (bookId: number) => { isFavorite: boolean; onHeartClick: (e: React.MouseEvent) => void };
+}) {
+  const router = useRouter();
+  if (books.length === 0) return null;
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="flex items-center gap-2 text-xl text-gray-900 font-semibold">
+          {icon}
+          {title}
+        </h2>
+        <Button type="link" className="text-blue-600" onClick={() => router.push(APP_ROUTE.courses)}>
+          Xem tất cả →
+        </Button>
+      </div>
+      <div className="flex gap-4 overflow-x-auto pb-3 snap-x scrollbar-none -mx-1 px-1">
+        {books.map((b) => {
+          const { isFavorite, onHeartClick } = makeHeartProps(b.book_id);
+          return (
+            <HomeBookCard
+              key={b.book_id}
+              book={b}
+              onClick={() => onBookClick(b.book_id)}
+              isFavorite={isFavorite}
+              onHeartClick={onHeartClick}
+            />
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
-const achievementNameClassByStatus: Record<AchievementStatusType, string> = {
-  [ACHIEVEMENT_STATUS.COMPLETED]: 'text-(--greenMedium)',
-  [ACHIEVEMENT_STATUS.CURRENT]: 'text-(--yellowDark)',
-  [ACHIEVEMENT_STATUS.PENDING]: 'text-(--grayMedium)',
-};
-
-// TODO: replace with courses API when ready
-const COURSES_PLACEHOLDER = [
-  {
-    id: 1,
-    title: 'Phong Thủy Cơ Bản',
-    description: 'Khóa học giới thiệu các kiến thức nền tảng về phong thủy, bao gồm âm dương ngũ hành, bát quái và cách bố trí không gian sống hợp lý.',
-    progress: 100,
-    thumbnail: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80',
-  },
-  {
-    id: 2,
-    title: 'Phong Thủy Nhà Ở',
-    description: 'Học cách áp dụng phong thủy vào thiết kế và bố trí nhà ở để mang lại vận khí tốt cho gia đình.',
-    progress: 100,
-    thumbnail: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&q=80',
-  },
-];
-
-// ===== Component =====
 export default function HomePage() {
   const router = useRouter();
-  const t = useTranslations();
-  const [showActivate, setShowActivate] = useState(false);
-  const [activateCode, setActivateCode] = useState('');
+  const [searchQ, setSearchQ] = useState("");
+  const [user, setUser] = useState<IDetailUser | undefined>(undefined);
+  const [isUserLoaded, setIsUserLoaded] = useState(false);
 
-  // Read logged-in user from cookie (set by useLogin on success)
-  const user = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
-  const userName = user?.name ?? '';
-  const achievementLabel = user?.achievement?.label ?? '';
-  const completedCourses = user?.completedCourses ?? 0;
+  useEffect(() => {
+    const storedUser = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
+    if (storedUser) {
+      setUser(storedUser);
+    }
+    setIsUserLoaded(true);
+  }, []);
 
-  // Fetch achievements from API (sorted by requiredCourses ASC)
-  const { data: achievementsData, isLoading: achievementsLoading } =
-    useAchievements({ page: 1, limit: 100 });
-  const achievementRows = achievementsData?.rows ?? [];
+  const userName = user?.name ?? "Độc giả";
 
-  // Compute status by comparing user's completedCourses vs each achievement's requiredCourses
-  const achievements: AchievementItem[] = achievementRows.map(
-    (item: { id: string; name: string; requiredCourses: number }) => ({
-      ...item,
-      status:
-        completedCourses >= item.requiredCourses
-          ? ACHIEVEMENT_STATUS.COMPLETED
-          : ACHIEVEMENT_STATUS.PENDING,
-    })
+  const { data: borrowingData } = useBorrowing();
+  const { data: reservationsData } = useReservations();
+  const { data: readingListData } = useReadingList();
+
+  const borrowedBooks = borrowingData?.data ?? [];
+  const reservationsList = reservationsData?.data ?? [];
+
+  const borrowedCount = borrowedBooks.length;
+  const overdueCount = borrowedBooks.filter((b) => b.days_remaining < 0).length;
+  const activeReservationsCount = reservationsList.filter(
+    (r) => r.status === 'waiting' || r.status === 'ready',
+  ).length;
+  const readingListCount = (readingListData?.data ?? []).filter(
+    (i) => i.status.value !== 'favorite'
+  ).length;
+
+  const { mutate: addItem } = useAddToReadingList();
+  const { mutate: removeItem } = useRemoveFromReadingList();
+
+  const favoriteItemMap = new Map(
+    (readingListData?.data ?? [])
+      .filter((item) => item.status.value === 'favorite')
+      .map((item) => [item.book_id, item])
   );
 
-  // Mark the highest completed achievement as CURRENT (user's active rank)
-  const lastCompletedIndex = achievements.findLastIndex(
-    (a) => a.status === ACHIEVEMENT_STATUS.COMPLETED
-  );
-  if (lastCompletedIndex >= 0) {
-    achievements[lastCompletedIndex].status = ACHIEVEMENT_STATUS.CURRENT;
-  }
+  const makeHeartProps = (bookId: number) => {
+    const favItem = favoriteItemMap.get(bookId) ?? null;
+    const isFavorite = !!favItem;
+    const onHeartClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isFavorite && favItem) {
+        removeItem(favItem.wishlist_id, {
+          onSuccess: () => message.success('Đã xóa khỏi yêu thích'),
+          onError: () => message.error('Có lỗi xảy ra'),
+        });
+      } else {
+        addItem({ book_id: bookId, status: 'favorite' }, {
+          onSuccess: () => message.success('Đã thêm vào yêu thích'),
+          onError: () => message.error('Có lỗi xảy ra'),
+        });
+      }
+    };
+    return { isFavorite, onHeartClick };
+  };
+
+  const { data: homeBooks, isLoading: isHomeBooksLoading } = useHomeBooks();
+
+  const { data: recommendationsData } = useRecommendations();
+  const recommendedBooks: IHomeBook[] = (recommendationsData?.data ?? []).map((r) => ({
+    book_id:          r.book_id,
+    title:            r.title,
+    cover_image:      r.cover_image,
+    available_copies: r.available_copies,
+  }));
+
+  const { data: collaborativeData } = useCollaborativeRecommendations();
+  const collaborativeBooks: IHomeBook[] = (collaborativeData?.data ?? []).map((r) => ({
+    book_id:          r.book_id,
+    title:            r.title,
+    cover_image:      r.cover_image,
+    available_copies: r.available_copies,
+  }));
+
+  const slideshowBooks = useMemo(() => {
+    const pool = new Map<number, IHomeBook>();
+    const addAll = (arr?: IHomeBook[]) => {
+      arr?.forEach((b) => {
+        if (b.cover_image && !pool.has(b.book_id)) pool.set(b.book_id, b);
+      });
+    };
+    addAll(recommendedBooks);
+    addAll(collaborativeBooks);
+    addAll(homeBooks?.featured);
+    addAll(homeBooks?.new_books);
+    addAll(homeBooks?.most_borrowed);
+
+    const shuffled = Array.from(pool.values());
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, 10);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recommendationsData, collaborativeData, homeBooks]);
+
+  const handleBookClick = (bookId: number) => {
+    router.push(`${APP_ROUTE.courses}/${bookId}`);
+  };
+
+  const [debouncedQ, setDebouncedQ] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(searchQ.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQ]);
+  const { data: searchResults, isFetching: isSearching } = useSearchBooks({ q: debouncedQ });
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQ.trim()) router.push(`/courses?q=${encodeURIComponent(searchQ.trim())}`);
+    else router.push('/courses');
+  };
 
   return (
-    <div>
-      <div className="flex flex-col gap-8">
-        {/* Welcome Banner */}
-        <div className="bg-linear-to-r from-(--blueGradientStart) to-(--blueGradientEnd) p-6 rounded-[10px] flex items-center gap-3">
-          <div className="shrink-0 w-8 h-8">
-            <WelcomeTrophyIcon />
-          </div>
-          <div>
-            <p className="font-bold text-2xl leading-8 text-(--whiteColor)">
-              {t('user_home_greeting', {
-                achievement: achievementLabel,
-                name: userName,
-              })}
-            </p>
-            <p className="font-normal text-base leading-6 text-(--blueLight) mt-1">
-              {t('user_home_welcome_back')}
-            </p>
-          </div>
-        </div>
+    <div className="bg-gray-50 min-h-screen pb-12">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 text-white">
+        {/* Decorative blobs */}
+        <div className="absolute -top-24 -right-24 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-yellow-300/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card
-            onClick={() => router.push(APP_ROUTE.profile)}
-            className={cn(
-              'border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]',
-              HOVER_CLICKABLE
-            )}
-            styles={{ body: { padding: 24 } }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-[10px] flex items-center justify-center bg-(--blueLightest)">
-                <StatsBarChartIcon />
+        <div className="relative max-w-7xl mx-auto px-6 py-12 lg:py-16">
+          <div className="grid lg:grid-cols-2 gap-10 items-center">
+            {/* Left content */}
+            <div>
+              <div className="inline-flex items-center gap-2 bg-white/15 border border-white/25 rounded-full px-4 py-1.5 text-sm mb-4">
+                👋 Xin chào{isUserLoaded ? `, ${userName}` : ''}
               </div>
-              <div>
-                <p className="font-semibold text-base text-(--blackSoft)">
-                  {t('stats_title')}
-                </p>
-                <p className="text-sm text-(--grayMedium) mt-0.5">
-                  {t('stats_subtitle')}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <Card
-            onClick={() => setShowActivate(!showActivate)}
-            className={cn(
-              'border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]',
-              HOVER_CLICKABLE
-            )}
-            styles={{ body: { padding: 24 } }}
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-[10px] flex items-center justify-center bg-(--greenPale)">
-                <ActivateKeyIcon />
-              </div>
-              <div>
-                <p className="font-semibold text-base text-(--blackSoft)">
-                  {t('activate_title')}
-                </p>
-                <p className="text-sm text-(--grayMedium) mt-0.5">
-                  {t('activate_subtitle')}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Activate Code Section */}
-        {showActivate && (
-          <Card
-            className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
-            styles={{ body: { padding: 24 } }}
-          >
-            <p className="font-semibold text-lg text-(--blackSoft) mb-2">
-              {t('activate_title')}
-            </p>
-            <p className="text-(--grayMedium) mb-4">
-              {t('activate_description')}
-            </p>
-            <div className="flex gap-2">
-              <Input
-                placeholder={t('activate_placeholder')}
-                value={activateCode}
-                onChange={(e) => setActivateCode(e.target.value)}
-                className="flex-1"
-              />
-              <Button type="primary" className="h-10 rounded-lg font-medium">
-                {t('activate_button')}
-              </Button>
-            </div>
-          </Card>
-        )}
-
-        {/* Achievement Section */}
-        <Card
-          className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
-          styles={{ body: { padding: 24 } }}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <AchievementTrophyIcon />
-            <p className="font-semibold text-lg text-(--blackSoft)">
-              {t('ranking_title')}
-            </p>
-          </div>
-          <p className="text-base text-(--grayMedium) mb-4">
-            {t('user_home_achievement_hint')}
-          </p>
-
-          <div className="flex flex-col gap-3">
-            {achievementsLoading ? (
-              <div className="flex justify-center py-4">
-                <Spin />
-              </div>
-            ) : (
-              achievements.map((item) => (
-                <div
-                  key={item.id}
-                  className={`flex justify-between items-center p-4 rounded-[10px] border ${achievementCardClassByStatus[item.status]}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-12 h-12 rounded-full flex items-center justify-center ${achievementIconClassByStatus[item.status]}`}
-                    >
-                      <AchievementMedalIcon />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p
-                          className={`font-semibold text-base ${achievementNameClassByStatus[item.status]}`}
-                        >
-                          {item.name}
-                        </p>
-                        {item.status === ACHIEVEMENT_STATUS.COMPLETED && (
-                          <Tag color="green">
-                            {t('achievement_status_achieved')}
-                          </Tag>
-                        )}
-                        {item.status === ACHIEVEMENT_STATUS.CURRENT && (
-                          <Tag color="gold">
-                            {t('achievement_status_current')}
-                          </Tag>
-                        )}
-                      </div>
-                      <p className="text-sm text-(--grayDark) mt-0.5">
-                        {t('achievement_required_courses', {
-                          count: formatNumber(item.requiredCourses),
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </Card>
-
-        {/* Courses Section — TODO: replace COURSES_PLACEHOLDER with courses API when ready */}
-        <div>
-          <p className="font-semibold text-lg text-(--blackSoft) mb-4">
-            {t('your_courses')}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-<<<<<<< HEAD
-            {COURSES_PLACEHOLDER.map((course) => (
-              <Card
-                key={course.id}
-                onClick={() => router.push(`/courses/${course.id}`)}
-                className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)] overflow-hidden cursor-pointer"
-                styles={{ body: { padding: 0 } }}
-              >
-                <img
-                  src={course.thumbnail}
-                  alt={course.title}
-                  className="w-full h-40 object-cover"
-                />
-                <div className="p-4 flex flex-col gap-3">
-                  <p className="font-semibold text-base text-(--blackSoft) truncate">
-                    {course.title}
-                  </p>
-                  <p className="text-sm text-(--grayDark) line-clamp-2">
-                    {course.description}
-                  </p>
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-sm text-(--grayDark)">
-                        {t('progress_label')}
-                      </span>
-                      <span className="text-sm font-medium text-(--blackSoft)">
-                        {formatNumber(course.progress)}%
-                      </span>
-                    </div>
-                    <Progress percent={course.progress} showInfo={false} />
-                  </div>
-                  <Button
-                    type="primary"
-                    className="h-10 rounded-lg font-medium"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {t('complete_btn')}
-                  </Button>
-                </div>
-              </Card>
-            ))}
-=======
-            {coursesLoading ? (
-              <div className="flex justify-center py-4 col-span-full">
-                <Spin />
-              </div>
-            ) : userCourses.length === 0 ? (
-              <p className="col-span-full text-center text-(--grayMedium) py-8">
-                {t('no_courses_yet')}
+              <h1 className="text-4xl lg:text-5xl leading-tight drop-shadow">
+                Khám phá hàng ngàn<br />đầu sách hay
+              </h1>
+              <p className="mt-3 text-white/85 text-lg">
+                Mượn nhanh chóng · Đọc thông minh · Trả tiện lợi
               </p>
-            ) : (
-              userCourses.map((course: IListCourse) => {
-                // Backend returns progress 0-100 (rounded). Fallback to 0
-                // when the field is missing (legacy clients / cached data).
-                const progress = course.progress ?? 0;
-                const isDone = progress >= 100;
-                return (
-                  <Card
-                    key={course.id}
-                    onClick={() =>
-                      router.push(
-                        APP_ROUTE.courseDetails.replace('[courseId]', course.id)
-                      )
-                    }
-                    className={cn(
-                      'border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)] overflow-hidden',
-                      HOVER_CLICKABLE
-                    )}
-                    styles={{ body: { padding: 0 } }}
-                  >
-                    {course?.image && (
-                      <Image
-                        src={course?.image}
-                        alt={course?.name}
-                        className="w-full h-40 object-cover"
-                        width={500}
-                        height={200}
-                      />
-                    )}
-                    <div className="p-4 flex flex-col gap-3">
-                      <p className="font-semibold text-base text-(--blackSoft) truncate">
-                        {course?.name}
-                      </p>
-                      {course.description && (
-                        <p className="text-sm text-(--grayDark) line-clamp-2 min-h-10">
-                          {course.description}
-                        </p>
-                      )}
 
-                      <div className="flex flex-col gap-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-(--grayDark)">
-                            {t('progress_label')}
-                          </span>
-                          <span className="text-sm font-semibold text-(--blueMedium)">
-                            {progress}%
-                          </span>
-                        </div>
-                        <Progress
-                          percent={progress}
-                          showInfo={false}
-                          strokeColor="var(--blueMedium)"
-                          className="m-0!"
-                        />
-                      </div>
+              {/* Search bar */}
+              <form onSubmit={handleSearch} className="mt-6 bg-white rounded-2xl p-2 flex gap-2 shadow-2xl max-w-xl">
+                <Input
+                  prefix={<SearchOutlined className="text-gray-400" />}
+                  placeholder="Tìm sách, tác giả, thể loại..."
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  className="border-0 h-11 focus:ring-0"
+                  style={{ fontSize: "14px" }}
+                />
+                <Button type="primary" htmlType="submit" className="h-11 bg-blue-600 hover:bg-blue-700 px-6 rounded-xl border-0">
+                  Tìm kiếm
+                </Button>
+              </form>
 
-                      <Button
-                        type="primary"
-                        disabled={isDone}
-                        className="h-10 rounded-lg font-medium"
-                        onClick={(e) => {
-                          // Card already has onClick to navigate; stop bubbling
-                          // so "Đã hoàn thành" (disabled) doesn't inherit the
-                          // card click and behaves as a pure status indicator.
-                          e.stopPropagation();
-                          if (!isDone)
-                            router.push(
-                              APP_ROUTE.courseDetails.replace(
-                                '[courseId]',
-                                course.id
-                              )
-                            );
-                        }}
-                      >
-                        {t(
-                          isDone
-                            ? 'course_completed_btn'
-                            : 'course_continue_btn'
-                        )}
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })
-            )}
->>>>>>> c538635685df329f9e65815ac39c125a0a2e12a7
+            </div>
+
+            {/* Right stats (desktop only) */}
+            <div className="hidden lg:grid grid-cols-2 gap-3">
+              <StatPill
+                icon={<BookOutlined />}
+                label="Đang mượn"
+                value={`${borrowedCount} / ${READER_BORROW_LIMIT}`}
+                onClick={() => router.push(APP_ROUTE.borrowed)}
+              />
+              <StatPill
+                icon={<WarningOutlined />}
+                label="Quá hạn"
+                value={overdueCount}
+                accent="text-red-200"
+                onClick={() => router.push(APP_ROUTE.borrowed)}
+              />
+              <StatPill
+                icon={<ClockCircleOutlined />}
+                label="Đặt trước"
+                value={activeReservationsCount}
+                accent="text-amber-200"
+                onClick={() => router.push(APP_ROUTE.reservations)}
+              />
+              <StatPill
+                icon={<ReadOutlined />}
+                label="Danh sách đọc"
+                value={readingListCount}
+                onClick={() => router.push(APP_ROUTE.readingList)}
+              />
+            </div>
           </div>
+
+          {/* Mobile stats */}
+          <div className="grid grid-cols-4 gap-2 mt-6 lg:hidden">
+            {[
+              { label: "Mượn", value: `${borrowedCount}/${READER_BORROW_LIMIT}` },
+              { label: "Quá hạn", value: overdueCount },
+              { label: "Đặt trước", value: activeReservationsCount },
+              { label: "DS đọc", value: readingListCount },
+            ].map((stat) => (
+              <div
+                key={stat.label}
+                className="bg-white/15 border border-white/20 rounded-xl p-3 text-center hover:bg-white/20 transition-colors"
+              >
+                <p className="text-2xl text-white font-bold">{stat.value}</p>
+                <p className="text-[11px] text-white/70 mt-0.5">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Book Slideshow */}
+          {!debouncedQ && slideshowBooks.length > 0 && (
+            <div className="mt-8">
+              <BookSlideshow books={slideshowBooks} onBookClick={handleBookClick} />
+            </div>
+          )}
         </div>
+      </section>
+
+      {/* Overdue alert */}
+      {overdueCount > 0 && (
+        <div className="max-w-7xl mx-auto px-6 mt-6">
+          <button
+            onClick={() => router.push(APP_ROUTE.borrowed)}
+            className="w-full flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 hover:bg-red-100 transition-colors text-left"
+          >
+            <WarningOutlined className="text-red-500 text-lg flex-shrink-0" />
+            <p className="text-sm text-red-700">
+              Bạn có <span className="font-bold">{overdueCount} sách quá hạn</span>. Vui lòng trả sớm để tránh phát sinh phí.
+            </p>
+            <RightOutlined className="text-red-400 ml-auto text-xs flex-shrink-0" />
+          </button>
+        </div>
+      )}
+
+      {/* Book Sections / Search Results */}
+      <div className="max-w-7xl mx-auto px-6 mt-10 space-y-10">
+        {debouncedQ ? (
+          /* ── Search results ── */
+          <section>
+            <h2 className="flex items-center gap-2 text-xl text-gray-900 font-semibold mb-4">
+              <SearchOutlined className="text-blue-500" />
+              Kết quả cho &ldquo;{debouncedQ}&rdquo;
+            </h2>
+
+            {isSearching ? (
+              <div className="flex justify-center py-16">
+                <Spin size="large" />
+              </div>
+            ) : !searchResults || searchResults.length === 0 ? (
+              <Empty description="Không tìm thấy sách phù hợp" className="py-16" />
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 mb-4">
+                  Tìm thấy <span className="font-semibold text-gray-800">{searchResults.length}</span> kết quả
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {searchResults.map((book) => {
+                    const { isFavorite: isSrFav, onHeartClick: srHeartClick } = makeHeartProps(book.book_id);
+                    return (
+                    <div
+                      key={book.book_id}
+                      onClick={() => router.push(`${APP_ROUTE.courses}/${book.book_id}`)}
+                      className="bg-white rounded-xl border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all group"
+                    >
+                      {/* Cover */}
+                      <div className="relative aspect-[3/4] bg-gray-100 flex items-center justify-center overflow-hidden">
+                        {book.cover_image ? (
+                          <img
+                            src={toCoverImageUrl(book.cover_image) ?? undefined}
+                            alt={book.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        ) : (
+                          <BookOutlined style={{ fontSize: 36 }} className="text-gray-300" />
+                        )}
+                        <span
+                          className={`absolute top-2 left-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white ${
+                            book.available_copies > 0 ? "bg-emerald-500" : "bg-orange-400"
+                          }`}
+                        >
+                          {book.available_copies > 0 ? `Còn ${book.available_copies}` : "Hết"}
+                        </span>
+                        <button
+                          onClick={srHeartClick}
+                          className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-white/85 hover:bg-white flex items-center justify-center shadow-sm transition-all"
+                          title={isSrFav ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
+                        >
+                          {isSrFav
+                            ? <HeartFilled className="text-red-500 text-sm" />
+                            : <HeartOutlined className="text-gray-400 text-sm" />
+                          }
+                        </button>
+                      </div>
+                      {/* Info */}
+                      <div className="p-3">
+                        <p className="text-xs font-semibold text-gray-900 line-clamp-2 leading-snug mb-0.5 group-hover:text-blue-600 transition-colors">
+                          {book.title}
+                        </p>
+                        {book.author && (
+                          <p className="text-[11px] text-gray-500 truncate">{book.author}</p>
+                        )}
+                        {book.isbn && (
+                          <p className="text-[11px] text-gray-400 mt-1">ISBN: {book.isbn}</p>
+                        )}
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </section>
+        ) : isHomeBooksLoading ? (
+          <div className="flex justify-center py-16">
+            <Spin size="large" />
+          </div>
+        ) : (
+          /* ── Book collections ── */
+          <>
+            <BookSection
+              title="Sách gợi ý cho bạn"
+              icon={<StarOutlined className="text-indigo-500" />}
+              books={recommendedBooks}
+              onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
+            />
+            <BookSection
+              title="Độc giả giống bạn cũng đọc"
+              icon={<TeamOutlined className="text-teal-500" />}
+              books={collaborativeBooks}
+              onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
+            />
+            <BookSection
+              title="Sách nổi bật"
+              icon={<TrophyOutlined className="text-yellow-500" />}
+              books={homeBooks?.featured ?? []}
+              onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
+            />
+            <BookSection
+              title="Sách mới nhập"
+              icon={<ThunderboltOutlined className="text-blue-500" />}
+              books={homeBooks?.new_books ?? []}
+              onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
+            />
+            <BookSection
+              title="Sách được mượn nhiều nhất"
+              icon={<FireOutlined className="text-rose-500" />}
+              books={homeBooks?.most_borrowed ?? []}
+              onBookClick={handleBookClick}
+              makeHeartProps={makeHeartProps}
+            />
+          </>
+        )}
       </div>
     </div>
   );

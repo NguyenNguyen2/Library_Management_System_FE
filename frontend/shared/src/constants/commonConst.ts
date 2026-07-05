@@ -21,6 +21,12 @@ export const NotAvailable = '-';
 
 export const IMAGE_FALLBACK = `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMTI4IDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxMjgiIGhlaWdodD0iODAiIGZpbGw9IiNFOEVDRjAiLz48dGV4dCB4PSI2NCIgeT0iNDQiIGZvbnQtZmFtaWx5PSJJbnRlciIgZm9udC1zaXplPSIxMiIgZmlsbD0iIzlDQTNCOCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+`;
 
+// Ảnh bìa mặc định cho sách không có cover_image.
+// Đặt file ảnh vào:
+//   - frontend/admin/public/images/book-placeholder.png
+//   - frontend/website/public/images/book-placeholder.png
+export const BOOK_PLACEHOLDER = '/images/book-placeholder.png';
+
 // Framework-agnostic translator signature. Each app passes its own translator
 // (admin: i18next.t, website: next-intl useTranslations()) so shared code stays
 // decoupled from any specific i18n library.

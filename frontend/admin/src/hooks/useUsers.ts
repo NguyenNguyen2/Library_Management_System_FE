@@ -84,4 +84,62 @@ export const userHooks = {
       mutationFn: userApi.resetUserPassword,
     });
   },
+
+  useFetchReaderBorrowHistory: (id: string, enabled: boolean = true) => {
+    return useQuery({
+      queryKey: ['reader-borrow-history', id],
+      enabled: !!id && enabled,
+      queryFn: () => userApi.getReaderBorrowHistory(id),
+    });
+  },
+
+  useFetchLibrarians: (params: { keyword?: string; page?: number; limit?: number }) => {
+    return useQuery({
+      queryKey: ['librarians-list', params],
+      queryFn: () => userApi.getLibrarians(params),
+    });
+  },
+
+  useCreateLibrarian: () => {
+    const queryClient = useQueryClient();
+    return useMutation<any, AxiosError, { name: string; email: string; librarian_level: string; phone?: string; address?: string }>({
+      mutationFn: userApi.createLibrarian,
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['librarians-list'] });
+      },
+    });
+  },
+
+  useUpdateLibrarian: () => {
+    const queryClient = useQueryClient();
+    return useMutation<any, AxiosError, { id: string; body: { name?: string; email?: string; librarian_level?: string; phone?: string; address?: string; status?: number } }>({
+      mutationFn: userApi.updateLibrarian,
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['librarians-list'] });
+      },
+    });
+  },
+
+  useDeleteLibrarian: () => {
+    const queryClient = useQueryClient();
+    return useMutation<any, AxiosError, string>({
+      mutationFn: userApi.deleteLibrarian,
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['librarians-list'] });
+      },
+    });
+  },
+
+  useResetLibrarianPassword: () => {
+    return useMutation<any, AxiosError, string>({
+      mutationFn: userApi.resetLibrarianPassword,
+    });
+  },
+
+  useFetchLoginLogs: (params: { keyword?: string; status?: string; page?: number; limit?: number }) => {
+    return useQuery({
+      queryKey: ['login-logs-list', params],
+      queryFn: () => userApi.getLoginLogs(params),
+    });
+  },
 };

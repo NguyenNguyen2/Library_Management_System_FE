@@ -1,569 +1,643 @@
 'use client';
 
-import {
-  Avatar,
-  Card,
-  Button,
-  Form,
-  Progress,
-  Spin,
-  Upload,
-  message,
-} from 'antd';
+import { Avatar, Card, Button, Form, Input, Modal, Spin, Upload, message } from 'antd';
 import { PASSWORD_PATTERN } from '@shared/constants/regex';
+import PasswordStrengthChecklist from '@/features/auth/components/PasswordStrengthChecklist';
 import type { UploadRequestOption } from 'rc-upload/lib/interface';
 import {
   ArrowLeftOutlined,
   CameraOutlined,
   LoadingOutlined,
   UserOutlined,
+  LockOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { formatNumber } from '@shared/utils/numberUtils';
+import type { AxiosError } from 'axios';
 import CustomInput from '@shared/components/input/CustomInput';
 import { useUser } from '@shared/provider/UserProvider';
-import { uploadApi } from '@/features/uploads/api/uploadApi';
-import { useCourses } from '@/features/courses/hooks/useCourses';
+import { useRequestChangePassword, useVerifyChangePasswordOtp } from '@/features/users/hooks/useUsers';
 import {
-  useChangePassword,
-  useUpdateUser,
-} from '@/features/users/hooks/useUsers';
+  useGetProfile,
+  useUpdateProfile,
+  useUploadAvatar,
+} from '@/features/profile/hooks/useProfile';
+import {
+  useGetLibraryCard,
+  useSubmitCardRenewal,
+  useGetMyCardRenewalRequests,
+} from '@/features/library-card/hooks/useLibraryCard';
+import { useLogout } from '@/features/auth/hooks/useAuth';
 import { APP_ROUTE } from '@/constants/routes';
-import Image from 'next/image';
-import { IListCourse } from '@shared/types/CourseType';
 import { setCookie } from '@shared/utils/cookie';
 import { STORAGES } from '@shared/constants/storage';
-import { QuizHistoryModal } from '@/features/courses/components/QuizHistoryModal';
-import { CheckCircleIcon } from '../_icons/CheckCircleIcon';
-import { CourseBookIcon } from '../_icons/CourseBookIcon';
-import { ProgressTrendIcon } from '../_icons/ProgressTrendIcon';
-import { HOVER_CLICKABLE } from '@shared/constants/animation';
 
 const ProfilePage = () => {
   const router = useRouter();
   const t = useTranslations();
   const { user, setUser } = useUser();
-  const { mutate: updateUser, isPending: isSaving } = useUpdateUser();
-  const { mutate: changePassword, isPending: isChangingPw } =
-    useChangePassword();
+
+  const { mutate: logout } = useLogout();
+  const { mutate: requestChangePassword, isPending: isRequestingOtp } = useRequestChangePassword();
+  const { mutate: verifyOtp, isPending: isVerifyingOtp } = useVerifyChangePasswordOtp();
+
   const [pwForm] = Form.useForm();
 
   const [editingInfo, setEditingInfo] = useState(false);
   const [editingPw, setEditingPw] = useState(false);
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
   const [avatar, setAvatar] = useState<string | undefined>(undefined);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [quizHistoryCourse, setQuizHistoryCourse] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
 
-  const handleSubmitChangePassword = (values: {
-    currentPassword: string;
-    newPassword: string;
-  }) => {
-    changePassword(
+  // OTP modal state
+  const [otpModalVisible, setOtpModalVisible] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
+  const [pendingNewPassword, setPendingNewPassword] = useState('');
+  const [pendingConfirmNewPassword, setPendingConfirmNewPassword] = useState('');
+
+  // Realtime password display (for checklist + confirm match)
+  const [newPwDisplay, setNewPwDisplay] = useState('');
+  const [confirmPwDisplay, setConfirmPwDisplay] = useState('');
+
+  const userId = user?.id ?? '';
+
+  const {
+    data: profileData,
+    isLoading: isProfileLoading,
+    refetch: refetchProfile,
+  } = useGetProfile(userId);
+
+  const { mutate: updateProfile, isPending: isSaving } = useUpdateProfile();
+  const { mutate: uploadAvatarMutation, isPending: isUploadingAvatar } = useUploadAvatar();
+  const { data: libraryCard, isLoading: isCardLoading } = useGetLibraryCard(userId);
+  const { data: cardRenewalData } = useGetMyCardRenewalRequests();
+  const { mutate: submitCardRenewal, isPending: isSubmittingCardRenewal } = useSubmitCardRenewal();
+
+  const pendingCardRenewal = cardRenewalData?.data?.find((r) => r.status === 'pending');
+
+  const handleCardRenewalRequest = () => {
+    submitCardRenewal(undefined, {
+      onSuccess: (res) => {
+        message.success(res.message ?? 'Yêu cầu gia hạn thẻ đã được gửi.');
+      },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.';
+        message.error(msg);
+      },
+    });
+  };
+
+  // Sync form state from fetched profile
+  useEffect(() => {
+    if (profileData) {
+      setFullName(profileData.full_name ?? '');
+      setPhone(profileData.phone ?? '');
+      setAddress(profileData.address ?? '');
+      setAvatar(profileData.avatar_url ?? undefined);
+    }
+  }, [profileData]);
+
+  const handleUploadAvatar = (options: UploadRequestOption) => {
+    const { file, onSuccess, onError } = options;
+    if (!(file instanceof File)) return;
+
+    uploadAvatarMutation(
+      { userId, file },
       {
-        currentPassword: values.currentPassword,
-        newPassword: values.newPassword,
+        onSuccess: async (data) => {
+          setAvatar(data.avatar_url);
+          await refetchProfile();
+          if (user) {
+            const updated = { ...user, avatar: data.avatar_url };
+            setUser(updated);
+            setCookie(STORAGES.USER_LOGIN, updated);
+          }
+          onSuccess?.(data);
+        },
+        onError: (err) => {
+          message.error(t('config_error_message'));
+          onError?.(err as Error);
+        },
+      }
+    );
+  };
+
+  const handleSaveInfo = () => {
+    if (!userId) return;
+    updateProfile(
+      {
+        userId,
+        body: {
+          full_name: fullName,
+          phone: phone || null,
+          address: address || null,
+        },
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          await refetchProfile();
+          if (user) {
+            const updated = { ...user, name: fullName, phone, address, avatar };
+            setUser(updated);
+            setCookie(STORAGES.USER_LOGIN, updated);
+          }
+          setEditingInfo(false);
           message.success(t('save_btn'));
-          pwForm.resetFields();
-          setEditingPw(false);
         },
         onError: () => {
           message.error(t('config_error_message'));
         },
-      },
+      }
     );
   };
 
-  /**
-   * Click-to-upload flow for the avatar circle. Wired to Antd Upload's
-   * `customRequest` so we control the network call (reuse `uploadApi.upload`)
-   * and skip the default file-list UI entirely.
-   */
-  const handleUploadAvatar = async (options: UploadRequestOption) => {
-    const { file, onSuccess, onError } = options;
-    try {
-      setIsUploadingAvatar(true);
-      const uploaded = await uploadApi.upload([file as File], 'avatar');
-      const fileUrl = uploaded?.[0]?.fileUrl;
-      if (fileUrl) setAvatar(fileUrl);
-      onSuccess?.(uploaded);
-    } catch (err) {
-      message.error(t('config_error_message'));
-      onError?.(err as Error);
-    } finally {
-      setIsUploadingAvatar(false);
+  const handleCancelEdit = () => {
+    setEditingInfo(false);
+    if (profileData) {
+      setFullName(profileData.full_name ?? '');
+      setPhone(profileData.phone ?? '');
+      setAddress(profileData.address ?? '');
+      setAvatar(profileData.avatar_url ?? undefined);
     }
   };
 
-  // Sync local form state with user data on load / change
-  useEffect(() => {
-    if (user) {
-      setName(user.name ?? '');
-      setAvatar(user.avatar);
-    }
-  }, [user]);
-
-  const handleSaveInfo = () => {
-    if (!user?.id) return;
-    updateUser(
-      { id: user.id, body: { name, avatar } },
+  // Step 1: verify current password → send OTP
+  const handleSubmitChangePassword = (values: {
+    currentPassword: string;
+    newPassword: string;
+    confirmNewPassword: string;
+  }) => {
+    requestChangePassword(
       {
-        onSuccess: (updated) => {
-          // Mirror new fields into provider + cookie so the rest of the app
-          // (header name/avatar, future reloads) reflects the change without
-          // a second fetch.
-          const next = { ...user, ...updated };
-          setUser(next);
-          setCookie(STORAGES.USER_LOGIN, next);
-          setEditingInfo(false);
-          message.success(t('save_btn'));
-        },
+        currentPassword:    values.currentPassword,
+        newPassword:        values.newPassword,
+        confirmNewPassword: values.confirmNewPassword,
       },
+      {
+        onSuccess: () => {
+          // Store pending passwords for the verify step
+          setPendingNewPassword(values.newPassword);
+          setPendingConfirmNewPassword(values.confirmNewPassword);
+          setOtpValue('');
+          setOtpModalVisible(true);
+          message.info('Mã OTP đã được gửi đến email của bạn.');
+        },
+        onError: (err) => {
+          const errMsg = (err as AxiosError<{ message: string }>)?.response?.data?.message;
+          message.error(errMsg || t('config_error_message'));
+        },
+      }
     );
   };
 
-  // Fetch user's courses (same endpoint home page uses — backend returns
-  // CourseWithProgress: totalLessons, completedLessons, progress, no lessons[]).
-  const { data: coursesData, isLoading: coursesLoading } = useCourses({
-    page: 1,
-    limit: 100,
-  });
-  const userCourses: IListCourse[] = coursesData?.rows ?? [];
-
-  // Left-column overview stats — aggregated in a single pass over the course
-  // list (also used to render the right-column cards). One `reduce` keeps
-  // source of truth together; no separate stats API round-trip.
-  // Course-level aggregation: "đã hoàn thành" counts courses at 100%,
-  // "đang học" counts courses at 0<progress<100, and the overall progress bar
-  // reflects completed / total at the course level (consistent with the rows).
-  const { totalCourses, completedCoursesCount, inProgressCount } =
-    userCourses.reduce(
-      (acc, c) => {
-        const progress = c.progress ?? 0;
-        acc.totalCourses += 1;
-        if (progress >= 100) acc.completedCoursesCount += 1;
-        else if (progress > 0) acc.inProgressCount += 1;
-        return acc;
+  // Step 2: verify OTP → apply new password
+  const handleVerifyOtp = () => {
+    if (!otpValue.trim()) {
+      message.error('Vui lòng nhập mã OTP.');
+      return;
+    }
+    verifyOtp(
+      {
+        otp:                otpValue.trim(),
+        newPassword:        pendingNewPassword,
+        confirmNewPassword: pendingConfirmNewPassword,
       },
-      { totalCourses: 0, completedCoursesCount: 0, inProgressCount: 0 }
+      {
+        onSuccess: () => {
+          message.success('Đổi mật khẩu thành công.');
+          setOtpModalVisible(false);
+          setOtpValue('');
+          setPendingNewPassword('');
+          setPendingConfirmNewPassword('');
+          resetPasswordFields();
+        },
+        onError: (err) => {
+          const errMsg = (err as AxiosError<{ message: string }>)?.response?.data?.message;
+          message.error(errMsg || 'OTP không hợp lệ hoặc đã hết hạn.');
+        },
+      }
     );
-  const overallProgress =
-    totalCourses > 0
-      ? Math.round((completedCoursesCount / totalCourses) * 100)
-      : 0;
+  };
+
+  const resetPasswordFields = () => {
+    setNewPwDisplay('');
+    setConfirmPwDisplay('');
+    pwForm.resetFields();
+    setEditingPw(false);
+  };
+
+  const handleCancelOtp = () => {
+    setOtpModalVisible(false);
+    setOtpValue('');
+    setPendingNewPassword('');
+    setPendingConfirmNewPassword('');
+  };
+
+  if (!userId) {
+    return (
+      <div className="flex justify-center py-12">
+        <Spin />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <div>
-        {/* Back button */}
-        <Button
-          type="text"
-          icon={<ArrowLeftOutlined />}
-          onClick={() => router.push(APP_ROUTE.home)}
-          className="text-(--blackSoft) font-medium text-base px-0 mb-6 hover:bg-transparent hover:underline"
+    <div className="max-w-4xl mx-auto w-full">
+      {/* Back button */}
+      <Button
+        type="text"
+        icon={<ArrowLeftOutlined />}
+        onClick={() => router.push(APP_ROUTE.home)}
+        className="text-(--blackSoft) font-medium text-base px-0 mb-6 hover:bg-transparent hover:underline"
+      >
+        {t('back_button')}
+      </Button>
+
+      <div className="flex flex-col gap-6">
+        {/* ── Top row: Personal Info + Library Card ── */}
+        <div className="grid md:grid-cols-2 gap-6 items-stretch">
+        {/* ── Personal Info Card ── */}
+        <Card
+          className="h-full border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
+          styles={{ body: { padding: 24 } }}
         >
-          {t('back_button')}
-        </Button>
+          <p className="font-semibold text-lg tracking-tight text-(--blackSoft) mb-4">
+            {t('personal_info_title')}
+          </p>
 
-        {/* 2-column layout */}
-        <div className="grid grid-cols-1 md:grid-cols-[308px_1fr] gap-6 items-start">
-          {/* Left column */}
-          <div className="flex flex-col gap-6">
-            {/* Personal Info Card */}
-            <Card
-              className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
-              styles={{ body: { padding: 24 } }}
-            >
-              <p className="font-semibold text-lg tracking-tight text-(--blackSoft) mb-4">
-                {t('personal_info_title')}
-              </p>
-
-              {!editingInfo ? (
-                <div className="flex flex-col items-center gap-4">
-                  <Avatar
-                    size={128}
-                    shape="circle"
-                    src={avatar || undefined}
-                    icon={<UserOutlined />}
-                    className="bg-(--blueLight) rounded-full shrink-0"
-                  />
-                  <div>
-                    <p className="font-bold text-lg text-(--blackSoft) text-center">
-                      {name}
-                    </p>
-                    <p className="text-(--grayMedium) mt-0.5 text-center">
-                      {user?.email}
-                    </p>
+          {isProfileLoading ? (
+            <div className="flex justify-center py-8">
+              <Spin />
+            </div>
+          ) : !editingInfo ? (
+            /* ── View mode ── */
+            <div className="flex flex-col items-center gap-4">
+              <Avatar
+                size={128}
+                shape="circle"
+                src={avatar || undefined}
+                icon={<UserOutlined />}
+                className="bg-(--blueLight) rounded-full shrink-0"
+              />
+              <div className="text-center space-y-0.5">
+                <p className="font-bold text-lg text-(--blackSoft)">{fullName}</p>
+                <p className="text-(--grayMedium)">{profileData?.email}</p>
+                {phone && <p className="text-(--grayMedium)">{phone}</p>}
+                {address && <p className="text-(--grayMedium)">{address}</p>}
+              </div>
+              <Button
+                block
+                onClick={() => setEditingInfo(true)}
+                className="border border-(--grayBorderMedium) rounded-lg text-(--blackSoft) font-medium text-sm h-10"
+              >
+                Chỉnh sửa thông tin
+              </Button>
+            </div>
+          ) : (
+            /* ── Edit mode ── */
+            <div className="flex flex-col gap-4">
+              {/* Avatar upload */}
+              <div className="flex justify-center">
+                <Upload
+                  accept="image/jpeg,image/jpg,image/png"
+                  showUploadList={false}
+                  customRequest={handleUploadAvatar}
+                  disabled={isUploadingAvatar}
+                >
+                  <div className="relative cursor-pointer group">
+                    <Avatar
+                      size={128}
+                      shape="circle"
+                      src={avatar || undefined}
+                      icon={<UserOutlined />}
+                      className="bg-(--blueLight) rounded-full shrink-0"
+                    />
+                    <div className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-(--primaryBlue) text-white flex items-center justify-center shadow-md transition-opacity group-hover:opacity-90">
+                      {isUploadingAvatar ? (
+                        <LoadingOutlined className="text-base" />
+                      ) : (
+                        <CameraOutlined className="text-base" />
+                      )}
+                    </div>
                   </div>
+                </Upload>
+              </div>
+
+              {/* Họ tên */}
+              <div>
+                <p className="font-medium text-sm text-(--blackSoft) mb-1.5">
+                  {t('full_name')}
+                </p>
+                <CustomInput
+                  value={fullName}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setFullName(e.target.value)
+                  }
+                />
+              </div>
+
+              {/* Email (readonly) */}
+              <div>
+                <p className="font-medium text-sm text-(--blackSoft) mb-1.5">
+                  {t('email')}
+                </p>
+                <CustomInput value={profileData?.email ?? ''} disabled />
+                <span className="block text-(--grayMedium) text-xs mt-1">
+                  {t('email_cannot_change')}
+                </span>
+              </div>
+
+              {/* Số điện thoại */}
+              <div>
+                <p className="font-medium text-sm text-(--blackSoft) mb-1.5">
+                  {t('phone_number')}
+                </p>
+                <CustomInput
+                  value={phone}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setPhone(e.target.value)
+                  }
+                />
+              </div>
+
+              {/* Địa chỉ */}
+              <div>
+                <p className="font-medium text-sm text-(--blackSoft) mb-1.5">
+                  {t('address')}
+                </p>
+                <CustomInput
+                  value={address}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                    setAddress(e.target.value)
+                  }
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleCancelEdit}
+                  className="flex-1 rounded-lg font-medium text-base h-10"
+                >
+                  {t('cancel_btn')}
+                </Button>
+                <Button
+                  type="primary"
+                  loading={isSaving}
+                  onClick={handleSaveInfo}
+                  className="flex-1 rounded-lg font-medium text-base h-10"
+                >
+                  {t('save_btn')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* ── Library Card ── */}
+        <Card
+          className="h-full border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
+          styles={{ body: { padding: 24 } }}
+        >
+          <p className="font-semibold text-lg tracking-tight text-(--blackSoft) mb-4">
+            Thẻ thư viện
+          </p>
+
+          {isCardLoading ? (
+            <div className="flex justify-center py-6">
+              <Spin />
+            </div>
+          ) : !libraryCard ? (
+            <p className="text-sm text-(--grayMedium) text-center py-4">
+              Bạn chưa được cấp thẻ thư viện.
+            </p>
+          ) : (
+            <div className="space-y-0">
+              {[
+                { label: 'Số thẻ', value: libraryCard.card_number },
+                {
+                  label: 'Ngày cấp',
+                  value: new Date(libraryCard.issue_date).toLocaleDateString('vi-VN'),
+                },
+                {
+                  label: 'Ngày hết hạn',
+                  value: new Date(libraryCard.expiry_date).toLocaleDateString('vi-VN'),
+                },
+                { label: 'Hạn mức mượn', value: `${libraryCard.borrow_limit} cuốn` },
+                { label: 'Mượn tối đa', value: `${libraryCard.max_borrow_days} ngày` },
+              ].map(({ label, value }) => (
+                <div
+                  key={label}
+                  className="flex justify-between items-center py-2.5 border-b border-(--blackBorder) last:border-0"
+                >
+                  <span className="text-sm text-(--grayMedium)">{label}</span>
+                  <span className="text-sm font-medium text-(--blackSoft)">{value}</span>
+                </div>
+              ))}
+              <div className="flex justify-between items-center py-2.5">
+                <span className="text-sm text-(--grayMedium)">Trạng thái</span>
+                <span
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                    libraryCard.card_status === 'Hợp lệ'
+                      ? 'bg-green-100 text-green-700'
+                      : libraryCard.card_status === 'Hết hạn'
+                      ? 'bg-orange-100 text-orange-600'
+                      : 'bg-red-100 text-red-600'
+                  }`}
+                >
+                  {libraryCard.card_status}
+                </span>
+              </div>
+
+              {/* Nút gia hạn thẻ */}
+              <div className="pt-3">
+                {pendingCardRenewal ? (
+                  <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                    Yêu cầu gia hạn thẻ đang chờ thư viện duyệt
+                  </div>
+                ) : libraryCard.card_status !== 'Bị khóa' ? (
                   <Button
                     block
-                    onClick={() => setEditingInfo(true)}
+                    loading={isSubmittingCardRenewal}
+                    onClick={handleCardRenewalRequest}
                     className="border border-(--grayBorderMedium) rounded-lg text-(--blackSoft) font-medium text-sm h-10"
                   >
-                    {t('edit_button')}
+                    Gửi yêu cầu gia hạn thẻ
                   </Button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-4">
-                  {/* Click-to-upload avatar — the whole circle acts as the
-                      file picker. A small camera badge hints at the action;
-                      a spinner replaces it while uploading. */}
-                  <div className="flex justify-center">
-                    <Upload
-                      accept="image/*"
-                      showUploadList={false}
-                      customRequest={handleUploadAvatar}
-                      disabled={isUploadingAvatar}
-                    >
-                      <div className="relative cursor-pointer group">
-                        <Avatar
-                          size={128}
-                          shape="circle"
-                          src={avatar || undefined}
-                          icon={<UserOutlined />}
-                          className="bg-(--blueLight) rounded-full shrink-0"
-                        />
-                        <div className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-(--primaryBlue) text-white flex items-center justify-center shadow-md transition-opacity group-hover:opacity-90">
-                          {isUploadingAvatar ? (
-                            <LoadingOutlined className="text-base" />
-                          ) : (
-                            <CameraOutlined className="text-base" />
-                          )}
-                        </div>
-                      </div>
-                    </Upload>
-                  </div>
-
-                  <div>
-                    <p className="font-medium text-sm text-(--blackSoft) mb-1.5">
-                      {t('full_name')}
-                    </p>
-                    <CustomInput
-                      value={name}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setName(e.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div>
-                    <p className="font-medium text-sm text-(--blackSoft) mb-1.5">
-                      {t('email')}
-                    </p>
-                    <CustomInput value={user?.email ?? ''} disabled />
-                    <span className="block text-(--grayMedium) mt-1">
-                      {t('email_cannot_change')}
-                    </span>
-                  </div>
-
-                  {/* Cancel first, Save on the right — matches the design spec. */}
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => setEditingInfo(false)}
-                      className="flex-1 rounded-lg font-medium text-base h-10"
-                    >
-                      {t('cancel_btn')}
-                    </Button>
-                    <Button
-                      type="primary"
-                      loading={isSaving}
-                      onClick={handleSaveInfo}
-                      className="flex-1 rounded-lg font-medium text-base h-10"
-                    >
-                      {t('save_btn')}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card>
-
-            {/* Stats Overview Card */}
-            <Card
-              className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
-              styles={{ body: { padding: 24 } }}
-            >
-              <p className="font-semibold text-lg tracking-tight text-(--blackSoft) mb-4">
-                {t('stats_overview_title')}
-              </p>
-              <div className="flex flex-col gap-4">
-                <div className="flex justify-between items-center px-3 h-12 rounded-[10px] bg-(--blueLightest)">
-                  <div className="flex items-center gap-2">
-                    <CourseBookIcon />
-                    <p className="text-sm text-(--blackSoft)">{t('course')}</p>
-                  </div>
-                  <p className="font-bold text-base text-(--primaryBlue)">
-                    {formatNumber(totalCourses)}
-                  </p>
-                </div>
-
-                <div className="flex justify-between items-center px-3 h-12 rounded-[10px] bg-(--greenPale)">
-                  <div className="flex items-center gap-2">
-                    <CheckCircleIcon />
-                    <p className="text-sm text-(--blackSoft)">
-                      {t('completed_label')}
-                    </p>
-                  </div>
-                  <p className="font-bold text-base text-(--greenMedium)">
-                    {formatNumber(completedCoursesCount)}/
-                    {formatNumber(totalCourses)}
-                  </p>
-                </div>
-
-                <div className="flex justify-between items-center px-3 h-12 rounded-[10px] bg-(--orangePale)">
-                  <div className="flex items-center gap-2">
-                    <ProgressTrendIcon />
-                    <p className="text-sm text-(--blackSoft)">
-                      {t('progress_in_progress')}
-                    </p>
-                  </div>
-                  <p className="font-bold text-base text-(--orangeBright)">
-                    {formatNumber(inProgressCount)}
-                  </p>
-                </div>
-
-                <div className="border-t border-(--blackBorder) pt-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-sm text-(--blackSoft)">
-                      {t('completion_progress_label')}
-                    </p>
-                    <p className="font-bold text-sm text-(--blackSoft)">
-                      {formatNumber(overallProgress)}%
-                    </p>
-                  </div>
-                  <Progress percent={overallProgress} showInfo={false} />
-                </div>
+                ) : null}
               </div>
-            </Card>
-
-            {/* Change Password Card */}
-            <Card
-              className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
-              styles={{ body: { padding: 24 } }}
-            >
-              <p className="font-semibold text-lg tracking-tight text-(--blackSoft) mb-4">
-                {t('change_password')}
-              </p>
-
-              {!editingPw ? (
-                <Button
-                  block
-                  onClick={() => setEditingPw(true)}
-                  className="border border-(--grayBorderMedium) rounded-lg text-(--blackSoft) font-medium text-sm h-10"
-                >
-                  {t('change_password')}
-                </Button>
-              ) : (
-                <Form
-                  form={pwForm}
-                  layout="vertical"
-                  onFinish={handleSubmitChangePassword}
-                  className="flex flex-col gap-0"
-                  requiredMark={false}
-                >
-                  <Form.Item
-                    label={
-                      <span className="font-medium text-sm text-(--blackSoft)">
-                        {t('current_password_label')}
-                      </span>
-                    }
-                    name="currentPassword"
-                    rules={[
-                      { required: true, message: t('password_required') },
-                    ]}
-                  >
-                    <CustomInput.Password
-                      placeholder={t('enter_password')}
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    label={
-                      <span className="font-medium text-sm text-(--blackSoft)">
-                        {t('new_password')}
-                      </span>
-                    }
-                    name="newPassword"
-                    rules={[
-                      { required: true, message: t('password_required') },
-                      {
-                        pattern: PASSWORD_PATTERN,
-                        message: t('password_invalid'),
-                      },
-                    ]}
-                  >
-                    <CustomInput.Password
-                      placeholder={t('enter_password')}
-                    />
-                  </Form.Item>
-
-                  <Form.Item
-                    label={
-                      <span className="font-medium text-sm text-(--blackSoft)">
-                        {t('confirm_new_password_label')}
-                      </span>
-                    }
-                    name="confirmNewPassword"
-                    dependencies={['newPassword']}
-                    rules={[
-                      {
-                        required: true,
-                        message: t('confirm_password_required'),
-                      },
-                      ({ getFieldValue }) => ({
-                        validator(_, value) {
-                          if (!value || getFieldValue('newPassword') === value)
-                            return Promise.resolve();
-                          return Promise.reject(
-                            new Error(t('passwords_do_not_match')),
-                          );
-                        },
-                      }),
-                    ]}
-                  >
-                    <CustomInput.Password
-                      placeholder={t('reenter_new_password')}
-                    />
-                  </Form.Item>
-
-                  {/* Cancel first, Save on the right — matches personal info. */}
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => {
-                        pwForm.resetFields();
-                        setEditingPw(false);
-                      }}
-                      className="flex-1 rounded-lg font-medium text-base h-10"
-                    >
-                      {t('cancel_btn')}
-                    </Button>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      loading={isChangingPw}
-                      className="flex-1 rounded-lg font-medium text-base h-10"
-                    >
-                      {t('save_btn')}
-                    </Button>
-                  </div>
-                </Form>
-              )}
-            </Card>
-          </div>
-
-          {/* Right column */}
-          <Card
-            className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
-            styles={{ body: { padding: 24 } }}
-          >
-            <p className="font-semibold text-lg tracking-tight text-(--blackSoft) mb-1.5">
-              {t('course_progress_title')}
-            </p>
-            <p className="text-(--grayMedium) mb-6">
-              {t('course_progress_subtitle')}
-            </p>
-
-            <div className="flex flex-col gap-6">
-              {coursesLoading ? (
-                <div className="flex justify-center py-8">
-                  <Spin />
-                </div>
-              ) : userCourses.length === 0 ? (
-                <p className="text-center text-(--grayMedium) py-8">
-                  {t('no_courses_yet')}
-                </p>
-              ) : (
-                userCourses.map((course: IListCourse) => {
-                  const progress = course.progress ?? 0;
-                  const total = course.totalLessons ?? 0;
-                  const done = course.completedLessons ?? 0;
-                  return (
-                    <div
-                      key={course.id}
-                      onClick={() =>
-                        router.push(
-                          APP_ROUTE.courseDetails.replace(
-                            '[courseId]',
-                            course.id
-                          )
-                        )
-                      }
-                      className={`border border-(--blackBorder) rounded-[10px] p-6 ${HOVER_CLICKABLE}`}
-                    >
-                      <div className="flex gap-4 items-start">
-                        {course.image && (
-                          <Image
-                            src={course.image}
-                            alt={course.name}
-                            width={96}
-                            height={96}
-                            className="w-24 h-24 object-cover rounded-[10px] shrink-0"
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-lg text-(--blackSoft) leading-7 mb-1 truncate">
-                            {course.name}
-                          </p>
-                          {course.description && (
-                            <p className="text-(--grayDark) mb-3 line-clamp-2">
-                              {course.description}
-                            </p>
-                          )}
-
-                          <div className="flex justify-between items-center mb-2">
-                            <p className="text-(--grayDark)">
-                              {formatNumber(done)}/{formatNumber(total)}{' '}
-                              {t('lesson_unit')}
-                            </p>
-                            <p className="font-medium text-sm text-(--blackSoft)">
-                              {formatNumber(progress)}%
-                            </p>
-                          </div>
-
-                          <Progress
-                            percent={progress}
-                            showInfo={false}
-                            className="mb-3"
-                          />
-
-                          {/* "Lịch sử làm bài" — stop event bubbling so the
-                              card's navigate-to-course onClick doesn't fire. */}
-                          <Button
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setQuizHistoryCourse({
-                                id: course.id,
-                                name: course.name,
-                              });
-                            }}
-                          >
-                            {t('quiz_history_btn')}
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
             </div>
-          </Card>
-        </div>
+          )}
+        </Card>
+
+        </div>{/* end grid */}
+
+        {/* ── Bảo mật Card ── */}
+        <Card
+          className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
+          styles={{ body: { padding: 24 } }}
+        >
+          <p className="font-semibold text-lg tracking-tight text-(--blackSoft) mb-4">
+            Bảo mật
+          </p>
+
+          {!editingPw ? (
+            <div className="flex flex-col gap-2">
+              <Button
+                block
+                icon={<LockOutlined />}
+                onClick={() => setEditingPw(true)}
+                className="border border-(--grayBorderMedium) rounded-lg text-(--blackSoft) font-medium text-sm h-10"
+              >
+                Thay đổi mật khẩu
+              </Button>
+              <Button
+                block
+                danger
+                icon={<LogoutOutlined />}
+                onClick={() => logout()}
+                className="rounded-lg font-medium text-sm h-10"
+              >
+                Đăng xuất
+              </Button>
+            </div>
+          ) : (
+            <Form
+              form={pwForm}
+              layout="vertical"
+              onFinish={handleSubmitChangePassword}
+              className="flex flex-col gap-0"
+              requiredMark={false}
+            >
+              <Form.Item
+                label={
+                  <span className="font-medium text-sm text-(--blackSoft)">
+                    {t('current_password_label')}
+                  </span>
+                }
+                name="currentPassword"
+                rules={[{ required: true, message: t('password_required') }]}
+              >
+                <CustomInput.Password placeholder={t('enter_password')} />
+              </Form.Item>
+
+              <Form.Item
+                label={
+                  <span className="font-medium text-sm text-(--blackSoft)">
+                    {t('new_password')}
+                  </span>
+                }
+                name="newPassword"
+                rules={[
+                  { required: true, message: t('password_required') },
+                  { pattern: PASSWORD_PATTERN, message: t('password_invalid') },
+                ]}
+              >
+                <CustomInput.Password
+                  placeholder={t('enter_password')}
+                  onChange={(e) => setNewPwDisplay(e.target.value)}
+                />
+              </Form.Item>
+              <PasswordStrengthChecklist password={newPwDisplay} />
+
+              <Form.Item
+                label={
+                  <span className="font-medium text-sm text-(--blackSoft)">
+                    {t('confirm_new_password_label')}
+                  </span>
+                }
+                name="confirmNewPassword"
+                dependencies={['newPassword']}
+                rules={[
+                  { required: true, message: t('confirm_password_required') },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue('newPassword') === value)
+                        return Promise.resolve();
+                      return Promise.reject(
+                        new Error(t('passwords_do_not_match'))
+                      );
+                    },
+                  }),
+                ]}
+              >
+                <CustomInput.Password
+                  placeholder={t('reenter_new_password')}
+                  onChange={(e) => setConfirmPwDisplay(e.target.value)}
+                />
+              </Form.Item>
+              {confirmPwDisplay && (
+                <p className={`text-xs -mt-4 mb-3 px-1 ${newPwDisplay === confirmPwDisplay ? 'text-green-600' : 'text-red-500'}`}>
+                  {newPwDisplay === confirmPwDisplay ? '✓ Mật khẩu khớp' : 'Mật khẩu chưa khớp'}
+                </p>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={resetPasswordFields}
+                  className="flex-1 rounded-lg font-medium text-base h-10"
+                >
+                  {t('cancel_btn')}
+                </Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isRequestingOtp}
+                  className="flex-1 rounded-lg font-medium text-base h-10"
+                >
+                  {t('save_btn')}
+                </Button>
+              </div>
+            </Form>
+          )}
+        </Card>
       </div>
 
-      <QuizHistoryModal
-        open={!!quizHistoryCourse}
-        courseId={quizHistoryCourse?.id ?? ''}
-        courseName={quizHistoryCourse?.name ?? ''}
-        onClose={() => setQuizHistoryCourse(null)}
-      />
+      {/* ── OTP Verification Modal ── */}
+      <Modal
+        open={otpModalVisible}
+        title="Xác nhận đổi mật khẩu"
+        onCancel={handleCancelOtp}
+        footer={null}
+        maskClosable={false}
+        centered
+      >
+        <div className="py-2">
+          <p className="text-sm text-gray-600 mb-4">
+            Mã OTP đã được gửi đến email của bạn. Vui lòng kiểm tra hộp thư và nhập mã bên dưới.
+            Mã có hiệu lực trong <strong>15 phút</strong>.
+          </p>
+          <p className="font-medium text-sm text-(--blackSoft) mb-1.5">Mã OTP (6 chữ số)</p>
+          <Input
+            value={otpValue}
+            onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="000000"
+            maxLength={6}
+            size="large"
+            className="text-center tracking-[0.5rem] text-lg font-mono mb-4"
+          />
+          <div className="flex gap-2">
+            <Button
+              onClick={handleCancelOtp}
+              className="flex-1 rounded-lg font-medium h-10"
+            >
+              {t('cancel_btn')}
+            </Button>
+            <Button
+              type="primary"
+              loading={isVerifyingOtp}
+              onClick={handleVerifyOtp}
+              disabled={otpValue.length !== 6}
+              className="flex-1 rounded-lg font-medium h-10"
+            >
+              Xác nhận
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

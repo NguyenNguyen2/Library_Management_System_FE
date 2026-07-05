@@ -11,6 +11,37 @@ import {
 } from '@shared/types/GeneralType';
 import axiosInstance from './axiosInstance';
 
+export interface ReaderListItem {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  address: string | null;
+  avatar: string | null;
+  card: 'regular' | 'premium';
+  card_number: string;
+  borrowing: number;
+  overdue: number;
+  status: { value: string; label: string };
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface BorrowHistoryRow {
+  borrow_id: number;
+  borrow_date: string;
+  due_date: string;
+  status: string;
+  librarian_name: string | null;
+  book_title: string;
+  copy_barcode: string;
+  return_date: string | null;
+  condition_return: string | null;
+  renew_count: number;
+  fine_amount: number;
+  fine_status: string | null;
+}
+
 export const userApi = {
   getListUser: async (params: BaseListParams) => {
     const response = await axiosInstance.get<ListResponseType<IListUser>>(
@@ -60,5 +91,45 @@ export const userApi = {
       `/private/v1/users/${id}/reset-password`
     );
     return response.data?.results?.object ?? response.data;
+  },
+
+  getReaderList: async (params: { keyword?: string; page?: number; limit?: number }): Promise<{ total: number; rows: ReaderListItem[] }> => {
+    const response = await axiosInstance.get('/private/v1/readers', { params });
+    return response.data?.results?.objects ?? { total: 0, rows: [] };
+  },
+
+  getReaderBorrowHistory: async (id: string): Promise<BorrowHistoryRow[]> => {
+    const response = await axiosInstance.get(`/private/v1/readers/${id}/borrow-history`);
+    return response.data?.results?.objects || [];
+  },
+
+  getLibrarians: async (params: { keyword?: string; page?: number; limit?: number }) => {
+    const response = await axiosInstance.get('/private/v1/librarians', { params });
+    return response.data;
+  },
+
+  createLibrarian: async (body: { name: string; email: string; librarian_level: string; phone?: string; address?: string }) => {
+    const response = await axiosInstance.post('/private/v1/librarians', body);
+    return response.data?.results?.object;
+  },
+
+  updateLibrarian: async ({ id, body }: { id: string; body: { name?: string; email?: string; librarian_level?: string; phone?: string; address?: string; status?: number } }) => {
+    const response = await axiosInstance.patch(`/private/v1/librarians/${id}`, body);
+    return response.data?.results?.object;
+  },
+
+  deleteLibrarian: async (id: string) => {
+    const response = await axiosInstance.delete(`/private/v1/librarians/${id}`);
+    return response.data;
+  },
+
+  resetLibrarianPassword: async (id: string) => {
+    const response = await axiosInstance.post(`/private/v1/librarians/${id}/reset-password`);
+    return response.data?.results?.object;
+  },
+
+  getLoginLogs: async (params: { keyword?: string; status?: string; page?: number; limit?: number }) => {
+    const response = await axiosInstance.get('/private/v1/login-logs', { params });
+    return response.data;
   },
 };

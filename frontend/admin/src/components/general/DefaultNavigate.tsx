@@ -1,9 +1,10 @@
 import { Button, Flex } from 'antd';
 import {
   BarChartOutlined,
-  CrownOutlined,
+  CreditCardOutlined,
   LockOutlined,
   LogoutOutlined,
+  RobotOutlined,
   SettingOutlined,
   UserOutlined,
   BookOutlined,
@@ -12,6 +13,7 @@ import {
   DownOutlined,
   UpOutlined,
   DeploymentUnitOutlined,
+  LineChartOutlined,
 } from '@ant-design/icons';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -49,71 +51,82 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
   const menuConfig: NavItem[] = [
     {
       key: 'dashboard',
-      label: 'Dashboard',
+      label: t(getKey('menu_dashboard')),
       icon: <BarChartOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.DASHBOARD,
     },
     {
       key: 'users',
-      label: 'Quản lý độc giả',
+      label: t(getKey('user_management')),
       icon: <UserOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.USERS,
     },
     {
       key: 'books',
-      label: 'Quản lý Sách',
+      label: t(getKey('menu_books')),
       icon: <BookOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.COURSES,
+      to: ROUTES.BOOKS,
       children: [
-        { label: 'Danh sách sách', to: ROUTES.COURSES },
-        { label: 'Tác giả & Thể loại', to: ROUTES.COURSES + '?tab=authors' },
-        { label: 'Sách nổi bật', to: ROUTES.COURSES + '?tab=featured' },
+        { label: t(getKey('menu_book_list')), to: ROUTES.BOOKS },
+        { label: t(getKey('menu_author_category')), to: ROUTES.BOOKS + '?tab=authors' },
+        { label: t(getKey('menu_featured_books')), to: ROUTES.BOOKS + '?tab=featured' },
       ],
     },
     {
       key: 'inventory',
-      label: 'Quản lý Kho',
+      label: t(getKey('menu_inventory')),
       icon: <DeploymentUnitOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.COURSES + '?tab=copies',
+      to: ROUTES.BOOKS + '?tab=copies',
       children: [
-        { label: 'Danh sách bản sao', to: ROUTES.COURSES + '?tab=copies' },
-        { label: 'Thêm bản sao & In QR', to: ROUTES.COURSES + '?tab=add-copy' },
-        { label: 'Import & Thanh lý', to: ROUTES.COURSES + '?tab=import' },
-        { label: 'Báo cáo kho', to: ROUTES.COURSES + '?tab=report' },
+        { label: t(getKey('menu_copy_list')), to: ROUTES.BOOKS + '?tab=copies' },
+        { label: t(getKey('menu_inventory_report')), to: ROUTES.BOOKS + '?tab=report' },
       ],
     },
     {
       key: 'transactions',
-      label: 'Giao dịch',
+      label: t(getKey('menu_transactions')),
       icon: <LockOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.CODES,
-      badge: 47,
+      to: ROUTES.TRANSACTIONS,
       children: [
-        { label: 'Mượn / Trả sách', to: ROUTES.CODES },
-        { label: 'Gia hạn & Đặt trước', to: ROUTES.CODES + '?tab=reservations' },
-        { label: 'Lịch sử giao dịch', to: ROUTES.DASHBOARD },
-        { label: 'Quản lý độc giả', to: ROUTES.USERS },
+        { label: t(getKey('checkout_title')), to: ROUTES.TRANSACTIONS },
+        { label: t(getKey('return_title')), to: ROUTES.RETURN },
+        { label: t(getKey('renew_title')), to: ROUTES.RENEW },
+        { label: t(getKey('reservation_title')), to: ROUTES.RESERVATION },
+        { label: t(getKey('menu_user_list')), to: ROUTES.TRANSACTION_LOG },
       ],
     },
+
     {
-      key: 'achievements',
-      label: 'Quản lý Danh hiệu',
-      icon: <CrownOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.ACHIEVEMENTS,
+      key: 'fees',
+      label: 'Quản lý phí & Thanh toán',
+      icon: <CreditCardOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.FEES,
+    },
+    {
+      key: 'reports',
+      label: 'Báo cáo & Thống kê',
+      icon: <LineChartOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.REPORTS,
+    },
+    {
+      key: 'ai-demand',
+      label: 'AI Phân tích nhu cầu',
+      icon: <RobotOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.AI_DEMAND,
     },
     {
       key: 'settings',
-      label: 'Cấu hình hệ thống',
+      label: t(getKey('menu_settings')),
       icon: <SettingOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.SETTINGS,
       children: [
-        { label: 'Tất cả cấu hình', to: ROUTES.SETTINGS },
-        { label: 'Thủ thư & phân quyền', to: ROUTES.USERS + '?tab=librarians' },
+        { label: t(getKey('menu_all_settings')), to: ROUTES.SETTINGS },
+        { label: t(getKey('menu_librarian_permission')), to: ROUTES.USERS + '?tab=librarians' },
+        { label: t(getKey('menu_audit_log')), to: ROUTES.USERS + '?tab=audit' },
       ],
     },
   ];
 
-  // Check if a parent menu item should be active (only highlights if it does NOT have children)
   const isActive = (item: NavItem) => {
     const path = pathname.pathname + pathname.search;
     if (item.children) {
@@ -151,7 +164,6 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
     <div className={cn('flex h-full flex-col bg-[#1E2A3B] text-[#8FA3BF]')}>
       {/* Header / Logo */}
       <Flex
-        gap={12}
         align="center"
         justify={collapsed ? 'center' : 'space-between'}
         className={cn('relative px-4 border-b border-[#2D3F52] h-16 shrink-0')}
@@ -161,7 +173,7 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
             <Flex align="center" gap={12} className="min-w-0">
               <BookOutlined style={{ fontSize: 24, color: '#60A5FA' }} className="shrink-0" />
               <span style={{ fontSize: '16px', fontWeight: 600 }} className="text-white truncate">
-                Thư Viện ABC
+                Thư Viện Sách Việt
               </span>
             </Flex>
             <Button

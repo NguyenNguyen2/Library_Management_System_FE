@@ -1,7 +1,9 @@
 import { TableColumnsType, Tag, Card } from 'antd';
+import { TableColumnsType, Tag, Card } from 'antd';
 import dayjs from 'dayjs';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { TrophyOutlined, BookOutlined, StarOutlined, FlagOutlined } from '@ant-design/icons';
 import { TrophyOutlined, BookOutlined, StarOutlined, FlagOutlined } from '@ant-design/icons';
 import { getKey } from '@shared/types/I18nKeyType';
 import { COLORS } from '@shared/constants/color';

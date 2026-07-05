@@ -1,40 +1,29 @@
 import axiosInstance from './axiosInstance';
-import { DetailResponseType } from '@shared/types/GeneralType';
 
-export interface IPlatformSettings {
-  id: string;
-  videoLockDays: number;
-  quizPassThreshold: number;
-  quizRetryLimit: number;
-  inactiveUserPasswordResetDays: number;
-  createdAt: string;
-  updatedAt: string;
+export interface ISystemSetting {
+  setting_id: number;
+  config_key: string;
+  config_value: string;
+  updated_at: string;
 }
 
-export type IPlatformSettingsPayload = Partial<
-  Pick<
-    IPlatformSettings,
-    | 'videoLockDays'
-    | 'quizPassThreshold'
-    | 'quizRetryLimit'
-    | 'inactiveUserPasswordResetDays'
-  >
->;
+export type SystemSettingsPayload = Record<string, number>;
 
 export const settingsApi = {
-  get: async (): Promise<IPlatformSettings> => {
-    const response = await axiosInstance.get<
-      DetailResponseType<IPlatformSettings>
-    >('/private/v1/settings');
-    return response?.data?.results?.object;
+  // GET /private/v1/system-settings — returns one row per allowed config_key
+  get: async (): Promise<ISystemSetting[]> => {
+    const response = await axiosInstance.get<ISystemSetting[]>(
+      '/private/v1/system-settings',
+    );
+    return response.data;
   },
 
-  update: async (
-    body: IPlatformSettingsPayload,
-  ): Promise<IPlatformSettings> => {
-    const response = await axiosInstance.patch<
-      DetailResponseType<IPlatformSettings>
-    >('/private/v1/settings', body);
-    return response?.data?.results?.object;
+  // POST /private/v1/system-settings/update — body: { settings: { config_key: value, ... } }
+  update: async (settings: SystemSettingsPayload): Promise<ISystemSetting[]> => {
+    const response = await axiosInstance.post<ISystemSetting[]>(
+      '/private/v1/system-settings/update',
+      { settings },
+    );
+    return response.data;
   },
 };

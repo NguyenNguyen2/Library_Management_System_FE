@@ -6,7 +6,18 @@ import { STORAGES } from '@shared/constants/storage';
  * Paths matched by a prefix — anything starting with these is public.
  * Auth pages must stay accessible to logged-out users.
  */
-const PUBLIC_PREFIX_PATHS = ['/login', '/signup', '/forgot-password'];
+const PUBLIC_PREFIX_PATHS = ['/login', '/signup', '/forgot-password', '/auth/google', '/auth/verify-email-sent'];
+
+/**
+ * Open paths: accessible to everyone (logged-in and logged-out).
+ * Unlike PUBLIC_PREFIX_PATHS, logged-in users are NOT redirected away.
+ */
+const OPEN_PREFIX_PATHS = ['/shared', '/auth/verify-email'];
+
+/**
+ * Development-only public paths (only when mock data is enabled)
+ */
+const DEV_PUBLIC_PREFIX_PATHS = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true' ? ['/mock-test'] : [];
 
 /**
  * Paths matched exactly — the landing page `/` is public,
@@ -20,12 +31,14 @@ export function middleware(req: NextRequest) {
 
   const isExactPublic = PUBLIC_EXACT_PATHS.includes(pathname);
   const isPrefixPublic = PUBLIC_PREFIX_PATHS.some((p) => pathname.startsWith(p));
-  const isPublic = isExactPublic || isPrefixPublic;
+  const isDevPublic = DEV_PUBLIC_PREFIX_PATHS.some((p) => pathname.startsWith(p));
+  const isOpenPath = OPEN_PREFIX_PATHS.some((p) => pathname.startsWith(p));
+  const isPublic = isExactPublic || isPrefixPublic || isDevPublic || isOpenPath;
 
   // 1. Public paths
   if (isPublic) {
     // Already logged-in users visiting auth pages get bounced to /home.
-    // The landing `/` remains accessible to everyone (logged-in or not).
+    // The landing `/`, dev pages, and open shared pages remain accessible to everyone.
     if (token && isPrefixPublic) {
       const url = req.nextUrl.clone();
       url.pathname = '/home';
@@ -49,5 +62,5 @@ export function middleware(req: NextRequest) {
 
 // Skip Next.js internals + static assets.
 export const config = {
-  matcher: '/((?!api/public|_next/static|_next/image|favicon.ico).*)',
+  matcher: '/((?!api/public|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|woff2?)$).*)',
 };

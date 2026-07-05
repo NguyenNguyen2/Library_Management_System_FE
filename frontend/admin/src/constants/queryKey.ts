@@ -18,4 +18,22 @@ export const QueryKey = {
     list: 'achievementsList',
     detail: 'achievementsDetail',
   },
+  reports: {
+    transactions:        'reportTransactions',
+    topBooks:            'reportTopBooks',
+    topAuthors:          'reportTopAuthors',          // Phase 2 (authors)
+    topCategories:       'reportTopCategories',       // Phase 2 (categories)
+    topReaders:          'reportTopReaders',          // Phase 3A
+    readerRegistrations: 'reportReaderRegistrations', // Phase 3B
+    overdueBooks:        'reportOverdueBooks',         // Phase 4 (overdue)
+    overdueSummary:      'reportOverdueSummary',       // Phase 4 (overdue)
+    fineRevenue:         'reportFineRevenue',           // Phase 4 (fine)
+    fineReasons:         'reportFineReasons',           // Phase 4 (fine)
+    todayReport:         'reportTodayReport',
+  },
+  aiDemand: {
+    importSuggestions: 'aiImportSuggestions',
+    lowBorrowBooks:    'aiLowBorrowBooks',
+    seasonalDemand:    'aiSeasonalDemand',
+  },
 } as const;

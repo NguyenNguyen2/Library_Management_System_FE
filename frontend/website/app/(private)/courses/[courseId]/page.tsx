@@ -1,383 +1,552 @@
-'use client';
+  'use client';
+  import axiosInstance from '@/lib/axios/axios-client';
+  import { Button, Card, Dropdown, Input, Pagination, Rate, Spin, Tag, message } from 'antd';
+  import { ArrowLeftOutlined, BookOutlined, CheckOutlined, DownOutlined, HeartFilled, HeartOutlined } from '@ant-design/icons';
+import { use, useEffect, useState } from 'react';
+  import { useRouter } from 'next/navigation';
+  import { useQueryClient } from '@tanstack/react-query';
+  import { getCookie } from '@shared/utils/cookie';
+  import { STORAGES } from '@shared/constants/storage';
+  import type { IDetailUser } from '@shared/types/UserType';
+  import {
+    useBookDetail, useRelatedBooks,
+    useBookReviews, useReviewPermission, useSubmitReview,
+  } from '@/features/books/hooks/useBooks';
+  import type { IRelatedBook } from '@/features/books/api/bookApi';
+  import { APP_ROUTE } from '@/constants/routes';
+  import { toCoverImageUrl } from '@/lib/utils/image';
+  import type { IReadingListStatus } from '@/features/reading-list/api/readingListApi';
+  import {
+    useReadingList,
+    useAddToReadingList,
+    useUpdateReadingList,
+    useRemoveFromReadingList,
+  } from '@/features/reading-list/hooks/useReadingList';
 
-import { Card, Button, Result, Spin, Tag } from 'antd';
-import {
-  ArrowLeftOutlined,
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  CloseCircleOutlined,
-  LockOutlined,
-  PlayCircleOutlined,
-  QuestionCircleOutlined,
-} from '@ant-design/icons';
-import { use, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import {
-  useCourseLessons,
-  useUpdateLessonProgress,
-} from '@/features/courses/hooks/useCourses';
-import { LessonQuizPanel } from '@/features/courses/components/LessonQuizPanel';
-import { PlayCircleIcon } from '../../_icons/PlayCircleIcon';
-import { formatNumber } from '@shared/utils/numberUtils';
-import { IListLesson } from '@shared/types/CourseType';
-import {
-  cn,
-  CompletedLearningStatus,
-  FailLearningStatus,
-  findOptionObject,
-  LearningStatusOptions,
-  LockedLearningStatus,
-  NotStartedLearningStatus,
-  QuizLearningStatus,
-} from '@shared/constants/commonConst';
-import { HOVER_CLICKABLE } from '@shared/constants/animation';
+  function formatDate(dt: string) {
+    const d = new Date(dt.replace(' ', 'T'));
+    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
 
-export default function CoursePage({
-  params,
-}: {
-  params: Promise<{ courseId: string }>;
-}) {
-  const { courseId } = use(params);
-  const router = useRouter();
-  const t = useTranslations();
+  export default function BookDetailPage({
+    params,
+  }: {
+    params: Promise<{ courseId: string }>;
+  }) {
+    const { courseId } = use(params);
+    const bookId = Number(courseId);
+    const router = useRouter();
+    const queryClient = useQueryClient();
+  const [user, setUser] = useState<IDetailUser | undefined>(undefined);
+  const [isUserLoaded, setIsUserLoaded] = useState(false);
 
-  const { data: lessonList, isLoading } = useCourseLessons(courseId);
+  useEffect(() => {
+    const storedUser = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
+    if (storedUser) {
+      setUser(storedUser);
+    }
+    setIsUserLoaded(true);
+  }, []);
 
-  const { mutate: updateLessonProgress, isPending: isStartingQuiz } =
-    useUpdateLessonProgress(courseId);
+    const [reviewContent, setReviewContent] = useState('');
+    const [reviewPage, setReviewPage] = useState(1);
+    const [reviewRating, setReviewRating] = useState(0);
+    const userId = user?.id ? Number(user.id) : undefined;
 
-  const [selectedLesson, setSelectedLesson] = useState<IListLesson | null>(
-    null
-  );
-  const selectedLearningStatus = selectedLesson?.learningStatus?.value
-    ? findOptionObject(
-        LearningStatusOptions(t),
-        selectedLesson.learningStatus.value
-      )
-    : null;
+    const { data: book, isLoading, isError } = useBookDetail(bookId);
+    const { data: related } = useRelatedBooks(bookId);
+    const { data: reviewsData, isLoading: isReviewsLoading, refetch: refetchReviews } = useBookReviews(bookId, reviewPage);
+    const { data: permissionData } = useReviewPermission(bookId, userId ?? 0);
+    const submitReviewMutation = useSubmitReview();
 
-  // Factory-backed constants for equality checks (so call sites stay decoupled
-  // from raw string literals — only commonConst owns the canonical values).
-  const notStartedStatus = NotStartedLearningStatus(t);
-  const quizStatus = QuizLearningStatus(t);
-  const completedStatus = CompletedLearningStatus(t);
-  const lockedStatus = LockedLearningStatus(t);
-  const failStatus = FailLearningStatus(t);
+    const { data: readingListData } = useReadingList();
+    const addItem = useAddToReadingList();
+    const [isReserving, setIsReserving] = useState(false);
+    const updateItem = useUpdateReadingList();
+    const removeItem = useRemoveFromReadingList();
 
-  // Sequential gating: a lesson unlocks only when the previous one is done
-  // (COMPLETED or LOCKED — LOCKED is auto-lock after passing, still "done").
-  // The first lesson has no prerequisite and is always accessible.
-  const selectedLessonIndex =
-    lessonList?.findIndex((l: IListLesson) => l.id === selectedLesson?.id) ??
-    -1;
-  const prevLesson =
-    selectedLessonIndex > 0 ? lessonList?.[selectedLessonIndex - 1] : null;
-  const isPrevLessonDone = prevLesson
-    ? prevLesson.learningStatus?.value === completedStatus.value ||
-      prevLesson.learningStatus?.value === lockedStatus.value
-    : true;
-  const isLockedByPrev = !isPrevLessonDone;
-  // Locked UI fires when either the status itself is LOCKED, or the previous
-  // lesson gates this one.
-  const showLockedBox =
-    selectedLearningStatus?.value === lockedStatus.value || isLockedByPrev;
+    const allItems = readingListData?.data ?? [];
+    const favoriteItem = allItems.find(
+      (item) => item.book_id === bookId && item.status.value === 'favorite'
+    ) ?? null;
+    const readingItem = allItems.find(
+      (item) => item.book_id === bookId && item.status.value !== 'favorite'
+    ) ?? null;
 
-  const getYoutubeEmbedUrl = (url?: string | null) => {
-    if (!url) return null;
-    const match = url.match(
-      /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([^&?\s]+)/
-    );
-    return match ? `https://www.youtube.com/embed/${match[1]}` : null;
-  };
+    const isFavorite = !!favoriteItem;
 
-  const handleStartQuiz = () => {
-    if (!selectedLesson) return;
-    updateLessonProgress(
-      { lessonId: selectedLesson.id, status: quizStatus.value },
+   const handleReserveBook = async () => {
+  try {
+    setIsReserving(true);
+
+    const { data } = await axiosInstance.post(
+      '/v1/me/reservations',
       {
-        // API trả UserLessonProgress (chỉ có learningStatus), không phải full
-        // IListLesson — merge learningStatus mới vào selectedLesson cũ để giữ
-        // nguyên name, duration, youtubeUrl, ...
-        onSuccess: (data) => {
-          setSelectedLesson((prev) =>
-            prev ? { ...prev, learningStatus: data.learningStatus } : prev
-          );
-        },
+        book_id: bookId,
       }
     );
-  };
 
-  // Each lesson icon shares the same 9x9 rounded badge wrapper so the lesson
-  // list row layout stays consistent across every learning status.
-  const renderLessonIcon = (lesson: IListLesson) => {
-    const wrap = (bgClass: string, icon: React.ReactNode) => (
-      <div
-        className={cn(
-          'w-9 h-9 rounded-full flex items-center justify-center shrink-0',
-          bgClass
-        )}
-      >
-        {icon}
-      </div>
+    message.success(
+      `Đặt trước thành công. Vị trí #${data.queue_position}`
     );
+    queryClient.invalidateQueries({
+     queryKey: ['my-reservations'],
+    });
 
-    switch (lesson.learningStatus?.value) {
-      case completedStatus.value:
-        return wrap(
-          'bg-(--greenLight)',
-          <CheckCircleOutlined style={{ color: 'green' }} />
-        );
-      case quizStatus.value:
-        return wrap(
-          'bg-(--blueLightest)',
-          <QuestionCircleOutlined style={{ color: 'blue' }} />
-        );
-      case failStatus.value:
-        return wrap(
-          'bg-(--orangePale)',
-          <CloseCircleOutlined style={{ color: 'red' }} />
-        );
-      case lockedStatus.value:
-        return wrap(
-          'bg-(--yellowPale)',
-          <LockOutlined style={{ color: 'orange' }} />
-        );
-      case completedStatus.value:
-      default:
-        return wrap(
-          'bg-(--grayBorder)',
-          <PlayCircleOutlined style={{ color: 'gray' }} />
-        );
+    // Chuyển sang trang danh sách đặt trước
+    router.push('/reservations');
+
+  } catch (error: any) {
+    message.error(
+      error?.response?.data?.message || 'Không thể kết nối máy chủ'
+    );
+  } finally {
+    setIsReserving(false);
+  }
+};
+
+    const handleToggleFavorite = () => {
+      addItem.mutate(
+        { book_id: bookId, status: 'favorite' },
+        {
+          onSuccess: () => message.success('Đã thêm vào yêu thích.'),
+          onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+        }
+      );
+    };
+
+    const handleRemoveFavorite = () => {
+      if (!favoriteItem) return;
+      removeItem.mutate(favoriteItem.wishlist_id, {
+        onSuccess: () => message.success('Đã xóa khỏi yêu thích.'),
+        onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+      });
+    };
+
+    const handleAddToList = () => {
+      addItem.mutate(
+        { book_id: bookId, status: 'want_to_read' },
+        {
+          onSuccess: () => message.success('Đã thêm vào danh sách đọc.'),
+          onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+        }
+      );
+    };
+
+    const handleMarkFinished = () => {
+      if (!readingItem) return;
+      updateItem.mutate(
+        { wishlistId: readingItem.wishlist_id, status: 'finished' },
+        {
+          onSuccess: () => message.success('Đã đánh dấu hoàn thành.'),
+          onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+        }
+      );
+    };
+
+    const handleMenuClick = ({ key }: { key: string }) => {
+      if (!readingItem) return;
+      if (key === 'remove') {
+        removeItem.mutate(readingItem.wishlist_id, {
+          onSuccess: () => message.success('Đã xóa khỏi danh sách đọc.'),
+          onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+        });
+        return;
+      }
+      updateItem.mutate(
+        { wishlistId: readingItem.wishlist_id, status: key as IReadingListStatus },
+        {
+          onSuccess: () => message.success('Đã cập nhật trạng thái.'),
+          onError: () => message.error('Có lỗi xảy ra. Vui lòng thử lại.'),
+        }
+      );
+    };
+
+    const handleSubmitReview = async () => {
+      if (!reviewRating) {
+        message.warning('Vui lòng chọn số sao.');
+        return;
+      }
+      if (!reviewContent.trim()) {
+        message.warning('Vui lòng nhập nội dung nhận xét.');
+        return;
+      }
+      try {
+        await submitReviewMutation.mutateAsync({
+          bookId,
+          data: { user_id: userId, rating: reviewRating, content: reviewContent },
+        });
+        message.success('Đánh giá đã được lưu.');
+        setReviewRating(0);
+        setReviewContent('');
+        setReviewPage(1);
+        refetchReviews();
+        queryClient.invalidateQueries({ queryKey: ['book-detail', bookId] });
+      } catch {
+        message.error('Có lỗi xảy ra. Vui lòng thử lại.');
+      }
+    };
+
+    if (isLoading) {
+      return (
+        <div className="flex justify-center py-24">
+          <Spin size="large" />
+        </div>
+      );
     }
-  };
 
-  return (
-    <div>
-      <div>
+    if (isError || !book) {
+      return (
+        <div className="flex flex-col items-center py-24 gap-4">
+          <BookOutlined className="text-5xl text-gray-300" />
+          <p className="text-gray-500">Không tìm thấy sách.</p>
+          <Button onClick={() => router.push(APP_ROUTE.courses)}>
+            Quay về danh mục
+          </Button>
+        </div>
+      );
+    }
+
+    const metaRows = [
+      { label: 'Nhà xuất bản', value: book.publisher },
+      { label: 'Năm xuất bản', value: book.publish_year },
+      { label: 'Ngôn ngữ', value: book.language },
+      { label: 'Số trang', value: book.pages },
+      { label: 'ISBN', value: book.isbn },
+    ].filter(({ value }) => value !== null && value !== undefined);
+
+    return (
+      <div className="max-w-4xl mx-auto">
         <Button
           type="text"
           icon={<ArrowLeftOutlined />}
-          onClick={() => router.back()}
+          onClick={() => router.push(APP_ROUTE.courses)}
           className="mb-6 px-0 font-medium text-base text-(--blackSoft) hover:underline hover:bg-transparent"
         >
-          {t('back_button')}
+          Quay về danh mục
         </Button>
 
-        <div className="grid grid-cols-1 md:grid-cols-[309px_1fr] gap-6 items-start">
-          {/* Left: lesson list */}
+        <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6 items-start">
+          {/* Cover image */}
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-full aspect-[3/4] rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center shadow-md">
+              {book.cover_image ? (
+                <img
+                  src={toCoverImageUrl(book.cover_image) ?? undefined}
+                  alt={book.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <BookOutlined className="text-6xl text-gray-300" />
+              )}
+            </div>
+
+            <div
+              className={`w-full text-center text-sm font-semibold py-2 px-4 rounded-lg ${
+                book.available_copies > 0
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  : 'bg-orange-50 text-orange-600 border border-orange-200'
+              }`}
+            >
+              {book.available_copies > 0
+                ? `Có sẵn ${book.available_copies} bản`
+                : 'Không có sẵn'}
+            </div>
+          </div>
+
+          {/* Detail card */}
           <Card
-            className="rounded-[10px] border border-(--grayBorder)"
+            className="border border-(--grayBorder) rounded-[10px] shadow-[0_1px_3px_var(--blackBorder)]"
             styles={{ body: { padding: 24 } }}
           >
-            <p className="mb-1.5 block text-lg font-bold tracking-tight text-(--blackSoft)">
-              {t('lesson_list_title')}
-            </p>
-            <p className="mb-4 block text-sm text-(--grayDark)">
-              {formatNumber(lessonList?.length)} {t('lesson_unit')}
-            </p>
+            <h1 className="text-2xl font-bold text-(--blackSoft) mb-2 leading-tight">
+              {book.title}
+            </h1>
 
-            {isLoading ? (
-              <div className="flex justify-center py-8">
-                <Spin />
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {lessonList?.map((lesson: IListLesson) => {
-                  const isSelected = selectedLesson?.id === lesson.id;
-                  const learningStatus = findOptionObject(
-                    LearningStatusOptions(t),
-                    lesson.learningStatus?.value
-                  );
+            {book.authors.length > 0 && (
+              <p className="text-base text-(--grayDark) mb-3">
+                {book.authors.join(', ')}
+              </p>
+            )}
 
-                  return (
-                    <div
-                      key={lesson.id}
-                      onClick={() => setSelectedLesson(lesson)}
-                      className={cn(
-                        'flex items-center justify-between rounded-[10px] border px-4 py-3',
-                        HOVER_CLICKABLE,
-                        isSelected
-                          ? 'border-(--blueMedium) bg-(--blueLightest)'
-                          : 'border-(--blackBorder) bg-transparent hover:border-(--grayMedium)'
-                      )}
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {renderLessonIcon(lesson)}
-
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="line-clamp-1 text-base font-medium leading-6 text-(--blackSoft)">
-                              {lesson.name}
-                            </p>
-
-                            <Tag
-                              color={
-                                (learningStatus?.color as string) || 'default'
-                              }
-                              className="!text-xs !m-0"
-                            >
-                              {learningStatus?.label}
-                            </Tag>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            {lesson.duration && (
-                              <span className="flex items-center gap-1 text-sm text-(--grayDark)">
-                                <ClockCircleOutlined className="text-xs" />
-                                {lesson.duration}
-                              </span>
-                            )}
-                            {lesson.questionCount > 0 && (
-                              <span className="text-sm text-(--grayDark)">
-                                • {formatNumber(lesson.questionCount)}{' '}
-                                {t('question_unit')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+            {book.categories.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {book.categories.map((cat) => (
+                  <Tag key={cat} color="blue" className="text-xs">
+                    {cat}
+                  </Tag>
+                ))}
               </div>
             )}
-          </Card>
 
-          {/* Right: video player */}
-          <Card
-            className="min-h-[237px] rounded-[10px] border border-(--grayBorder)"
-            styles={{ body: { padding: 24, height: '100%' } }}
-          >
-            {selectedLesson ? (
-              <div className="flex flex-col gap-4 h-full">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-xl font-bold leading-7 text-(--blackSoft)">
-                    {selectedLesson.name}
-                  </p>
-                  {selectedLesson.learningStatus &&
-                    selectedLesson.learningStatus.value !==
-                      notStartedStatus.value && (
-                      <Tag
-                        color={
-                          (findOptionObject(
-                            LearningStatusOptions(t),
-                            selectedLesson.learningStatus.value
-                          )?.color as string) || 'default'
-                        }
-                        className="text-sm! px-3! py-1! shrink-0"
-                      >
-                        {
-                          findOptionObject(
-                            LearningStatusOptions(t),
-                            selectedLesson.learningStatus.value
-                          )?.label
-                        }
-                      </Tag>
-                    )}
-                </div>
-                {/* Locked — gray box replacing video. Fires when status is
-                    LOCKED, or when the previous lesson isn't done yet. */}
-                {showLockedBox && (
-                  <div className="aspect-video w-full rounded-[10px] bg-gray-200 flex items-center justify-center">
-                    <div className="text-center text-gray-500">
-                      <LockOutlined className="text-4xl mb-2" />
-                      <p className="text-lg font-semibold">
-                        {t('video_locked')}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Video player — visible only for NOT_STARTED and COMPLETED,
-                    and only when not gated by the previous lesson. */}
-                {!isLockedByPrev &&
-                  (selectedLearningStatus?.value === notStartedStatus.value ||
-                    selectedLearningStatus?.value === completedStatus.value) &&
-                  (getYoutubeEmbedUrl(selectedLesson?.youtubeUrl) ? (
-                    <div
-                      className="relative aspect-video w-full rounded-[10px] overflow-hidden group"
-                      onContextMenu={(e) => e.preventDefault()}
-                    >
-                      <iframe
-                        src={getYoutubeEmbedUrl(selectedLesson?.youtubeUrl)!}
-                        className="absolute inset-0 w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                      <div
-                        className="absolute inset-0 z-10"
-                        onContextMenu={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          (e.currentTarget as HTMLElement).style.display =
-                            'none';
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div className="aspect-video w-full rounded-[10px] bg-(--grayBorder) flex items-center justify-center">
-                      <p className="text-(--grayMedium)">{t('no_video')}</p>
-                    </div>
-                  ))}
-
-                {/* Complete lesson button — only show when NOT_STARTED and
-                    not gated by the previous lesson. */}
-                {!isLockedByPrev &&
-                  selectedLearningStatus?.value === notStartedStatus.value && (
-                    <div className="flex justify-end">
-                      <Button
-                        type="primary"
-                        loading={isStartingQuiz}
-                        onClick={handleStartQuiz}
-                        className="h-10 rounded-lg text-base font-medium"
-                      >
-                        {t('complete_video_button')}
-                      </Button>
-                    </div>
-                  )}
-
-                {/* Quiz panel — show when status is QUIZ and not gated. */}
-                {!isLockedByPrev &&
-                  selectedLearningStatus?.value === quizStatus.value && (
-                    <LessonQuizPanel
-                      lessonId={selectedLesson.id}
-                      courseId={courseId}
-                    />
-                  )}
-
-                {/* FAIL — show "Chưa đạt" result (only when not gated). */}
-                {!isLockedByPrev &&
-                  selectedLearningStatus?.value === failStatus.value && (
-                    <Result
-                      status="error"
-                      title={t('quiz_result_failed_title')}
-                      // extra={
-                      //   <Button
-                      //     type="primary"
-                      //     loading={isStartingQuiz}
-                      //     onClick={handleStartQuiz}
-                      //   >
-                      //     {t('quiz_retry')}
-                      //   </Button>
-                      // }
-                    />
-                  )}
+            {book.total_reviews > 0 && (
+              <div className="flex items-center gap-2 mb-4">
+                <Rate disabled allowHalf value={book.avg_rating} className="text-sm" />
+                <span className="text-sm text-(--grayMedium)">
+                  {book.avg_rating.toFixed(1)} ({book.total_reviews} đánh giá)
+                </span>
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center min-h-[200px] gap-4">
-                <PlayCircleIcon />
-                <div className="text-center">
-                  <p className="font-medium text-lg text-(--navyDark) leading-7">
-                    {t('select_lesson_title')}
-                  </p>
-                  <p className="text-base text-(--grayDark) mt-1">
-                    {t('select_lesson_subtitle')}
-                  </p>
+            )}
+
+            {/* Yêu thích */}
+            <div className="mb-3">
+              {isFavorite ? (
+                <Button
+                  icon={<HeartFilled className="text-red-500" />}
+                  onClick={handleRemoveFavorite}
+                  loading={removeItem.isPending}
+                  className="w-full border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+                >
+                  Đã yêu thích
+                </Button>
+              ) : (
+                <Button
+                  icon={<HeartOutlined className="text-red-400" />}
+                  onClick={handleToggleFavorite}
+                  loading={addItem.isPending || updateItem.isPending}
+                  className="w-full border-red-100 text-red-500 hover:border-red-200 hover:bg-red-50"
+                >
+                  Thêm vào yêu thích
+                </Button>
+              )}
+         
+            {/* Reading list widget */}
+            <div className="mt-3 mb-4">
+              {!readingItem ? (
+                <Button
+                  icon={<BookOutlined />}
+                  onClick={handleAddToList}
+                  loading={addItem.isPending}
+                  className="w-full"
+                >
+                  Thêm vào danh sách đọc
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Tag
+                    color={
+                      readingItem.status.value === 'want_to_read'
+                        ? 'blue'
+                        : readingItem.status.value === 'reading'
+                          ? 'orange'
+                          : 'green'
+                    }
+                    className="text-sm px-3 py-1 m-0"
+                  >
+                    {readingItem.status.label}
+                  </Tag>
+                  {readingItem.status.value === 'reading' && (
+                    <Button
+                      size="small"
+                      icon={<CheckOutlined />}
+                      onClick={handleMarkFinished}
+                      loading={updateItem.isPending}
+                    >
+                      Hoàn thành
+                    </Button>
+                  )}
+                  <Dropdown
+                    menu={{
+                      items: [
+                        { key: 'want_to_read', label: 'Đọc sau' },
+                        { key: 'reading', label: 'Đang đọc' },
+                        { key: 'finished', label: 'Đã đọc' },
+                        { type: 'divider' as const },
+                        { key: 'remove', label: 'Xóa khỏi danh sách', danger: true },
+                      ],
+                      onClick: handleMenuClick,
+                    }}
+                  >
+                    <Button size="small">
+                      Quản lý <DownOutlined />
+                    </Button>
+                  </Dropdown>
                 </div>
+              )}
+            </div>
+            </div>
+            {book.available_copies === 0 && (
+              <Button
+                type="primary"
+                onClick={handleReserveBook}
+                loading={isReserving}
+                className="w-full mt-3 bg-blue-600"
+              >
+                Đặt trước sách
+              </Button>
+            )}
+            {metaRows.length > 0 && (
+              <div className="border-t border-(--blackBorder) pt-4">
+                {metaRows.map(({ label, value }) => (
+                  <div
+                    key={label}
+                    className="flex justify-between items-center py-2.5 border-b border-(--blackBorder) last:border-0"
+                  >
+                    <span className="text-sm text-(--grayMedium)">{label}</span>
+                    <span className="text-sm font-medium text-(--blackSoft)">
+                      {String(value)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {book.description && (
+              <div className="mt-4 pt-4 border-t border-(--blackBorder)">
+                <p className="text-sm font-semibold text-(--blackSoft) mb-2">Mô tả</p>
+                <p className="text-sm text-(--grayDark) leading-relaxed whitespace-pre-line">
+                  {book.description}
+                </p>
               </div>
             )}
           </Card>
         </div>
+
+        {/* Related sections */}
+        {related && related.same_author.length > 0 && (
+          <RelatedSection
+            title="Sách cùng tác giả"
+            books={related.same_author}
+            onBookClick={(id) => router.push(`${APP_ROUTE.courses}/${id}`)}
+          />
+        )}
+
+        {related && related.same_category.length > 0 && (
+          <RelatedSection
+            title="Có thể bạn cũng thích"
+            books={related.same_category}
+            onBookClick={(id) => router.push(`${APP_ROUTE.courses}/${id}`)}
+          />
+        )}
+
+        {/* ── Reviews section ── */}
+        <div className="mt-10">
+          <h2 className="text-xl font-semibold text-(--blackSoft) mb-5">Đánh giá &amp; Nhận xét</h2>
+
+          {/* Rating summary */}
+          {book.total_reviews > 0 && (
+            <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 rounded-xl border border-(--grayBorder)">
+              <span className="text-5xl font-bold text-(--blackSoft)">{book.avg_rating.toFixed(1)}</span>
+              <div>
+                <Rate disabled allowHalf value={book.avg_rating} className="text-base" />
+                <p className="text-sm text-(--grayMedium) mt-1">{book.total_reviews} đánh giá</p>
+              </div>
+            </div>
+          )}
+
+          {/* Review form */}
+          {permissionData?.can_review && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-6">
+              <p className="text-sm font-semibold text-(--blackSoft) mb-3">Viết đánh giá của bạn</p>
+              <Rate
+                value={reviewRating}
+                onChange={setReviewRating}
+                className="mb-3 text-xl"
+              />
+              <Input.TextArea
+                rows={3}
+                placeholder="Nhập nội dung nhận xét (tối đa 1000 ký tự)..."
+                value={reviewContent}
+                onChange={(e) => setReviewContent(e.target.value)}
+                maxLength={1000}
+                showCount
+                className="mb-3"
+              />
+              <Button
+                type="primary"
+                loading={submitReviewMutation.isPending}
+                onClick={handleSubmitReview}
+              >
+                Gửi đánh giá
+              </Button>
+            </div>
+          )}
+
+          {/* Review list */}
+          {isReviewsLoading ? (
+            <div className="flex justify-center py-8">
+              <Spin />
+            </div>
+          ) : !reviewsData || reviewsData.data.length === 0 ? (
+            <p className="text-sm text-(--grayMedium) text-center py-8">Chưa có đánh giá nào.</p>
+          ) : (
+            <>
+              <div className="space-y-5">
+                {reviewsData.data.map((r) => (
+                  <div key={r.review_id} className="border-b border-(--blackBorder) pb-5 last:border-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-semibold text-(--blackSoft)">{r.full_name}</span>
+                      <span className="text-xs text-(--grayMedium)">{formatDate(r.created_at)}</span>
+                    </div>
+                    <Rate disabled value={r.rating} className="text-sm mb-1.5" />
+                    {r.content && (
+                      <p className="text-sm text-(--grayDark) leading-relaxed">{r.content}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {reviewsData.pagination.last_page > 1 && (
+                <div className="flex justify-center mt-6">
+                  <Pagination
+                    current={reviewPage}
+                    total={reviewsData.pagination.total}
+                    pageSize={reviewsData.pagination.per_page}
+                    onChange={(p) => setReviewPage(p)}
+                    showSizeChanger={false}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
+
+  function RelatedSection({
+    title,
+    books,
+    onBookClick,
+  }: {
+    title: string;
+    books: IRelatedBook[];
+    onBookClick: (bookId: number) => void;
+  }) {
+    return (
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-(--blackSoft) mb-4">{title}</h2>
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          {books.map((b) => (
+            <div
+              key={b.book_id}
+              onClick={() => onBookClick(b.book_id)}
+              className="cursor-pointer group"
+            >
+              <div className="relative aspect-[3/4] rounded-lg overflow-hidden bg-gray-100 flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+                {b.cover_image ? (
+                  <img
+                    src={toCoverImageUrl(b.cover_image) ?? undefined}
+                    alt={b.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <BookOutlined className="text-3xl text-gray-300" />
+                )}
+                <span
+                  className={`absolute top-1.5 left-1.5 text-[9px] font-semibold px-1.5 py-0.5 rounded-full text-white ${
+                    b.available_copies > 0 ? 'bg-emerald-500' : 'bg-orange-400'
+                  }`}
+                >
+                  {b.available_copies > 0 ? 'Có sẵn' : 'Hết'}
+                </span>
+              </div>
+              <p className="text-xs font-medium text-(--blackSoft) mt-1.5 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">
+                {b.title}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
