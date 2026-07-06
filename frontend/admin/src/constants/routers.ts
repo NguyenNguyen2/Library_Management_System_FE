@@ -17,6 +17,7 @@ export const ROUTES = {
   USER_HISTORY: '/users/:userId/history',
   TRANSACTION_LOG: '/transaction-log',
   AI_DEMAND: '/ai-demand',
+  AI_ASSISTANT: '/ai-assistant',
 };
 
 type RoutePath = typeof ROUTES[keyof typeof ROUTES];
@@ -38,6 +39,7 @@ export const HEADER_TITLES: Record<RoutePath, keyof I18nKey> = {
   [ROUTES.USER_HISTORY]: 'user_history_title',
   [ROUTES.TRANSACTION_LOG]: 'menu_user_list',
   [ROUTES.AI_DEMAND]: 'dashboard',
+  [ROUTES.AI_ASSISTANT]: 'menu_ai_assistant',
 };
 
 export const DYNAMIC_ROUTES: string[] = [ROUTES.USER_HISTORY];

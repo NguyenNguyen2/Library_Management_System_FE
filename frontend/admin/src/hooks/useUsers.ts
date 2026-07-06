@@ -142,4 +142,19 @@ export const userHooks = {
       queryFn: () => userApi.getLoginLogs(params),
     });
   },
+
+  useFetchActivityLogs: (params: {
+    keyword?: string;
+    module?: string;
+    action?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    per_page?: number;
+  }) => {
+    return useQuery({
+      queryKey: ['activity-logs-list', params],
+      queryFn: () => userApi.getActivityLogs(params),
+    });
+  },
 };
