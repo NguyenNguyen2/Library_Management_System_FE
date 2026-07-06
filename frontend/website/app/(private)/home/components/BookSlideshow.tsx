@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { BookOutlined, HeartFilled, LeftOutlined, RightOutlined } from "@ant-design/icons";
 import type { IHomeBook } from "@/features/books/api/bookApi";
+import { toCoverImageUrl } from "@/lib/utils/image";
 
 const AUTOPLAY_INTERVAL_MS = 2000;
 const MOBILE_BREAKPOINT_PX = 640;
@@ -102,7 +103,7 @@ export function BookSlideshow({
                 <div className="relative aspect-[3/4] bg-gray-100 flex items-center justify-center overflow-hidden">
                   {book.cover_image ? (
                     <img
-                      src={book.cover_image}
+                      src={toCoverImageUrl(book.cover_image) ?? undefined}
                       alt={book.title}
                       className="w-full h-full object-cover"
                     />

@@ -442,6 +442,8 @@ const ViTranslation = {
   menu_all_settings: 'Tất cả cấu hình',
   menu_librarian_permission: 'Thủ thư & phân quyền',
   menu_audit_log: 'Nhật ký truy cập',
+  menu_system_log: 'Nhật ký hệ thống',
+  menu_ai_assistant: 'AI Gợi Ý Sách',
   checkout_title: 'Mượn sách',
   return_title: 'Trả sách',
   renew_title: 'Gia hạn sách',
