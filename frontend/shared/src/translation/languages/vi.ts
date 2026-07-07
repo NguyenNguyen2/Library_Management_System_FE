@@ -446,7 +446,7 @@ const ViTranslation = {
   menu_ai_assistant: 'AI Gợi Ý Sách',
   checkout_title: 'Mượn sách',
   return_title: 'Trả sách',
-  renew_title: 'Gia hạn sách',
+  renew_title: 'Gia hạn sách & thẻ',
   reservation_title: 'Đặt trước sách',
   user_history_title: 'Lịch sử độc giả',
 };
