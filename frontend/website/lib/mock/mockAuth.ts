@@ -64,15 +64,28 @@ export const mockSignIn = ({ email }: { email: string; password: string }): Prom
 export const mockForgotPassword = (_body: { email: string }): Promise<{ message: string }> => {
   return new Promise((resolve) => {
     setTimeout(() => {
-      resolve({ message: 'Link đặt lại mật khẩu đã được gửi.' });
+      resolve({ message: 'Nếu email tồn tại, mã OTP đã được gửi.' });
     }, MOCK_DELAY);
   });
 };
 
-export const mockResetPassword = (_body: { token: string; email: string; password: string; password_confirmation: string }): Promise<{ message: string }> => {
+// Mock OTP is always "123456" for local/demo testing (mirrors mockVerifyRegistrationOtp).
+export const mockVerifyForgotPasswordOtp = ({ otp }: { email: string; otp: string }): Promise<{ message: string }> => {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (otp !== '123456') {
+        reject({ response: { data: { message: 'OTP không chính xác.', error: 'invalid' } } });
+        return;
+      }
+      resolve({ message: 'Xác minh OTP thành công.' });
+    }, MOCK_DELAY);
+  });
+};
+
+export const mockResetPassword = (_body: { email: string; otp: string; password: string; password_confirmation: string }): Promise<{ message: string }> => {
   return new Promise((resolve) => {
     setTimeout(() => {
-      resolve({ message: 'Đổi mật khẩu thành công.' });
+      resolve({ message: 'Đổi mật khẩu thành công. Vui lòng đăng nhập.' });
     }, MOCK_DELAY);
   });
 };

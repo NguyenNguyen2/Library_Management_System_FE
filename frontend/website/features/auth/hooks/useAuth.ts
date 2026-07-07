@@ -10,6 +10,7 @@ import {
   mockSignIn,
   mockSignUp,
   mockForgotPassword,
+  mockVerifyForgotPasswordOtp,
   mockResetPassword,
   mockVerifyRegistrationOtp,
   mockResendRegistrationOtp,
@@ -77,17 +78,26 @@ export const useResendRegistrationOtp = () => {
   });
 };
 
+// Step 1 — validate Gmail + gửi OTP. Cùng mutation này được gọi lại để "Gửi lại OTP".
 export const useForgotPassword = () => {
   return useMutation<{ message: string }, AxiosError, { email: string }>({
     mutationFn: USE_MOCK ? mockForgotPassword : authApi.forgotPassword,
   });
 };
 
+// Step 2 — xác minh OTP trước khi hiển thị form mật khẩu mới.
+export const useVerifyForgotPasswordOtp = () => {
+  return useMutation<{ message: string }, AxiosError, { email: string; otp: string }>({
+    mutationFn: USE_MOCK ? mockVerifyForgotPasswordOtp : authApi.verifyForgotPasswordOtp,
+  });
+};
+
+// Step 3 — đổi mật khẩu. Không tự đăng nhập — thành công thì quay về màn hình Đăng nhập.
 export const useResetPassword = () => {
   return useMutation<
     { message: string },
     AxiosError,
-    { token: string; email: string; password: string; password_confirmation: string }
+    { email: string; otp: string; password: string; password_confirmation: string }
   >({
     mutationFn: USE_MOCK ? mockResetPassword : authApi.resetPassword,
   });
