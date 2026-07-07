@@ -15,7 +15,7 @@ export interface ICardRenewalRequest {
   card_id: number;
   user_id: number;
   requested_expiry_date: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   review_note: string | null;
   requested_at: string;
 }
@@ -38,6 +38,12 @@ export const libraryCardApi = {
 
   getMyRenewalRequests: async (): Promise<{ data: ICardRenewalRequest[] }> => {
     const response = await axiosInstance.get('/v1/me/library-card/renewal-requests');
+    return response.data;
+  },
+
+  // Chỉ cho phép hủy khi yêu cầu còn Pending (backend re-check lại).
+  cancelRenewalRequest: async (requestId: number): Promise<{ message: string }> => {
+    const response = await axiosInstance.delete(`/v1/me/library-card/renewal-request/${requestId}`);
     return response.data;
   },
 };

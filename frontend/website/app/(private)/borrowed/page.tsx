@@ -10,7 +10,7 @@ import {
   ReloadOutlined,
   LoadingOutlined,
 } from '@ant-design/icons';
-import { useBorrowing, useRenewBorrowing } from '@/features/borrowing/hooks/useBorrowing';
+import { useBorrowing, useRenewBorrowing, useCancelRenewBorrowing } from '@/features/borrowing/hooks/useBorrowing';
 import { APP_ROUTE } from '@/constants/routes';
 import { READER_BORROW_LIMIT } from '@/lib/mock/mockData';
 import { formatDateVN } from '@/lib/utils/date';
@@ -49,9 +49,13 @@ function getDayStatus(daysRemaining: number) {
 function BorrowedBookCard({
   item,
   onRenew,
+  onCancelRenew,
+  isCanceling,
 }: {
   item: IBorrowedBook;
   onRenew: (item: IBorrowedBook) => void;
+  onCancelRenew: (item: IBorrowedBook) => void;
+  isCanceling: boolean;
 }) {
   const router = useRouter();
   const status = getDayStatus(item.days_remaining);
@@ -136,10 +140,20 @@ function BorrowedBookCard({
 
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             {item.renewal_pending ? (
-              <span className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 font-semibold">
-                <LoadingOutlined spin />
-                Chờ duyệt gia hạn
-              </span>
+              <>
+                <span className="flex items-center gap-1.5 text-xs text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 font-semibold">
+                  <LoadingOutlined spin />
+                  Chờ duyệt gia hạn
+                </span>
+                <Button
+                  size="small"
+                  danger
+                  loading={isCanceling}
+                  onClick={() => onCancelRenew(item)}
+                >
+                  Hủy yêu cầu
+                </Button>
+              </>
             ) : (
               <Button
                 size="small"
@@ -170,6 +184,7 @@ function BorrowedBooksContent() {
   const { modal, message } = App.useApp();
   const { data, isLoading } = useBorrowing();
   const renewMutation = useRenewBorrowing();
+  const cancelRenewMutation = useCancelRenewBorrowing();
 
   const borrowed = data?.data ?? [];
   const overdueCount = borrowed.filter((b) => b.days_remaining < 0).length;
@@ -189,6 +204,25 @@ function BorrowedBooksContent() {
           throw err;
         });
         message.success(res.message ?? 'Yêu cầu gia hạn đã được gửi.');
+      },
+    });
+  };
+
+  // Chỉ cho phép hủy khi yêu cầu còn ở trạng thái Pending.
+  const handleCancelRenew = (item: IBorrowedBook) => {
+    modal.confirm({
+      title: 'Hủy yêu cầu gia hạn',
+      content: `Bạn có chắc muốn hủy yêu cầu gia hạn "${item.title}"?`,
+      okText: 'Hủy yêu cầu',
+      okButtonProps: { danger: true },
+      cancelText: 'Đóng',
+      onOk: async () => {
+        const res = await cancelRenewMutation.mutateAsync(item.borrow_id).catch((err: any) => {
+          const msg = err?.response?.data?.message ?? 'Hủy yêu cầu thất bại. Vui lòng thử lại.';
+          message.error(msg);
+          throw err;
+        });
+        message.success(res.message ?? 'Đã hủy yêu cầu gia hạn.');
       },
     });
   };
@@ -242,6 +276,8 @@ function BorrowedBooksContent() {
               key={`${item.borrow_id}-${item.copy_id}`}
               item={item}
               onRenew={handleRenew}
+              onCancelRenew={handleCancelRenew}
+              isCanceling={cancelRenewMutation.isPending}
             />
           ))}
         </div>
