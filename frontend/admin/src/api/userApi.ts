@@ -132,4 +132,32 @@ export const userApi = {
     const response = await axiosInstance.get('/private/v1/login-logs', { params });
     return response.data;
   },
+
+  getActivityLogs: async (params: {
+    keyword?: string;
+    module?: string;
+    action?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    per_page?: number;
+  }): Promise<{ objects: ActivityLogRow[]; total: number; per_page: number; page: number }> => {
+    const response = await axiosInstance.get('/private/v1/activity-logs', { params });
+    return response.data?.results ?? { objects: [], total: 0, per_page: params.per_page ?? 20, page: 1 };
+  },
 };
+
+export interface ActivityLogRow {
+  audit_id: number;
+  actor_id: number;
+  action: string;
+  module: string | null;
+  table_name: string;
+  record_id: number;
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+  description: string | null;
+  ip_address: string | null;
+  created_at: string;
+  user?: { user_id: number; full_name: string; email: string } | null;
+}

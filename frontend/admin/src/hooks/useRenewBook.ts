@@ -33,11 +33,13 @@ export const renewHooks = {
     });
   },
 
+  // Poll để danh sách tự cập nhật khi Reader hủy yêu cầu — không cần F5.
   useRenewList: () =>
     useQuery<RenewListResponse>({
       queryKey: ['renew-list'],
       queryFn: renewApi.getRenewList,
-      staleTime: 30_000,
+      staleTime: 5_000,
+      refetchInterval: 5_000,
     }),
 
   useRejectBook: () => {

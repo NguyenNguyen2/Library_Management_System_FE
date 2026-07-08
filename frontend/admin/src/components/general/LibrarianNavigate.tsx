@@ -5,6 +5,7 @@ import { Button, Flex } from 'antd';
 import {
   BarChartOutlined,
   LogoutOutlined,
+  MessageOutlined,
   RobotOutlined,
   UserOutlined,
   BookOutlined,
@@ -54,7 +55,7 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
   const menuConfig: NavItem[] = [
     {
       key: 'dashboard',
-      label: 'Dashboard',
+      label: 'Bảng điều khiển',
       icon: <BarChartOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.DASHBOARD,
     },
@@ -87,44 +88,40 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
     },
     {
       key: 'transactions',
-      label: 'Giao dịch mượn trả',
+      label: 'Giao dịch',
       icon: <LockOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.TRANSACTIONS,
       children: [
-        { label: 'Mượn sách (Check-out)', to: ROUTES.TRANSACTIONS },
-        { label: 'Trả sách (Check-in)', to: ROUTES.RETURN },
-        { label: 'Gia hạn', to: ROUTES.RENEW },
-        { label: 'Đặt trước', to: ROUTES.RESERVATION },
+        { label: 'Mượn sách', to: ROUTES.TRANSACTIONS },
+        { label: 'Trả sách', to: ROUTES.RETURN },
+        { label: 'Gia hạn sách & thẻ', to: ROUTES.RENEW },
+        { label: 'Đặt trước sách', to: ROUTES.RESERVATION },
         { label: 'Danh sách người dùng', to: ROUTES.TRANSACTION_LOG },
       ],
     },
     {
       key: 'fees',
-      label: 'Quản lý phí',
+      label: 'Quản lý phí & Thanh toán',
       icon: <CreditCardOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.FEES,
-      children: [
-        { label: 'Danh sách & Thanh toán', to: ROUTES.FEES },
-        { label: 'Lịch sử thu phí', to: ROUTES.FEES },
-        { label: 'Báo cáo doanh thu', to: ROUTES.FEES },
-      ],
     },
     {
       key: 'reports',
       label: 'Báo cáo & Thống kê',
       icon: <LineChartOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.REPORTS,
-      children: [
-        { label: 'Báo cáo mượn trả', to: ROUTES.REPORTS },
-        { label: 'Sách trễ hạn', to: ROUTES.REPORTS },
-        { label: 'AI Analytics', to: ROUTES.REPORTS },
-      ],
     },
     {
       key: 'ai-demand',
       label: 'AI Phân tích nhu cầu',
       icon: <RobotOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.AI_DEMAND,
+    },
+    {
+      key: 'ai-assistant',
+      label: 'AI Gợi Ý Sách',
+      icon: <MessageOutlined style={{ fontSize: 18 }} />,
+      to: ROUTES.AI_ASSISTANT,
     },
   ];
 

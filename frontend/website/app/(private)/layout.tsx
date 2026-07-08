@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import type { ReactNode } from 'react'
 import { useNotificationSync } from '@/features/notifications/hooks/useNotifications'
+import Footer from '@/features/private/components/Footer'
 
 // dynamic ssr:false — getCookie dùng document.cookie, không chạy được trên server
 const HeaderWithSideBar = dynamic(
@@ -28,6 +29,7 @@ const PrivateLayout = ({ children }: { children: ReactNode }) => {
       {/* 25px padding on every edge for all private pages; individual pages
           only control their inner layout, no outer padding needed. */}
       <main className='flex-1 p-6.25'>{children}</main>
+      <Footer />
       <ChatWidget />
     </div>
   )

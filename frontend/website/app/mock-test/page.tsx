@@ -2,6 +2,7 @@
 
 import { useAchievements } from '@/features/achievements/hooks/useAchievements';
 import { useCourses } from '@/features/courses/hooks/useCourses';
+import type { MockAchievement, MockCourse } from '@/lib/mock/mockData';
 
 export default function MockTestPage() {
   const { data: achievementsData, isLoading: achLoading } = useAchievements({
@@ -38,7 +39,7 @@ export default function MockTestPage() {
           <p className="text-gray-500">No achievements loaded</p>
         ) : (
           <div className="grid gap-3">
-            {achievements.map((ach: any) => (
+            {achievements.map((ach: MockAchievement) => (
               <div key={ach.id} className="bg-white border rounded-lg p-4 shadow-sm">
                 <h3 className="font-semibold">{ach.name}</h3>
                 <p className="text-sm text-gray-600">Required Courses: {ach.requiredCourses}</p>
@@ -57,7 +58,7 @@ export default function MockTestPage() {
           <p className="text-gray-500">No courses loaded</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {courses.map((course: any) => (
+            {courses.map((course: MockCourse) => (
               <div key={course.id} className="bg-white border rounded-lg p-4 shadow-sm">
                 <h3 className="font-semibold text-lg">{course.name}</h3>
                 <p className="text-sm text-gray-600 mt-1">{course.description}</p>

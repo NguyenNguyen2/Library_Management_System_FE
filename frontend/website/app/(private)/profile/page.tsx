@@ -28,6 +28,7 @@ import {
   useGetLibraryCard,
   useSubmitCardRenewal,
   useGetMyCardRenewalRequests,
+  useCancelCardRenewal,
 } from '@/features/library-card/hooks/useLibraryCard';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { APP_ROUTE } from '@/constants/routes';
@@ -75,6 +76,7 @@ const ProfilePage = () => {
   const { data: libraryCard, isLoading: isCardLoading } = useGetLibraryCard(userId);
   const { data: cardRenewalData } = useGetMyCardRenewalRequests();
   const { mutate: submitCardRenewal, isPending: isSubmittingCardRenewal } = useSubmitCardRenewal();
+  const { mutate: cancelCardRenewal, isPending: isCancelingCardRenewal } = useCancelCardRenewal();
 
   const pendingCardRenewal = cardRenewalData?.data?.find((r) => r.status === 'pending');
 
@@ -83,9 +85,32 @@ const ProfilePage = () => {
       onSuccess: (res) => {
         message.success(res.message ?? 'Yêu cầu gia hạn thẻ đã được gửi.');
       },
-      onError: (err: any) => {
-        const msg = err?.response?.data?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.';
+      onError: (err: Error) => {
+        const msg = (err as AxiosError<{ message?: string }>)?.response?.data?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.';
         message.error(msg);
+      },
+    });
+  };
+
+  // Chỉ cho phép hủy khi yêu cầu còn ở trạng thái Pending.
+  const handleCancelCardRenewal = () => {
+    if (!pendingCardRenewal) return;
+    Modal.confirm({
+      title: 'Hủy yêu cầu gia hạn thẻ',
+      content: 'Bạn có chắc muốn hủy yêu cầu gia hạn thẻ thư viện đang chờ duyệt?',
+      okText: 'Hủy yêu cầu',
+      okButtonProps: { danger: true },
+      cancelText: 'Đóng',
+      onOk: () => {
+        cancelCardRenewal(pendingCardRenewal.request_id, {
+          onSuccess: (res) => {
+            message.success(res.message ?? 'Đã hủy yêu cầu gia hạn thẻ.');
+          },
+          onError: (err: Error) => {
+            const msg = (err as AxiosError<{ message?: string }>)?.response?.data?.message ?? 'Hủy yêu cầu thất bại. Vui lòng thử lại.';
+            message.error(msg);
+          },
+        });
       },
     });
   };
@@ -454,9 +479,21 @@ const ProfilePage = () => {
               {/* Nút gia hạn thẻ */}
               <div className="pt-3">
                 {pendingCardRenewal ? (
-                  <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-                    Yêu cầu gia hạn thẻ đang chờ thư viện duyệt
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                      Yêu cầu gia hạn thẻ đang chờ thư viện duyệt
+                    </div>
+                    <Button
+                      danger
+                      block
+                      size="small"
+                      loading={isCancelingCardRenewal}
+                      onClick={handleCancelCardRenewal}
+                      className="rounded-lg font-medium text-sm h-9"
+                    >
+                      Hủy yêu cầu
+                    </Button>
                   </div>
                 ) : libraryCard.card_status !== 'Bị khóa' ? (
                   <Button

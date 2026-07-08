@@ -6,7 +6,15 @@ import { STORAGES } from '@shared/constants/storage';
 import { IResponseLogin } from '@shared/types/AuthType';
 import { APP_ROUTE } from '@/constants/routes';
 import { authApi } from '../api/authApi';
-import { mockSignIn, mockSignUp, mockForgotPassword, mockResetPassword } from '@/lib/mock/mockAuth';
+import {
+  mockSignIn,
+  mockSignUp,
+  mockForgotPassword,
+  mockVerifyForgotPasswordOtp,
+  mockResetPassword,
+  mockVerifyRegistrationOtp,
+  mockResendRegistrationOtp,
+} from '@/lib/mock/mockAuth';
 import { useUser } from '@shared/provider/UserProvider';
 
 const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
@@ -38,32 +46,58 @@ export const useLogin = () => {
   });
 };
 
+// Step 1 — validate + send OTP. Navigation to the OTP step is handled at the
+// call site (same pattern as useForgotPassword below), since the register form
+// itself switches to an inline OTP view instead of routing away.
 export const useRegister = () => {
-  const router = useRouter();
-
   return useMutation<
     { success: boolean; message: string },
     AxiosError,
     { full_name: string; email: string; password: string; password_confirmation: string }
   >({
     mutationFn: USE_MOCK ? mockSignUp : authApi.signUp,
-    onSuccess: (_data, variables) => {
-      router.push(`/auth/verify-email-sent?email=${encodeURIComponent(variables.email)}`);
-    },
   });
 };
 
+// Step 2 — verify OTP. full_name/password are re-submitted here (mirrors the
+// existing change-password OTP flow) because the account is only created now,
+// after Gmail ownership has been proven.
+export const useVerifyRegistrationOtp = () => {
+  return useMutation<
+    { success: boolean; message: string; token: string; user_id: number; role: string },
+    AxiosError,
+    { email: string; otp: string; full_name?: string; password?: string; password_confirmation?: string }
+  >({
+    mutationFn: USE_MOCK ? mockVerifyRegistrationOtp : authApi.verifyRegistrationOtp,
+  });
+};
+
+export const useResendRegistrationOtp = () => {
+  return useMutation<{ message: string }, AxiosError, { email: string }>({
+    mutationFn: USE_MOCK ? mockResendRegistrationOtp : authApi.resendRegistrationOtp,
+  });
+};
+
+// Step 1 — validate Gmail + gửi OTP. Cùng mutation này được gọi lại để "Gửi lại OTP".
 export const useForgotPassword = () => {
   return useMutation<{ message: string }, AxiosError, { email: string }>({
     mutationFn: USE_MOCK ? mockForgotPassword : authApi.forgotPassword,
   });
 };
 
+// Step 2 — xác minh OTP trước khi hiển thị form mật khẩu mới.
+export const useVerifyForgotPasswordOtp = () => {
+  return useMutation<{ message: string }, AxiosError, { email: string; otp: string }>({
+    mutationFn: USE_MOCK ? mockVerifyForgotPasswordOtp : authApi.verifyForgotPasswordOtp,
+  });
+};
+
+// Step 3 — đổi mật khẩu. Không tự đăng nhập — thành công thì quay về màn hình Đăng nhập.
 export const useResetPassword = () => {
   return useMutation<
     { message: string },
     AxiosError,
-    { token: string; email: string; password: string; password_confirmation: string }
+    { email: string; otp: string; password: string; password_confirmation: string }
   >({
     mutationFn: USE_MOCK ? mockResetPassword : authApi.resetPassword,
   });
