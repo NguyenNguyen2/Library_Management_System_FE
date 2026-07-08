@@ -85,8 +85,8 @@ const ProfilePage = () => {
       onSuccess: (res) => {
         message.success(res.message ?? 'Yêu cầu gia hạn thẻ đã được gửi.');
       },
-      onError: (err: any) => {
-        const msg = err?.response?.data?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.';
+      onError: (err: Error) => {
+        const msg = (err as AxiosError<{ message?: string }>)?.response?.data?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.';
         message.error(msg);
       },
     });
@@ -106,8 +106,8 @@ const ProfilePage = () => {
           onSuccess: (res) => {
             message.success(res.message ?? 'Đã hủy yêu cầu gia hạn thẻ.');
           },
-          onError: (err: any) => {
-            const msg = err?.response?.data?.message ?? 'Hủy yêu cầu thất bại. Vui lòng thử lại.';
+          onError: (err: Error) => {
+            const msg = (err as AxiosError<{ message?: string }>)?.response?.data?.message ?? 'Hủy yêu cầu thất bại. Vui lòng thử lại.';
             message.error(msg);
           },
         });

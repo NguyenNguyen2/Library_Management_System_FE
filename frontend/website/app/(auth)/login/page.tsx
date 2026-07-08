@@ -179,7 +179,7 @@ const LoginPage = () => {
     if (new URLSearchParams(window.location.search).get('verified') === '1') {
       message.success('Xác minh email thành công. Vui lòng đăng nhập.');
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Khôi phục draft đăng ký sau F5 (còn hạn OTP hay không do backend quyết định
   // khi bấm Xác minh — ở đây chỉ khôi phục để người dùng không phải nhập lại).
@@ -192,7 +192,7 @@ const LoginPage = () => {
     setPasswordConfirmation(draft.passwordConfirmation);
     setView('register-otp');
     startResendCountdown(Math.max(0, Math.ceil((draft.resendDeadline - Date.now()) / 1000)));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     return () => {

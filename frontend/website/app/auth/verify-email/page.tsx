@@ -90,7 +90,7 @@ function VerifyEmailContent() {
         setErrorCode('invalid');
         setState('error');
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleResend = async () => {
     if (!errorEmail) return;

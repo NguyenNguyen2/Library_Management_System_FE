@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import type { AxiosError } from 'axios';
 import { App, Button, Spin } from 'antd';
 import {
   WarningOutlined,
@@ -198,7 +199,7 @@ function BorrowedBooksContent() {
       cancelText: 'Hủy',
       okButtonProps: { type: 'primary' },
       onOk: async () => {
-        const res = await renewMutation.mutateAsync(item.borrow_id).catch((err: any) => {
+        const res = await renewMutation.mutateAsync(item.borrow_id).catch((err: AxiosError<{ message?: string }>) => {
           const msg = err?.response?.data?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.';
           message.error(msg);
           throw err;
@@ -217,7 +218,7 @@ function BorrowedBooksContent() {
       okButtonProps: { danger: true },
       cancelText: 'Đóng',
       onOk: async () => {
-        const res = await cancelRenewMutation.mutateAsync(item.borrow_id).catch((err: any) => {
+        const res = await cancelRenewMutation.mutateAsync(item.borrow_id).catch((err: AxiosError<{ message?: string }>) => {
           const msg = err?.response?.data?.message ?? 'Hủy yêu cầu thất bại. Vui lòng thử lại.';
           message.error(msg);
           throw err;

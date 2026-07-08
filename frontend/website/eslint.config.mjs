@@ -33,6 +33,12 @@ const eslintConfig = [
         "error",
         { max: 1, maxEOF: 1, maxBOF: 0 },
       ],
+      // eslint-plugin-react-hooks@4.6.2 (kéo theo bởi eslint-config-next) gọi
+      // context.getSource() — API đã bị gỡ khỏi ESLint 9, khiến rule này crash
+      // toàn bộ tiến trình lint (không chỉ báo lỗi, mà throw exception) trên
+      // bất kỳ file nào có useEffect/useMemo có dependency array. Tắt riêng
+      // rule này để lint chạy được; rules-of-hooks (rule quan trọng hơn) vẫn bật.
+      "react-hooks/exhaustive-deps": "off",
     },
   },
 ];
