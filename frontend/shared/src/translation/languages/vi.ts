@@ -422,7 +422,7 @@ const ViTranslation = {
   quiz_no_questions: 'Bản sao này chưa có thông tin mượn.',
 
   // Sidebar Menu Admin
-  menu_dashboard: 'Dashboard',
+  menu_dashboard: 'Bảng điều khiển',
   menu_books: 'Quản lý Sách',
   menu_book_list: 'Danh sách sách',
   menu_author_category: 'Tác giả & Thể loại',
@@ -434,7 +434,7 @@ const ViTranslation = {
   menu_inventory_report: 'Báo cáo kho',
   menu_transactions: 'Giao dịch',
   menu_borrow_return: 'Mượn / Trả sách',
-  menu_renew_reserve: 'Gia hạn & Đặt trước',
+  menu_renew_reserve: 'Gia hạn Sách & Thẻ',
   menu_transaction_history: 'Lịch sử giao dịch',
   menu_user_list: 'Danh sách người dùng',
   menu_achievements: 'Quản lý Danh hiệu',
