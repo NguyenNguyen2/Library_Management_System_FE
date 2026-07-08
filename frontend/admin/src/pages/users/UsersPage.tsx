@@ -122,7 +122,7 @@ const LibrariansSection = ({ addTrigger, onTriggerReset }: { addTrigger: number;
             refetch();
           },
           onError: (err: any) => {
-            message.error(err?.response?.data?.message || 'Có lỗi xảy ra.');
+            message.error(err?.response?.data?.message || 'Không thể cập nhật tài khoản thủ thư. Vui lòng thử lại.');
           },
         }
       );
@@ -154,7 +154,7 @@ const LibrariansSection = ({ addTrigger, onTriggerReset }: { addTrigger: number;
             refetch();
           },
           onError: (err: any) => {
-            message.error(err?.response?.data?.message || 'Có lỗi xảy ra.');
+            message.error(err?.response?.data?.message || 'Không thể tạo tài khoản thủ thư. Vui lòng thử lại.');
           },
         }
       );
@@ -940,7 +940,7 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
             refetch();
           },
           onError: (err: any) => {
-            message.error(err?.response?.data?.message || 'Có lỗi xảy ra.');
+            message.error(err?.response?.data?.message || 'Không thể cập nhật tài khoản độc giả. Vui lòng thử lại.');
           },
         }
       );
@@ -960,7 +960,7 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
             refetch();
           },
           onError: (err: any) => {
-            message.error(err?.response?.data?.message || 'Có lỗi xảy ra.');
+            message.error(err?.response?.data?.message || 'Không thể tạo tài khoản độc giả. Vui lòng thử lại.');
           },
         }
       );
