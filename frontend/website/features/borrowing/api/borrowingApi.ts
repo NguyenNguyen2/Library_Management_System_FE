@@ -52,14 +52,15 @@ export const borrowingApi = {
     return response.data;
   },
 
-  submitRenewalRequest: async (borrowId: number): Promise<IBorrowRenewalRequestResponse> => {
-    const response = await axiosInstance.post(`/v1/me/borrowing/${borrowId}/renew`);
+  // copy_id xác định đúng cuốn sách được chọn trong giao dịch (borrow_id có thể gồm nhiều sách).
+  submitRenewalRequest: async (borrowId: number, copyId: number): Promise<IBorrowRenewalRequestResponse> => {
+    const response = await axiosInstance.post(`/v1/me/borrowing/${borrowId}/renew`, { copy_id: copyId });
     return response.data;
   },
 
   // Chỉ cho phép hủy khi yêu cầu còn Pending (backend re-check lại).
-  cancelRenewalRequest: async (borrowId: number): Promise<{ message: string }> => {
-    const response = await axiosInstance.delete(`/v1/me/borrowing/${borrowId}/renew`);
+  cancelRenewalRequest: async (borrowId: number, copyId: number): Promise<{ message: string }> => {
+    const response = await axiosInstance.delete(`/v1/me/borrowing/${borrowId}/renew`, { data: { copy_id: copyId } });
     return response.data;
   },
 

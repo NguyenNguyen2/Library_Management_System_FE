@@ -199,11 +199,14 @@ function BorrowedBooksContent() {
       cancelText: 'Hủy',
       okButtonProps: { type: 'primary' },
       onOk: async () => {
-        const res = await renewMutation.mutateAsync(item.borrow_id).catch((err: AxiosError<{ message?: string }>) => {
-          const msg = err?.response?.data?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.';
-          message.error(msg);
-          throw err;
-        });
+        // Truyền đúng borrow_id + copy_id của sách được chọn — không tác động sách khác.
+        const res = await renewMutation
+          .mutateAsync({ borrowId: item.borrow_id, copyId: item.copy_id })
+          .catch((err: AxiosError<{ message?: string }>) => {
+            const msg = err?.response?.data?.message ?? 'Gửi yêu cầu thất bại. Vui lòng thử lại.';
+            message.error(msg);
+            throw err;
+          });
         message.success(res.message ?? 'Yêu cầu gia hạn đã được gửi.');
       },
     });
@@ -218,11 +221,13 @@ function BorrowedBooksContent() {
       okButtonProps: { danger: true },
       cancelText: 'Đóng',
       onOk: async () => {
-        const res = await cancelRenewMutation.mutateAsync(item.borrow_id).catch((err: AxiosError<{ message?: string }>) => {
-          const msg = err?.response?.data?.message ?? 'Hủy yêu cầu thất bại. Vui lòng thử lại.';
-          message.error(msg);
-          throw err;
-        });
+        const res = await cancelRenewMutation
+          .mutateAsync({ borrowId: item.borrow_id, copyId: item.copy_id })
+          .catch((err: AxiosError<{ message?: string }>) => {
+            const msg = err?.response?.data?.message ?? 'Hủy yêu cầu thất bại. Vui lòng thử lại.';
+            message.error(msg);
+            throw err;
+          });
         message.success(res.message ?? 'Đã hủy yêu cầu gia hạn.');
       },
     });
