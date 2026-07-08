@@ -2,9 +2,7 @@
 // Automatically switches between mock data and real API based on NEXT_PUBLIC_USE_MOCK_DATA env var
 
 import * as React from 'react';
-import { mockAchievements } from '@/lib/mock/mockData';
-
-const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true';
+import { mockAchievements, type MockAchievement } from '@/lib/mock/mockData';
 
 interface MockResponse<T> {
   rows: T[];
@@ -18,9 +16,9 @@ export function useMockAchievements(params?: { page?: number; limit?: number }) 
   const limit = params?.limit ?? 10;
 
   // Simulate API delay
-  const [data, setData] = React.useState<MockResponse<any> | null>(null);
+  const [data, setData] = React.useState<MockResponse<MockAchievement> | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
+  const [error] = React.useState(null);
 
   React.useEffect(() => {
     const timer = setTimeout(() => {

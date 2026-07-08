@@ -1,4 +1,5 @@
   'use client';
+  import type { AxiosError } from 'axios';
   import axiosInstance from '@/lib/axios/axios-client';
   import { Button, Card, Dropdown, Input, Pagination, Rate, Spin, Tag, message } from 'antd';
   import { ArrowLeftOutlined, BookOutlined, CheckOutlined, DownOutlined, HeartFilled, HeartOutlined } from '@ant-design/icons';
@@ -38,14 +39,12 @@ import { use, useEffect, useState } from 'react';
     const router = useRouter();
     const queryClient = useQueryClient();
   const [user, setUser] = useState<IDetailUser | undefined>(undefined);
-  const [isUserLoaded, setIsUserLoaded] = useState(false);
 
   useEffect(() => {
     const storedUser = getCookie(STORAGES.USER_LOGIN) as IDetailUser | undefined;
     if (storedUser) {
       setUser(storedUser);
     }
-    setIsUserLoaded(true);
   }, []);
 
     const [reviewContent, setReviewContent] = useState('');
@@ -96,9 +95,9 @@ import { use, useEffect, useState } from 'react';
     // Chuyển sang trang danh sách đặt trước
     router.push('/reservations');
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     message.error(
-      error?.response?.data?.message || 'Không thể kết nối máy chủ'
+      (error as AxiosError<{ message?: string }>)?.response?.data?.message || 'Không thể kết nối máy chủ'
     );
   } finally {
     setIsReserving(false);
@@ -169,6 +168,11 @@ import { use, useEffect, useState } from 'react';
       }
       if (!reviewContent.trim()) {
         message.warning('Vui lòng nhập nội dung nhận xét.');
+        return;
+      }
+      // Kiểm tra userId trước khi gọi API để đảm bảo an toàn kiểu dữ liệu.
+      if (!userId) {
+        message.error('Vui lòng đăng nhập lại.');
         return;
       }
       try {

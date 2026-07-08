@@ -79,7 +79,7 @@ function CallbackContent() {
         message.error('Không thể lấy thông tin người dùng. Vui lòng thử lại.');
         router.replace(APP_ROUTE.login);
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-4">

@@ -31,3 +31,14 @@ export const useSubmitCardRenewal = () => {
     },
   });
 };
+
+// Reader tự hủy yêu cầu gia hạn thẻ khi còn Pending.
+export const useCancelCardRenewal = () => {
+  const queryClient = useQueryClient();
+  return useMutation<{ message: string }, Error, number>({
+    mutationFn: (requestId: number) => libraryCardApi.cancelRenewalRequest(requestId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-card-renewal-requests'] });
+    },
+  });
+};

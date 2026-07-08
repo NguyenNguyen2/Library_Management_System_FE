@@ -3,11 +3,13 @@ import { AxiosError } from 'axios';
 import { libraryCardRenewalApi, CardRenewalRequestItem } from '../api/libraryCardRenewalApi';
 
 export const libraryCardRenewalHooks = {
+  // Poll để danh sách tự cập nhật khi Reader hủy yêu cầu — không cần F5.
   useRequests: () =>
     useQuery<CardRenewalRequestItem[]>({
       queryKey: ['card-renewal-requests'],
       queryFn: () => libraryCardRenewalApi.listRequests('pending'),
-      staleTime: 30_000,
+      staleTime: 5_000,
+      refetchInterval: 5_000,
     }),
 
   useApprove: () => {

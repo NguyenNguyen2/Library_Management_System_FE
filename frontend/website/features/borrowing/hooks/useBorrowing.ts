@@ -32,3 +32,14 @@ export const useRenewBorrowing = () => {
     },
   });
 };
+
+// Reader tự hủy yêu cầu gia hạn sách khi còn Pending.
+export const useCancelRenewBorrowing = () => {
+  const queryClient = useQueryClient();
+  return useMutation<{ message: string }, Error, number>({
+    mutationFn: (borrowId: number) => borrowingApi.cancelRenewalRequest(borrowId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-borrowing'] });
+    },
+  });
+};
