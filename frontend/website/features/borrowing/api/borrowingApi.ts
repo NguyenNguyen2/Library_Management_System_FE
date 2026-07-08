@@ -57,6 +57,12 @@ export const borrowingApi = {
     return response.data;
   },
 
+  // Chỉ cho phép hủy khi yêu cầu còn Pending (backend re-check lại).
+  cancelRenewalRequest: async (borrowId: number): Promise<{ message: string }> => {
+    const response = await axiosInstance.delete(`/v1/me/borrowing/${borrowId}/renew`);
+    return response.data;
+  },
+
   getHistory: async (): Promise<IBorrowHistoryResponse> => {
     const response = await axiosInstance.get('/v1/me/borrowing/history');
     return response.data;

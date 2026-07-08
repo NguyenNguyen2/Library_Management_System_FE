@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { App, Button, Input } from 'antd';
 import {
   ArrowLeftOutlined,
-  CheckCircleOutlined,
   MailOutlined,
   ReloadOutlined,
 } from '@ant-design/icons';
@@ -13,6 +12,8 @@ import {
   useLogin,
   useRegister,
   useForgotPassword,
+  useVerifyForgotPasswordOtp,
+  useResetPassword,
   useVerifyRegistrationOtp,
   useResendRegistrationOtp,
 } from '@/features/auth/hooks/useAuth';
@@ -24,7 +25,7 @@ import { useUser } from '@shared/provider/UserProvider';
 import type { IDetailUser } from '@shared/types/UserType';
 import { APP_ROUTE } from '@/constants/routes';
 
-type View = 'login' | 'register' | 'register-otp' | 'forgot' | 'forgot-sent';
+type View = 'login' | 'register' | 'register-otp' | 'forgot' | 'forgot-otp' | 'forgot-reset';
 
 // Giữ dữ liệu đăng ký (chưa verify) qua sessionStorage — sống sót qua F5,
 // tự xoá khi đóng tab. Không dùng localStorage vì không cần tồn tại lâu dài.
@@ -122,6 +123,8 @@ const LoginPage = () => {
   const loginMutation = useLogin();
   const registerMutation = useRegister();
   const forgotPasswordMutation = useForgotPassword();
+  const verifyForgotOtpMutation = useVerifyForgotPasswordOtp();
+  const resetPasswordMutation = useResetPassword();
   const verifyOtpMutation = useVerifyRegistrationOtp();
   const resendOtpMutation = useResendRegistrationOtp();
 
@@ -132,6 +135,9 @@ const LoginPage = () => {
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [otp, setOtp] = useState('');
   const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirmation, setNewPasswordConfirmation] = useState('');
   const [error, setError] = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -173,7 +179,7 @@ const LoginPage = () => {
     if (new URLSearchParams(window.location.search).get('verified') === '1') {
       message.success('Xác minh email thành công. Vui lòng đăng nhập.');
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // Khôi phục draft đăng ký sau F5 (còn hạn OTP hay không do backend quyết định
   // khi bấm Xác minh — ở đây chỉ khôi phục để người dùng không phải nhập lại).
@@ -186,7 +192,7 @@ const LoginPage = () => {
     setPasswordConfirmation(draft.passwordConfirmation);
     setView('register-otp');
     startResendCountdown(Math.max(0, Math.ceil((draft.resendDeadline - Date.now()) / 1000)));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -309,7 +315,7 @@ const LoginPage = () => {
       { email: forgotEmail.trim() },
       {
         onSuccess: () => {
-          setView('forgot-sent');
+          setView('forgot-otp');
           startResendCountdown();
         },
         onError: (err) =>
@@ -324,10 +330,63 @@ const LoginPage = () => {
       { email: forgotEmail.trim() },
       {
         onSuccess: () => {
-          message.success('Đã gửi lại email khôi phục!');
+          message.success('Đã gửi lại mã OTP tới email của bạn.');
           startResendCountdown();
         },
         onError: () => message.error('Gửi lại thất bại. Vui lòng thử lại.'),
+      }
+    );
+  };
+
+  // Quên mật khẩu — Bước 2: xác minh OTP trước khi cho nhập mật khẩu mới.
+  const handleVerifyForgotOtp = () => {
+    setError('');
+    if (forgotOtp.length !== 6) {
+      setError('Vui lòng nhập đủ 6 chữ số OTP.');
+      return;
+    }
+
+    verifyForgotOtpMutation.mutate(
+      { email: forgotEmail.trim(), otp: forgotOtp },
+      {
+        onSuccess: () => setView('forgot-reset'),
+        onError: (err) => setError(extractErrorMessage(err, 'Xác minh thất bại. Vui lòng thử lại.')),
+      }
+    );
+  };
+
+  // Quên mật khẩu — Bước 3: đổi mật khẩu. Thành công thì về thẳng Đăng nhập,
+  // không tự đăng nhập.
+  const handleResetPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!newPassword || !newPasswordConfirmation) {
+      setError('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+    if (!PASSWORD_PATTERN.test(newPassword)) {
+      setError('Mật khẩu phải có ít nhất 8 ký tự, gồm chữ hoa, chữ thường, số và ký tự đặc biệt (@$!%*?&).');
+      return;
+    }
+    if (newPassword !== newPasswordConfirmation) {
+      setError('Mật khẩu xác nhận không khớp');
+      return;
+    }
+
+    resetPasswordMutation.mutate(
+      {
+        email: forgotEmail.trim(),
+        otp: forgotOtp,
+        password: newPassword,
+        password_confirmation: newPasswordConfirmation,
+      },
+      {
+        onSuccess: () => {
+          goToLogin();
+          message.success('Đổi mật khẩu thành công. Vui lòng đăng nhập.');
+        },
+        onError: (err) => setError(extractErrorMessage(err, 'Đổi mật khẩu thất bại. Vui lòng thử lại.')),
       }
     );
   };
@@ -337,6 +396,9 @@ const LoginPage = () => {
     setError('');
     setEmailNotVerified('');
     setForgotEmail('');
+    setForgotOtp('');
+    setNewPassword('');
+    setNewPasswordConfirmation('');
     setOtp('');
     if (countdownRef.current) clearInterval(countdownRef.current);
     setResendCountdown(0);
@@ -353,13 +415,15 @@ const LoginPage = () => {
   const heading =
     view === 'forgot'
       ? 'Quên mật khẩu'
-      : view === 'forgot-sent'
-        ? 'Kiểm tra email'
-        : view === 'register'
-          ? 'Đăng ký'
-          : view === 'register-otp'
-            ? 'Xác minh OTP'
-            : 'Đăng nhập';
+      : view === 'forgot-otp'
+        ? 'Xác minh OTP'
+        : view === 'forgot-reset'
+          ? 'Đặt mật khẩu mới'
+          : view === 'register'
+            ? 'Đăng ký'
+            : view === 'register-otp'
+              ? 'Xác minh OTP'
+              : 'Đăng nhập';
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 font-sans flex items-center justify-center">
@@ -459,7 +523,7 @@ const LoginPage = () => {
                   <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-700 flex gap-2">
                     <MailOutlined className="mt-0.5 flex-shrink-0" />
                     <span>
-                      Nhập email đã đăng ký. Chúng tôi sẽ gửi link đặt lại mật khẩu có hiệu lực{' '}
+                      Nhập email đã đăng ký. Chúng tôi sẽ gửi mã OTP có hiệu lực{' '}
                       <strong>15 phút</strong>.
                     </span>
                   </div>
@@ -491,39 +555,48 @@ const LoginPage = () => {
                     loading={isForgotPending}
                     className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold tracking-wide border-none"
                   >
-                    GỬI LINK ĐẶT LẠI MẬT KHẨU
+                    GỬI MÃ OTP
                   </Button>
                 </form>
               )}
 
-              {/* --- Quên mật khẩu: đã gửi email --- */}
-              {view === 'forgot-sent' && (
-                <div className="space-y-4 text-center">
-                  <div className="flex justify-center">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-                      <CheckCircleOutlined className="text-3xl text-green-500" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-gray-800 text-sm font-semibold">Email đã được gửi!</p>
-                    <p className="text-gray-500 text-xs mt-1">
-                      Chúng tôi đã gửi link đặt lại mật khẩu đến
-                    </p>
-                    <p className="text-blue-700 text-sm mt-0.5 break-all font-semibold">{forgotEmail}</p>
+              {/* --- Quên mật khẩu: nhập mã OTP --- */}
+              {view === 'forgot-otp' && (
+                <div className="space-y-4">
+                  <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-xs text-amber-700 flex gap-2">
+                    <MailOutlined className="mt-0.5 flex-shrink-0" />
+                    <span>
+                      Mã OTP 6 số đã được gửi tới <strong className="break-all">{forgotEmail}</strong>, hiệu lực{' '}
+                      <strong>15 phút</strong>.
+                    </span>
                   </div>
 
-                  <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-xs text-gray-600 text-left space-y-1">
-                    <p className="flex items-center gap-1.5">
-                      <span className="text-blue-500">①</span> Mở hộp thư email của bạn
-                    </p>
-                    <p className="flex items-center gap-1.5">
-                      <span className="text-blue-500">②</span> Nhấn vào link trong email (hiệu lực 15 phút)
-                    </p>
-                    <p className="flex items-center gap-1.5">
-                      <span className="text-blue-500">③</span> Đặt mật khẩu mới và đăng nhập lại
-                    </p>
-                    <p className="text-gray-400 mt-1.5">Không thấy email? Kiểm tra thư mục Spam.</p>
+                  <div className="flex justify-center">
+                    <Input.OTP
+                      length={6}
+                      size="large"
+                      value={forgotOtp}
+                      onChange={setForgotOtp}
+                      disabled={verifyForgotOtpMutation.isPending}
+                    />
                   </div>
+
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                      <AlertCircleIcon />
+                      <p className="text-xs text-red-600 m-0">{error}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="primary"
+                    htmlType="button"
+                    loading={verifyForgotOtpMutation.isPending}
+                    onClick={handleVerifyForgotOtp}
+                    className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold tracking-wide border-none"
+                  >
+                    XÁC MINH
+                  </Button>
 
                   <button
                     type="button"
@@ -534,7 +607,7 @@ const LoginPage = () => {
                     }`}
                   >
                     <ReloadOutlined className={isForgotPending ? 'animate-spin' : ''} />
-                    {resendCountdown > 0 ? `Gửi lại sau ${resendCountdown}s` : 'Gửi lại email'}
+                    {resendCountdown > 0 ? `Gửi lại sau ${resendCountdown}s` : 'Gửi lại OTP'}
                   </button>
 
                   <Button
@@ -545,6 +618,56 @@ const LoginPage = () => {
                     Quay lại đăng nhập
                   </Button>
                 </div>
+              )}
+
+              {/* --- Quên mật khẩu: nhập mật khẩu mới --- */}
+              {view === 'forgot-reset' && (
+                <form onSubmit={handleResetPassword} className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Mật khẩu mới</label>
+                    <Input.Password
+                      placeholder="Ít nhất 8 ký tự"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="h-10 text-sm rounded-lg"
+                      disabled={resetPasswordMutation.isPending}
+                      autoFocus
+                    />
+                    <PasswordStrengthChecklist password={newPassword} />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Xác nhận mật khẩu</label>
+                    <Input.Password
+                      placeholder="Nhập lại mật khẩu mới"
+                      value={newPasswordConfirmation}
+                      onChange={(e) => setNewPasswordConfirmation(e.target.value)}
+                      className="h-10 text-sm rounded-lg"
+                      disabled={resetPasswordMutation.isPending}
+                    />
+                    {newPasswordConfirmation && (
+                      <p className={`text-xs mt-1 px-1 ${newPassword === newPasswordConfirmation ? 'text-green-600' : 'text-red-500'}`}>
+                        {newPassword === newPasswordConfirmation ? '✓ Mật khẩu khớp' : 'Mật khẩu chưa khớp'}
+                      </p>
+                    )}
+                  </div>
+
+                  {error && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start gap-2">
+                      <AlertCircleIcon />
+                      <p className="text-xs text-red-600 m-0">{error}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={resetPasswordMutation.isPending}
+                    className="w-full h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold tracking-wide border-none"
+                  >
+                    ĐỔI MẬT KHẨU
+                  </Button>
+                </form>
               )}
 
               {/* --- Đăng ký: nhập mã OTP --- */}

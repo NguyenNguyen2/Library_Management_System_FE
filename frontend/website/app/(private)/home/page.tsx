@@ -261,7 +261,6 @@ export default function HomePage() {
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     return shuffled.slice(0, 10);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recommendationsData, collaborativeData, homeBooks]);
 
   const handleBookClick = (bookId: number) => {

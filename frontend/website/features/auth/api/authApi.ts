@@ -30,7 +30,11 @@ export const authApi = {
     const response = await axiosInstance.post('/v1/auth/forgot-password', body);
     return response?.data;
   },
-  resetPassword: async (body: { token: string; email: string; password: string; password_confirmation: string }): Promise<{ message: string }> => {
+  verifyForgotPasswordOtp: async (body: { email: string; otp: string }): Promise<{ message: string }> => {
+    const response = await axiosInstance.post('/v1/auth/verify-forgot-password-otp', body);
+    return response?.data;
+  },
+  resetPassword: async (body: { email: string; otp: string; password: string; password_confirmation: string }): Promise<{ message: string }> => {
     const response = await axiosInstance.post('/v1/auth/reset-password', body);
     return response?.data;
   },
