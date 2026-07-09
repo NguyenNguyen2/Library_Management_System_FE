@@ -49,11 +49,11 @@ const RenewBadge = ({ count, max }: { count: number; max: number }) => {
 };
 
 const RESERVATION_STATUS: Record<string, { color: string; label: string }> = {
-  waiting:   { color: 'blue',    label: 'Đang chờ' },
-  ready:     { color: 'green',   label: 'Sẵn sàng' },
-  converted: { color: 'purple',  label: 'Đã mượn' },
-  expired:   { color: 'default', label: 'Hết hạn' },
-  cancelled: { color: 'red',     label: 'Đã huỷ' },
+  pending:          { color: 'blue',    label: 'Đang chờ' },
+  ready_for_pickup: { color: 'green',   label: 'Sẵn sàng nhận' },
+  completed:        { color: 'purple',  label: 'Đã hoàn thành' },
+  expired:          { color: 'default', label: 'Hết hạn' },
+  cancelled:        { color: 'red',     label: 'Đã huỷ' },
 };
 
 const RenewBookPage = () => {
@@ -344,9 +344,9 @@ const RenewBookPage = () => {
       render: (v: string) => <span className="text-gray-500">{dayjs(v).format(FMT)}</span>,
     },
     {
-      title: 'HẾT HẠN',
-      dataIndex: 'expired_at',
-      key: 'expired_at',
+      title: 'HẠN NHẬN SÁCH',
+      dataIndex: 'pickup_deadline',
+      key: 'pickup_deadline',
       width: 110,
       render: (v: string | null) =>
         v ? (
@@ -358,7 +358,7 @@ const RenewBookPage = () => {
   ];
 
   const canRenewCount   = renewList.filter((r) => r.can_renew).length;
-  const waitingResCount = reservationList.filter((r) => r.status === 'waiting' || r.status === 'ready').length;
+  const waitingResCount = reservationList.filter((r) => r.status === 'pending' || r.status === 'ready_for_pickup').length;
 
   return (
     <div className="flex flex-col gap-0">
@@ -482,7 +482,7 @@ const RenewBookPage = () => {
                 size="middle"
                 locale={{ emptyText: 'Không có phiếu đặt trước nào' }}
                 rowClassName={(r) =>
-                  r.status === 'waiting' || r.status === 'ready' ? 'bg-purple-50/30' : ''
+                  r.status === 'pending' || r.status === 'ready_for_pickup' ? 'bg-purple-50/30' : ''
                 }
               />
             )}

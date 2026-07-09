@@ -8,6 +8,7 @@ import {
   CreateReservationResult,
   ConfirmReservationPayload,
   ConfirmReservationResult,
+  MarkReadyResult,
 } from '../api/reservationApi';
 
 export const reservationHooks = {
@@ -43,6 +44,18 @@ export const reservationHooks = {
     const qc = useQueryClient();
     return useMutation<ConfirmReservationResult, AxiosError, ConfirmReservationPayload>({
       mutationFn: reservationApi.confirmReservation,
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ['reservations'] });
+        qc.invalidateQueries({ queryKey: ['reportTodayReport'] });
+        qc.invalidateQueries({ queryKey: ['dashboard-summary'] });
+      },
+    });
+  },
+
+  useMarkReady: () => {
+    const qc = useQueryClient();
+    return useMutation<MarkReadyResult, AxiosError, number>({
+      mutationFn: reservationApi.markReady,
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: ['reservations'] });
         qc.invalidateQueries({ queryKey: ['reportTodayReport'] });
