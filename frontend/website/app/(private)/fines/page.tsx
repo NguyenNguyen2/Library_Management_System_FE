@@ -8,7 +8,6 @@ import {
   WarningOutlined,
   CalendarOutlined,
   DollarOutlined,
-  ClockCircleOutlined,
 } from '@ant-design/icons';
 import { useFines } from '@/features/fines/hooks/useFines';
 import { APP_ROUTE } from '@/constants/routes';
@@ -30,6 +29,24 @@ const STATUS_BADGE = {
     icon: <WarningOutlined />,
   },
 };
+
+// charged_days_late (backend suy ra từ amount / fine_per_day khi chia hết chính xác — xem
+// FineController::index) là số ngày ĐÃ DÙNG ĐỂ HÌNH THÀNH khoản phí đang hiển thị. Trang
+// Lịch sử phí chỉ phản ánh KHOẢN PHÍ, không phải tình trạng mượn/trả hiện tại — subtitle
+// không dùng current_overdue_days, không dùng payment_date, không dùng `reason` tĩnh cho
+// phí trễ hạn (có thể là dữ liệu cũ không còn đúng số ngày). Phí hỏng/mất/khác giữ nguyên
+// `reason` vì không liên quan đến số ngày trễ.
+function fineSubtitle(fine: IFine): string {
+  if (fine.type !== 'late') {
+    return fine.reason;
+  }
+  const isPaid = fine.status.value === 'paid';
+  if (fine.charged_days_late !== null) {
+    return isPaid ? `Đã thanh toán phí trễ ${fine.charged_days_late} ngày` : `Phí trễ ${fine.charged_days_late} ngày`;
+  }
+  // amount không chia hết chính xác cho fine_per_day -> không đủ căn cứ nêu số ngày cụ thể.
+  return isPaid ? 'Đã thanh toán phí trễ hạn' : 'Phí trễ hạn';
+}
 
 function FineCard({ fine }: { fine: IFine }) {
   const router = useRouter();
@@ -71,7 +88,7 @@ function FineCard({ fine }: { fine: IFine }) {
               >
                 {fine.title}
               </h3>
-              <p className="text-xs text-gray-500 mt-1">{fine.reason}</p>
+              <p className="text-xs text-gray-500 mt-1">{fineSubtitle(fine)}</p>
             </div>
           </div>
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
@@ -110,18 +127,6 @@ function FineCard({ fine }: { fine: IFine }) {
               }`}
             >
               {fine.return_date ? formatDateVN(fine.return_date) : 'Chưa trả'}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 flex items-center gap-1">
-              <ClockCircleOutlined /> Số ngày trễ
-            </p>
-            <p
-              className={`font-medium mt-0.5 ${
-                fine.days_late > 0 ? 'text-red-600' : 'text-gray-900'
-              }`}
-            >
-              {fine.days_late > 0 ? `${fine.days_late} ngày` : '—'}
             </p>
           </div>
         </div>
