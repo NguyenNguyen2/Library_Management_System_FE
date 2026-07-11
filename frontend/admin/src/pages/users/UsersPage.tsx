@@ -1328,19 +1328,21 @@ const UsersPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
-          {isAdmin && (
-            <Segmented
-              options={[
-                { label: 'Độc giả', value: 'readers' },
-                { label: 'Thủ thư', value: 'librarians' },
-                { label: 'Nhật ký truy cập', value: 'audit' },
-                { label: 'Nhật ký hệ thống', value: 'system-log' },
-              ]}
-              value={activeTab}
-              onChange={handleTabChange}
-              className="p-1 bg-gray-100 rounded-lg text-sm font-medium"
-            />
-          )}
+          <Segmented
+            options={
+              isAdmin
+                ? [
+                    { label: 'Độc giả', value: 'readers' },
+                    { label: 'Thủ thư', value: 'librarians' },
+                    { label: 'Nhật ký truy cập', value: 'audit' },
+                    { label: 'Nhật ký hệ thống', value: 'system-log' },
+                  ]
+                : [{ label: 'Độc giả', value: 'readers' }]
+            }
+            value={activeTab}
+            onChange={handleTabChange}
+            className="p-1 bg-gray-100 rounded-lg text-sm font-medium"
+          />
           {activeTab === 'readers' && (
             <Button
               type="primary"

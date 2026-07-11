@@ -241,6 +241,25 @@ const ReservationPage = () => {
       ellipsis: true,
     },
     {
+      title: 'Vị trí',
+      key: 'location',
+      width: 130,
+      render: (_: unknown, r: ReservationRecord) => {
+        if (r.status === 'pending' && r.pickup_type === 'online') {
+          return (
+            <Tooltip title="Phải xác nhận Có sách đúng theo thứ tự hàng chờ">
+              <Tag color="blue">Hạng chờ #{r.actual_queue_position}</Tag>
+            </Tooltip>
+          );
+        }
+        return r.shelf_location ? (
+          <Tag color="geekblue">{r.shelf_location}</Tag>
+        ) : (
+          <span className="text-gray-300 text-xs">—</span>
+        );
+      },
+    },
+    {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
@@ -647,7 +666,11 @@ const ReservationPage = () => {
               </div>
             ) : (
               <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-sm text-green-700">
-                Bản sao đã được giữ sẵn cho phiếu này (Copy #{confirmModal.reservation.copy_id}).
+                Bản sao đã được giữ sẵn cho phiếu này (Copy #{confirmModal.reservation.copy_id}
+                {confirmModal.reservation.shelf_location
+                  ? ` — vị trí ${confirmModal.reservation.shelf_location}`
+                  : ''}
+                ).
               </div>
             )}
           </div>

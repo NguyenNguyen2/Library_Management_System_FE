@@ -21,6 +21,7 @@ export interface ReservationRecord {
   status: 'pending' | 'ready_for_pickup' | 'completed' | 'expired' | 'cancelled';
   pickup_type: 'counter' | 'online';
   copy_id: number | null;
+  shelf_location: string | null;
   queue_position: number | null;
   actual_queue_position: number;
   notified_at: string | null;
