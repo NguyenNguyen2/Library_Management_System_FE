@@ -49,3 +49,9 @@ export const getInventorySummary = async (categoryId?: number) => {
     return response.data;
 };
 
+// Thanh lý bản sao sách bằng barcode trực tiếp
+export const liquidateBookCopyByBarcode = async (data: { barcode: string; reason: string; retired_date: string; note?: string }) => {
+    const response = await axiosInstance.post("/v1/book-copies/liquidate", data);
+    return response.data;
+};
+

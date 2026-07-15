@@ -80,7 +80,8 @@ import {
   deleteBookCopy,
   importCopies,
   getInventorySummary,
-  generateBarcode
+  generateBarcode,
+  liquidateBookCopyByBarcode
 } from '../../services/copyService';
 
 type Author = {
@@ -219,6 +220,8 @@ export function BooksListPage() {
   const [isRetireModalOpen, setIsRetireModalOpen] = useState(false);
   const [retiringCopyId, setRetiringCopyId] = useState<number | null>(null);
   const [retireForm] = Form.useForm();
+  const [directRetireForm] = Form.useForm();
+  const [liquidatingDirectly, setLiquidatingDirectly] = useState(false);
   const [importResult, setImportResult] = useState<any | null>(null);
   const [importing, setImporting] = useState(false);
 
@@ -341,6 +344,31 @@ export function BooksListPage() {
     } catch (err: any) {
       console.error(err);
       message.error(err?.response?.data?.message || "Lỗi khi thanh lý bản sao!");
+    }
+  };
+
+  const handleDirectRetire = async (values: any) => {
+    setLiquidatingDirectly(true);
+    try {
+      await liquidateBookCopyByBarcode({
+        barcode: values.barcode,
+        reason: values.reason,
+        retired_date: values.retired_date,
+        note: values.note
+      });
+      message.success(`Thanh lý bản sao có barcode "${values.barcode}" thành công!`);
+      directRetireForm.resetFields();
+      directRetireForm.setFieldsValue({
+        reason: 'Hư hỏng nặng không thể sửa',
+        retired_date: nowYMD(),
+        note: ''
+      });
+      loadCopies(copiesPage, copiesSearchText);
+    } catch (err: any) {
+      console.error(err);
+      message.error(err?.response?.data?.message || "Lỗi khi thanh lý bản sao!");
+    } finally {
+      setLiquidatingDirectly(false);
     }
   };
  
@@ -554,6 +582,17 @@ export function BooksListPage() {
       return () => clearTimeout(delayDebounceFn);
     }
   }, [copiesSearchText, activeTab]);
+
+  // Initialize direct retire form
+  useEffect(() => {
+    if (activeTab === 'import') {
+      directRetireForm.setFieldsValue({
+        reason: 'Hư hỏng nặng không thể sửa',
+        retired_date: nowYMD(),
+        note: ''
+      });
+    }
+  }, [activeTab]);
 
   // Trigger loading report summary data
   useEffect(() => {
@@ -1666,7 +1705,7 @@ export function BooksListPage() {
                     onClick={() => handleTabChange('import')}
                     className="h-10 rounded-lg flex items-center justify-center font-semibold"
                   >
-                    Import / Thanh lý
+                    Import & Thanh lý kho
                   </Button>
                   <Button
                     type="default"
@@ -1948,9 +1987,79 @@ export function BooksListPage() {
               )}
  
               <div className="border-t border-gray-100 w-full my-4 pt-4 text-left">
-                <h4 className="font-bold text-gray-700 mb-1 text-sm">Thanh lý bản sao (Liquidation)</h4>
-                <p className="text-xs text-gray-400 mb-2">Chuyển trạng thái các bản sao hư hỏng nặng hoặc mất sang danh mục thanh lý.</p>
-                <Button danger className="rounded-lg h-9" onClick={() => handleTabChange('copies')}>Đi tới danh sách để chọn thanh lý</Button>
+                <h4 className="font-bold text-gray-700 mb-2 text-sm">Thanh lý bản sao (Liquidation)</h4>
+                <p className="text-xs text-gray-400 mb-4">
+                  Nhập mã Barcode của bản sao sách cần thanh lý. Bản sao sẽ chuyển sang trạng thái <strong>'Đã thanh lý'</strong> và ghi nhận thông tin vào hệ thống (không xóa khỏi cơ sở dữ liệu).
+                </p>
+
+                <Form
+                  form={directRetireForm}
+                  layout="vertical"
+                  onFinish={handleDirectRetire}
+                  className="bg-gray-50/50 p-4 rounded-xl border border-gray-100/80"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+                    <Form.Item
+                      name="barcode"
+                      label={<span className="font-semibold text-xs text-gray-600">Mã Barcode bản sao</span>}
+                      rules={[{ required: true, message: 'Vui lòng nhập mã Barcode bản sao!' }]}
+                    >
+                      <Input placeholder="Ví dụ: BC260705..." className="h-9 rounded-lg" />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="reason"
+                      label={<span className="font-semibold text-xs text-gray-600">Lý do thanh lý</span>}
+                      rules={[{ required: true, message: 'Vui lòng chọn hoặc nhập lý do!' }]}
+                    >
+                      <Select 
+                        className="h-9"
+                        options={[
+                          { value: 'Hư hỏng nặng không thể sửa', label: 'Hư hỏng nặng không thể sửa' },
+                          { value: 'Sách bị mất / Thất thoát', label: 'Sách bị mất / Thất thoát' },
+                          { value: 'Hết hạn sử dụng / Lỗi thời', label: 'Hết hạn sử dụng / Lỗi thời' },
+                          { value: 'Khác', label: 'Lý do khác' }
+                        ]}
+                      />
+                    </Form.Item>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+                    <Form.Item
+                      name="retired_date"
+                      label={<span className="font-semibold text-xs text-gray-600">Ngày thanh lý</span>}
+                      rules={[{ required: true, message: 'Vui lòng chọn ngày thanh lý!' }]}
+                    >
+                      <Input type="date" className="h-9 rounded-lg" />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="note"
+                      label={<span className="font-semibold text-xs text-gray-600">Ghi chú thêm (nếu có)</span>}
+                    >
+                      <Input placeholder="Chi tiết tình trạng..." className="h-9 rounded-lg" />
+                    </Form.Item>
+                  </div>
+
+                  <Form.Item className="mb-0 text-right">
+                    <Button 
+                      type="default" 
+                      onClick={() => handleTabChange('copies')} 
+                      className="mr-2 h-9 rounded-lg"
+                    >
+                      Đi tới danh sách bản sao
+                    </Button>
+                    <Button 
+                      type="primary" 
+                      danger 
+                      htmlType="submit" 
+                      loading={liquidatingDirectly} 
+                      className="h-9 rounded-lg"
+                    >
+                      Xác nhận thanh lý
+                    </Button>
+                  </Form.Item>
+                </Form>
               </div>
             </div>
           </Card>
