@@ -22,15 +22,15 @@ import { toCoverImageUrl } from '@/lib/utils/image';
 import type { IReservation } from '@/features/reservations/api/reservationApi';
 
 const STATUS_CONFIG: Record<IReservation['status'], { label: string; icon: React.ReactNode; bg: string; text: string; border: string }> = {
-  waiting: { label: 'Đang chờ', icon: <ClockCircleOutlined />, bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' },
-  ready: { label: 'Sẵn sàng lấy', icon: <BellOutlined />, bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
+  pending: { label: 'Đang chờ', icon: <ClockCircleOutlined />, bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' },
+  ready_for_pickup: { label: 'Sẵn sàng lấy', icon: <BellOutlined />, bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
   completed: { label: 'Đã lấy', icon: <CheckCircleOutlined />, bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
   expired: { label: 'Đã hết hạn', icon: <ExclamationCircleOutlined />, bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200' },
   cancelled: { label: 'Đã hủy', icon: <ExclamationCircleOutlined />, bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-200' },
 };
 
 const TABS = [
-  { key: 'active' as const, label: 'Đang chờ', statuses: ['waiting', 'ready'] as IReservation['status'][] },
+  { key: 'active' as const, label: 'Đang chờ', statuses: ['pending', 'ready_for_pickup'] as IReservation['status'][] },
   { key: 'history' as const, label: 'Lịch sử', statuses: ['completed', 'expired', 'cancelled'] as IReservation['status'][] },
 ];
 
@@ -62,7 +62,7 @@ export default function ReservationsPage() {
     );
   }
 
-  const activeList = reservations.filter((r) => r.status === 'waiting' || r.status === 'ready');
+  const activeList = reservations.filter((r) => r.status === 'pending' || r.status === 'ready_for_pickup');
   const historyList = reservations.filter((r) => r.status === 'completed' || r.status === 'expired' || r.status === 'cancelled');
   const displayed = tab === 'active' ? activeList : historyList;
 
@@ -100,14 +100,14 @@ export default function ReservationsPage() {
             <HourglassOutlined />
             <span>Đang chờ</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{activeList.filter((r) => r.status === 'waiting').length}</p>
+          <p className="text-2xl font-bold text-gray-900">{activeList.filter((r) => r.status === 'pending').length}</p>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3">
           <div className="flex items-center gap-1.5 text-green-600 mb-1 text-xs font-medium">
             <BellOutlined />
             <span>Sẵn sàng lấy</span>
           </div>
-          <p className="text-2xl font-bold text-gray-900">{activeList.filter((r) => r.status === 'ready').length}</p>
+          <p className="text-2xl font-bold text-gray-900">{activeList.filter((r) => r.status === 'ready_for_pickup').length}</p>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
           <div className="flex items-center gap-1.5 text-blue-600 mb-1 text-xs font-medium">
@@ -137,7 +137,7 @@ export default function ReservationsPage() {
       </div>
 
       {/* Ready alert */}
-      {tab === 'active' && activeList.some((r) => r.status === 'ready') && (
+      {tab === 'active' && activeList.some((r) => r.status === 'ready_for_pickup') && (
         <div className="mb-4 bg-green-50 border border-green-300 rounded-xl px-4 py-3 flex items-start gap-3">
           <ExclamationCircleOutlined className="text-green-600 mt-0.5" />
           <div className="text-sm">
@@ -175,15 +175,15 @@ export default function ReservationsPage() {
               <div
                 key={reservation.reservation_id}
                 className={`bg-white border rounded-xl overflow-hidden transition-all ${
-                  reservation.status === 'ready' ? 'border-green-300 ring-1 ring-green-200' : 'border-gray-200'
+                  reservation.status === 'ready_for_pickup' ? 'border-green-300 ring-1 ring-green-200' : 'border-gray-200'
                 }`}
               >
-                {reservation.status === 'ready' && (
+                {reservation.status === 'ready_for_pickup' && (
                   <div className="bg-green-500 px-4 py-2 flex items-center gap-2 text-white text-sm font-semibold">
                     <BellOutlined />
                     <p>
                       Sách đã sẵn sàng — vui lòng đến lấy trước{' '}
-                      {reservation.expired_at ? formatDateVN(reservation.expired_at) : '2 ngày tới'}
+                      {reservation.pickup_deadline ? formatDateVN(reservation.pickup_deadline) : '2 ngày tới'}
                     </p>
                   </div>
                 )}
@@ -234,7 +234,7 @@ export default function ReservationsPage() {
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      {reservation.status === 'waiting' && (
+                      {reservation.status === 'pending' && reservation.pickup_type === 'online' && reservation.queue_position != null && (
                         <>
                           <div className="flex items-center gap-1.5 text-xs text-gray-600">
                             <TeamOutlined className="text-amber-500" />
@@ -250,6 +250,12 @@ export default function ReservationsPage() {
                           </div>
                         </>
                       )}
+                      {reservation.status === 'pending' && reservation.pickup_type === 'counter' && (
+                        <div className="flex items-center gap-1.5 text-xs text-cyan-700 col-span-2">
+                          <BookOutlined />
+                          <span>Sách đã có sẵn — vui lòng đến quầy thư viện để nhận.</span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-1.5 text-xs text-gray-500">
                         <CalendarOutlined className="text-gray-400" />
                         <span>Đặt ngày: {formatDateVN(reservation.reserved_at)}</span>
@@ -262,7 +268,7 @@ export default function ReservationsPage() {
                       )}
                     </div>
 
-                    {reservation.status === 'waiting' && (
+                    {reservation.status === 'pending' && (
                       <div className="flex items-center gap-2 mt-3">
                         <button
                           onClick={() => router.push(`${APP_ROUTE.courses}/${reservation.book_id}`)}

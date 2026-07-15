@@ -5,6 +5,8 @@ export interface IFineStatus {
   label: string;
 }
 
+export type IFineType = 'late' | 'damage' | 'lost' | 'other';
+
 export interface IFine {
   fine_id: number;
   borrow_id: number;
@@ -14,9 +16,22 @@ export interface IFine {
   borrow_date: string;
   due_date: string;
   return_date: string | null;
-  days_late: number;
+  /** Ngày ghi nhận thanh toán — KHÔNG phải ngày trả sách. */
+  payment_date: string | null;
+  /**
+   * Số ngày đã dùng để hình thành `amount` hiện tại (chỉ có với type='late').
+   * - status=paid: số ngày đã CHỐT lúc thanh toán (không đổi theo thời gian).
+   * - status=unpaid: tính RUNTIME từ due_date/return_date, cùng công thức trang "Đang mượn"
+   *   (BorrowingController) — luôn khớp với số ngày quá hạn hiển thị ở đó.
+   */
+  charged_days_late: number | null;
+  /**
+   * Với type='late' + status=unpaid: số tiền đang nợ THỰC TẾ = charged_days_late × fine_per_day
+   * (tính runtime, KHÔNG phải giá trị cũ lưu trong DB). Các trường hợp khác = số tiền đã lưu.
+   */
   amount: number;
   reason: string;
+  type: IFineType;
   status: IFineStatus;
   created_at: string;
 }

@@ -36,11 +36,11 @@ const STATUS_CONFIG: Record<
   string,
   { label: string; color: string; icon: React.ReactNode }
 > = {
-  waiting: { label: 'Đang chờ', color: 'blue', icon: <ClockCircleOutlined /> },
-  ready:   { label: 'Sẵn sàng', color: 'green', icon: <CheckCircleOutlined /> },
-  expired: { label: 'Hết hạn', color: 'default', icon: <CloseCircleOutlined /> },
-  converted: { label: 'Đã mượn', color: 'purple', icon: <SyncOutlined /> },
-  cancelled: { label: 'Đã hủy', color: 'red', icon: <CloseCircleOutlined /> },
+  pending:          { label: 'Đang chờ', color: 'blue', icon: <ClockCircleOutlined /> },
+  ready_for_pickup: { label: 'Sẵn sàng nhận', color: 'green', icon: <CheckCircleOutlined /> },
+  expired:          { label: 'Hết hạn', color: 'default', icon: <CloseCircleOutlined /> },
+  completed:        { label: 'Đã hoàn thành', color: 'purple', icon: <SyncOutlined /> },
+  cancelled:        { label: 'Đã hủy', color: 'red', icon: <CloseCircleOutlined /> },
 };
 
 const ReservationPage = () => {
@@ -64,10 +64,11 @@ const ReservationPage = () => {
     copyId: number | null;
   }>({ open: false, reservation: null, copyId: null });
 
-  const searchMutation  = reservationHooks.useSearchBook();
-  const createMutation  = reservationHooks.useCreateReservation();
-  const confirmMutation = reservationHooks.useConfirmReservation();
-  const cancelMutation  = reservationHooks.useCancelReservation();
+  const searchMutation    = reservationHooks.useSearchBook();
+  const createMutation    = reservationHooks.useCreateReservation();
+  const confirmMutation   = reservationHooks.useConfirmReservation();
+  const markReadyMutation = reservationHooks.useMarkReady();
+  const cancelMutation    = reservationHooks.useCancelReservation();
 
   const { data: listData, isLoading: listLoading } = reservationHooks.useListReservations({
     user_id: listUserId ? parseInt(listUserId) : undefined,
@@ -103,14 +104,21 @@ const ReservationPage = () => {
                   <span className="text-gray-500">Sách</span>
                   <span className="font-medium">{result.title}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Vị trí hàng chờ</span>
-                  <Badge
-                    count={result.queue_position}
-                    style={{ backgroundColor: '#3b82f6' }}
-                    overflowCount={99}
-                  />
-                </div>
+                {result.pickup_type === 'counter' || result.queue_position == null ? (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Hình thức</span>
+                    <Tag color="cyan">Tại quầy — đến nhận ngay</Tag>
+                  </div>
+                ) : (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Vị trí hàng chờ</span>
+                    <Badge
+                      count={result.queue_position}
+                      style={{ backgroundColor: '#3b82f6' }}
+                      overflowCount={99}
+                    />
+                  </div>
+                )}
               </div>
             ),
             okText: 'Đóng',
@@ -129,11 +137,18 @@ const ReservationPage = () => {
     );
   };
 
+  const confirmNeedsCopyId = (r: ReservationRecord | null) =>
+    !!r && r.status === 'pending' && r.pickup_type === 'counter';
+
   const handleConfirm = () => {
     const { reservation, copyId } = confirmModal;
-    if (!reservation || !copyId) return;
+    if (!reservation) return;
+    if (confirmNeedsCopyId(reservation) && !copyId) return;
     confirmMutation.mutate(
-      { reservation_id: reservation.reservation_id, copy_id: copyId },
+      {
+        reservation_id: reservation.reservation_id,
+        ...(confirmNeedsCopyId(reservation) ? { copy_id: copyId! } : {}),
+      },
       {
         onSuccess: (result) => {
           Modal.success({
@@ -167,6 +182,16 @@ const ReservationPage = () => {
         },
       }
     );
+  };
+
+  const handleMarkReady = (reservationId: number) => {
+    markReadyMutation.mutate(reservationId, {
+      onSuccess: () => message.success('Đã xác nhận có sách, độc giả sẽ được thông báo.'),
+      onError: (err) => {
+        const msg = (err.response?.data as { message?: string })?.message;
+        message.error(msg ?? 'Không thể xác nhận có sách.');
+      },
+    });
   };
 
   const handleCancel = (reservationId: number) => {
@@ -212,31 +237,33 @@ const ReservationPage = () => {
       title: 'Sách',
       dataIndex: 'title',
       key: 'title',
+      width: 220,
       ellipsis: true,
     },
     {
       title: 'Vị trí',
-      key: 'queue',
-      width: 80,
-      align: 'center',
-      render: (_: unknown, r: ReservationRecord) =>
-        r.status === 'waiting' || r.status === 'ready' ? (
-          <Tooltip title={`Hàng chờ thực tế: #${r.actual_queue_position}`}>
-            <Badge
-              count={r.actual_queue_position}
-              style={{ backgroundColor: '#3b82f6' }}
-              overflowCount={99}
-            />
-          </Tooltip>
+      key: 'location',
+      width: 130,
+      render: (_: unknown, r: ReservationRecord) => {
+        if (r.status === 'pending' && r.pickup_type === 'online') {
+          return (
+            <Tooltip title="Phải xác nhận Có sách đúng theo thứ tự hàng chờ">
+              <Tag color="blue">Hạng chờ #{r.actual_queue_position}</Tag>
+            </Tooltip>
+          );
+        }
+        return r.shelf_location ? (
+          <Tag color="geekblue">{r.shelf_location}</Tag>
         ) : (
-          <span className="text-gray-300">—</span>
-        ),
+          <span className="text-gray-300 text-xs">—</span>
+        );
+      },
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      width: 130,
+      width: 140,
       render: (v: string) => {
         const cfg = STATUS_CONFIG[v] ?? { label: v, color: 'default', icon: null };
         return (
@@ -254,14 +281,14 @@ const ReservationPage = () => {
       render: (v: string) => dayjs(v).format('DD/MM/YYYY'),
     },
     {
-      title: 'Hết hạn',
-      dataIndex: 'expired_at',
-      key: 'expired_at',
-      width: 110,
+      title: 'Hạn nhận sách',
+      dataIndex: 'pickup_deadline',
+      key: 'pickup_deadline',
+      width: 120,
       render: (v: string | null) =>
         v ? (
           <span className={dayjs(v).isBefore(dayjs()) ? 'text-red-500' : 'text-gray-600'}>
-            {dayjs(v).format('DD/MM/YYYY')}
+            {dayjs(v).format('DD/MM/YYYY HH:mm')}
           </span>
         ) : (
           <span className="text-gray-300 text-xs">—</span>
@@ -270,32 +297,63 @@ const ReservationPage = () => {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 180,
-      render: (_: unknown, r: ReservationRecord) => (
-        <div className="flex gap-1.5">
-          {(r.status === 'waiting' || r.status === 'ready') && (
-            <>
-              <Button
-                size="small"
-                type="primary"
-                onClick={() =>
-                  setConfirmModal({ open: true, reservation: r, copyId: null })
-                }
-              >
-                Xác nhận
-              </Button>
+      width: 120,
+      render: (_: unknown, r: ReservationRecord) => {
+        const isMarkingReady =
+          markReadyMutation.isPending && markReadyMutation.variables === r.reservation_id;
+        const isCancelling =
+          cancelMutation.isPending && cancelMutation.variables === r.reservation_id;
+
+        return (
+          <div className="flex flex-col gap-1 items-stretch">
+            {r.status === 'pending' && r.pickup_type === 'online' && (
+              <Tooltip title="Xác nhận có sách">
+                <Button
+                  size="small"
+                  type="primary"
+                  block
+                  className="text-xs px-1"
+                  style={{ background: '#059669', borderColor: '#059669' }}
+                  onClick={() => handleMarkReady(r.reservation_id)}
+                  loading={isMarkingReady}
+                  disabled={markReadyMutation.isPending && !isMarkingReady}
+                >
+                  Có sách
+                </Button>
+              </Tooltip>
+            )}
+            {(r.status === 'ready_for_pickup' ||
+              (r.status === 'pending' && r.pickup_type === 'counter')) && (
+              <Tooltip title="Xác nhận đã nhận sách">
+                <Button
+                  size="small"
+                  type="primary"
+                  block
+                  className="text-xs px-1"
+                  onClick={() =>
+                    setConfirmModal({ open: true, reservation: r, copyId: null })
+                  }
+                >
+                  Đã nhận
+                </Button>
+              </Tooltip>
+            )}
+            {(r.status === 'pending' || r.status === 'ready_for_pickup') && (
               <Button
                 size="small"
                 danger
+                block
+                className="text-xs px-1"
                 onClick={() => handleCancel(r.reservation_id)}
-                loading={cancelMutation.isPending}
+                loading={isCancelling}
+                disabled={cancelMutation.isPending && !isCancelling}
               >
                 Hủy
               </Button>
-            </>
-          )}
-        </div>
-      ),
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -446,19 +504,21 @@ const ReservationPage = () => {
                   </div>
                 </div>
 
-                {selectedBook.available_copies > 0 && (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    message="Sách này còn bản sẵn có. Đặt trước chỉ áp dụng khi sách hết bản."
-                    className="mt-2"
-                  />
-                )}
+                <Alert
+                  type={selectedBook.available_copies > 0 ? 'info' : 'warning'}
+                  showIcon
+                  message={
+                    selectedBook.available_copies > 0
+                      ? 'Sách còn bản sẵn có — phiếu sẽ ở hình thức "Tại quầy", độc giả có thể đến nhận ngay.'
+                      : 'Sách đã hết bản — phiếu sẽ ở hình thức "Online", xếp vào hàng chờ.'
+                  }
+                  className="mt-2"
+                />
               </div>
             )}
           </div>
 
-          {selectedBook && selectedBook.available_copies === 0 && (
+          {selectedBook && (
             <>
               <Divider className="my-0" />
               <div className="px-6 py-5">
@@ -525,11 +585,11 @@ const ReservationPage = () => {
                 allowClear
                 style={{ width: 140 }}
                 options={[
-                  { value: 'waiting',   label: 'Đang chờ' },
-                  { value: 'ready',     label: 'Sẵn sàng' },
-                  { value: 'expired',   label: 'Hết hạn' },
-                  { value: 'converted', label: 'Đã mượn' },
-                  { value: 'cancelled', label: 'Đã hủy' },
+                  { value: 'pending',          label: 'Đang chờ' },
+                  { value: 'ready_for_pickup', label: 'Sẵn sàng nhận' },
+                  { value: 'expired',          label: 'Hết hạn' },
+                  { value: 'completed',        label: 'Đã hoàn thành' },
+                  { value: 'cancelled',        label: 'Đã hủy' },
                 ]}
               />
             </div>
@@ -561,13 +621,15 @@ const ReservationPage = () => {
       {/* Confirm Modal */}
       <Modal
         open={confirmModal.open}
-        title="Xác nhận đặt trước tại quầy"
+        title="Xác nhận đã nhận sách"
         onCancel={() => setConfirmModal({ open: false, reservation: null, copyId: null })}
         onOk={handleConfirm}
-        okText="Xác nhận mượn sách"
+        okText="Xác nhận đã nhận sách"
         cancelText="Hủy"
         confirmLoading={confirmMutation.isPending}
-        okButtonProps={{ disabled: !confirmModal.copyId }}
+        okButtonProps={{
+          disabled: confirmNeedsCopyId(confirmModal.reservation) && !confirmModal.copyId,
+        }}
       >
         {confirmModal.reservation && (
           <div className="space-y-4 mt-2">
@@ -584,23 +646,33 @@ const ReservationPage = () => {
               </div>
             </div>
 
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-1">
-                Copy ID của bản sao sẽ giao
-              </p>
-              <InputNumber
-                placeholder="Nhập Copy ID"
-                value={confirmModal.copyId}
-                onChange={(v) =>
-                  setConfirmModal((prev) => ({ ...prev, copyId: v }))
-                }
-                style={{ width: '100%' }}
-                min={1}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Quét barcode để lấy copy_id hoặc nhập thủ công.
-              </p>
-            </div>
+            {confirmNeedsCopyId(confirmModal.reservation) ? (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">
+                  Copy ID của bản sao sẽ giao
+                </p>
+                <InputNumber
+                  placeholder="Nhập Copy ID"
+                  value={confirmModal.copyId}
+                  onChange={(v) =>
+                    setConfirmModal((prev) => ({ ...prev, copyId: v }))
+                  }
+                  style={{ width: '100%' }}
+                  min={1}
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Quét barcode để lấy copy_id hoặc nhập thủ công.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-sm text-green-700">
+                Bản sao đã được giữ sẵn cho phiếu này (Copy #{confirmModal.reservation.copy_id}
+                {confirmModal.reservation.shelf_location
+                  ? ` — vị trí ${confirmModal.reservation.shelf_location}`
+                  : ''}
+                ).
+              </div>
+            )}
           </div>
         )}
       </Modal>

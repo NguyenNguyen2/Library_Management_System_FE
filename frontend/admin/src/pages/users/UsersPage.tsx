@@ -122,7 +122,7 @@ const LibrariansSection = ({ addTrigger, onTriggerReset }: { addTrigger: number;
             refetch();
           },
           onError: (err: any) => {
-            message.error(err?.response?.data?.message || 'Có lỗi xảy ra.');
+            message.error(err?.response?.data?.message || 'Không thể cập nhật tài khoản thủ thư. Vui lòng thử lại.');
           },
         }
       );
@@ -154,7 +154,7 @@ const LibrariansSection = ({ addTrigger, onTriggerReset }: { addTrigger: number;
             refetch();
           },
           onError: (err: any) => {
-            message.error(err?.response?.data?.message || 'Có lỗi xảy ra.');
+            message.error(err?.response?.data?.message || 'Không thể tạo tài khoản thủ thư. Vui lòng thử lại.');
           },
         }
       );
@@ -940,7 +940,7 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
             refetch();
           },
           onError: (err: any) => {
-            message.error(err?.response?.data?.message || 'Có lỗi xảy ra.');
+            message.error(err?.response?.data?.message || 'Không thể cập nhật tài khoản độc giả. Vui lòng thử lại.');
           },
         }
       );
@@ -960,7 +960,7 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
             refetch();
           },
           onError: (err: any) => {
-            message.error(err?.response?.data?.message || 'Có lỗi xảy ra.');
+            message.error(err?.response?.data?.message || 'Không thể tạo tài khoản độc giả. Vui lòng thử lại.');
           },
         }
       );
@@ -1328,19 +1328,21 @@ const UsersPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 self-start md:self-auto">
-          {isAdmin && (
-            <Segmented
-              options={[
-                { label: 'Độc giả', value: 'readers' },
-                { label: 'Thủ thư', value: 'librarians' },
-                { label: 'Nhật ký truy cập', value: 'audit' },
-                { label: 'Nhật ký hệ thống', value: 'system-log' },
-              ]}
-              value={activeTab}
-              onChange={handleTabChange}
-              className="p-1 bg-gray-100 rounded-lg text-sm font-medium"
-            />
-          )}
+          <Segmented
+            options={
+              isAdmin
+                ? [
+                    { label: 'Độc giả', value: 'readers' },
+                    { label: 'Thủ thư', value: 'librarians' },
+                    { label: 'Nhật ký truy cập', value: 'audit' },
+                    { label: 'Nhật ký hệ thống', value: 'system-log' },
+                  ]
+                : [{ label: 'Độc giả', value: 'readers' }]
+            }
+            value={activeTab}
+            onChange={handleTabChange}
+            className="p-1 bg-gray-100 rounded-lg text-sm font-medium"
+          />
           {activeTab === 'readers' && (
             <Button
               type="primary"

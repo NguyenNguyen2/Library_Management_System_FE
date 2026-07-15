@@ -521,11 +521,11 @@ const DashboardPage = () => {
             const flow = summary.reservation_flow;
             const total = Object.values(flow).reduce((s, v) => s + v, 0) || 1;
             const items = [
-              { key: 'waiting',   label: 'Đang chờ',  color: '#3B82F6', value: flow.waiting },
-              { key: 'ready',     label: 'Sẵn sàng',  color: '#10B981', value: flow.ready },
-              { key: 'converted', label: 'Đã mượn',   color: '#8B5CF6', value: flow.converted },
-              { key: 'expired',   label: 'Hết hạn',   color: '#9CA3AF', value: flow.expired },
-              { key: 'cancelled', label: 'Đã huỷ',    color: '#EF4444', value: flow.cancelled },
+              { key: 'pending',          label: 'Đang chờ',      color: '#3B82F6', value: flow.pending },
+              { key: 'ready_for_pickup', label: 'Sẵn sàng nhận', color: '#10B981', value: flow.ready_for_pickup },
+              { key: 'completed',        label: 'Đã hoàn thành', color: '#8B5CF6', value: flow.completed },
+              { key: 'expired',          label: 'Hết hạn',       color: '#9CA3AF', value: flow.expired },
+              { key: 'cancelled',        label: 'Đã huỷ',        color: '#EF4444', value: flow.cancelled },
             ];
             return (
               <div className="space-y-3">

@@ -14,6 +14,7 @@ export interface RenewBookPayload {
 
 export interface RenewedTransaction {
   borrow_id: number;
+  copy_id: number;
   new_due_date: string;
 }
 

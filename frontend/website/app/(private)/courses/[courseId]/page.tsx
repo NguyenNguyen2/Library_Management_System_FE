@@ -86,7 +86,9 @@ import { use, useEffect, useState } from 'react';
     );
 
     message.success(
-      `Đặt trước thành công. Vị trí #${data.queue_position}`
+      data.pickup_type === 'counter'
+        ? 'Đặt sách tại quầy thành công. Vui lòng đến thư viện để nhận sách.'
+        : `Đặt trước thành công. Vị trí #${data.queue_position}`
     );
     queryClient.invalidateQueries({
      queryKey: ['my-reservations'],
@@ -369,16 +371,14 @@ import { use, useEffect, useState } from 'react';
               )}
             </div>
             </div>
-            {book.available_copies === 0 && (
-              <Button
-                type="primary"
-                onClick={handleReserveBook}
-                loading={isReserving}
-                className="w-full mt-3 bg-blue-600"
-              >
-                Đặt trước sách
-              </Button>
-            )}
+            <Button
+              type="primary"
+              onClick={handleReserveBook}
+              loading={isReserving}
+              className="w-full mt-3 bg-blue-600"
+            >
+              {book.available_copies > 0 ? 'Đặt sách tại quầy' : 'Đặt trước sách'}
+            </Button>
             {metaRows.length > 0 && (
               <div className="border-t border-(--blackBorder) pt-4">
                 {metaRows.map(({ label, value }) => (

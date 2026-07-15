@@ -1,4 +1,4 @@
-import { Button, Flex, Form, Input, Typography } from 'antd';
+import { Button, Flex, Form, Input, message, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -66,14 +66,9 @@ const ForgotPassword = () => {
           setStep(FORGOT_PW_STEP.OTP);
           startCooldown(email);
         },
-        // onError(error, variables) {
-        //   // If error is AUTH_00025 (resend more than 3 times in 15 minutes), start 15-minute cooldown
-        //   const errorId = (error as AxiosError<GeneralErrorType>).response?.data
-        //     ?.error_id;
-        //   if (errorId === ErrorId.AUTH_00025) {
-        //     startCooldown(variables.email, 900);
-        //   }
-        // },
+        onError: (err: any) => {
+          message.error(err?.response?.data?.message || 'Không thể gửi mã OTP. Vui lòng thử lại.');
+        },
       }
     );
   };
@@ -89,6 +84,9 @@ const ForgotPassword = () => {
           setStep(FORGOT_PW_STEP.RESET);
           stopCooldown();
         },
+        onError: (err: any) => {
+          message.error(err?.response?.data?.message || 'Mã OTP không chính xác.');
+        },
       }
     );
   };
@@ -101,6 +99,9 @@ const ForgotPassword = () => {
       {
         onSuccess: () => {
           navigate(ROUTES.LOGIN);
+        },
+        onError: (err: any) => {
+          message.error(err?.response?.data?.message || 'Không thể đổi mật khẩu. Vui lòng thử lại.');
         },
       }
     );

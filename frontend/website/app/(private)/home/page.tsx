@@ -272,7 +272,8 @@ export default function HomePage() {
     const t = setTimeout(() => setDebouncedQ(searchQ.trim()), 300);
     return () => clearTimeout(t);
   }, [searchQ]);
-  const { data: searchResults, isFetching: isSearching } = useSearchBooks({ q: debouncedQ });
+  const { data: searchResponse, isFetching: isSearching } = useSearchBooks({ q: debouncedQ });
+  const searchResults = searchResponse?.data;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

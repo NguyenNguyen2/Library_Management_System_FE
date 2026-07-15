@@ -9,7 +9,7 @@
     "backend"
   ],
   "scripts": {
-    "dev:fe-admin": "yarn workspace @frontend/admin dev",
+    "dev:fe-admin": "yarn workspace @frontend/admin dev --force",
     "dev:fe-website": "yarn workspace @frontend/website dev",
     "dev:be-admin": "yarn workspace @backend/monorepo dev:admin",
     "dev:be-website": "yarn workspace @backend/monorepo dev:website",

@@ -10,9 +10,13 @@ export interface IReservation {
   category_name: string | null;
   total_queue: number;
   reserved_at: string;
-  status: 'waiting' | 'ready' | 'completed' | 'expired' | 'cancelled';
-  queue_position: number;
+  status: 'pending' | 'ready_for_pickup' | 'completed' | 'expired' | 'cancelled';
+  pickup_type: 'counter' | 'online';
+  copy_id: number | null;
+  queue_position: number | null;
   notified_at: string | null;
+  ready_at: string | null;
+  pickup_deadline: string | null;
   expired_at: string | null;
 }
 

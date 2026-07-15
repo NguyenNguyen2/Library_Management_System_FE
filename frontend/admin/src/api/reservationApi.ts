@@ -18,10 +18,15 @@ export interface ReservationRecord {
   card_number: string | null;
   title: string;
   cover_image: string | null;
-  status: 'waiting' | 'ready' | 'expired' | 'converted' | 'cancelled';
-  queue_position: number;
+  status: 'pending' | 'ready_for_pickup' | 'completed' | 'expired' | 'cancelled';
+  pickup_type: 'counter' | 'online';
+  copy_id: number | null;
+  shelf_location: string | null;
+  queue_position: number | null;
   actual_queue_position: number;
   notified_at: string | null;
+  ready_at: string | null;
+  pickup_deadline: string | null;
   expired_at: string | null;
   created_at: string;
 }
@@ -42,14 +47,15 @@ export interface CreateReservationResult {
   reservation_id: number;
   book_id: number;
   title: string;
-  queue_position: number;
+  pickup_type: 'counter' | 'online';
+  queue_position: number | null;
   status: string;
   created_at: string;
 }
 
 export interface ConfirmReservationPayload {
   reservation_id: number;
-  copy_id: number;
+  copy_id?: number;
 }
 
 export interface ConfirmReservationResult {
@@ -59,6 +65,14 @@ export interface ConfirmReservationResult {
   book_title: string;
   borrow_date: string;
   due_date: string;
+}
+
+export interface MarkReadyResult {
+  reservation_id: number;
+  copy_id: number;
+  book_title: string;
+  ready_at: string;
+  pickup_deadline: string;
 }
 
 export const reservationApi = {
@@ -95,6 +109,13 @@ export const reservationApi = {
     payload: ConfirmReservationPayload
   ): Promise<ConfirmReservationResult> => {
     const res = await axiosInstance.post('/private/v1/reservation/confirm', payload);
+    return res.data?.results?.object;
+  },
+
+  markReady: async (reservationId: number): Promise<MarkReadyResult> => {
+    const res = await axiosInstance.post('/private/v1/reservation/mark-ready', {
+      reservation_id: reservationId,
+    });
     return res.data?.results?.object;
   },
 
