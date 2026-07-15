@@ -1705,7 +1705,7 @@ export function BooksListPage() {
                     onClick={() => handleTabChange('import')}
                     className="h-10 rounded-lg flex items-center justify-center font-semibold"
                   >
-                    Import & Thanh lý kho
+                    Nhập & Thanh lý kho
                   </Button>
                   <Button
                     type="default"
@@ -1890,7 +1890,7 @@ export function BooksListPage() {
       {activeTab === 'import' && (
           <Card 
             className="!rounded-[12px] border border-gray-100 shadow-sm max-w-[800px] mx-auto text-center py-6" 
-            title={<span className="font-bold text-navyDark text-base">Import & Thanh lý kho</span>}
+            title={<span className="font-bold text-navyDark text-base">Nhập & Thanh lý kho</span>}
             extra={
               <Button onClick={() => handleTabChange('copies')} className="rounded-lg h-9">
                 Quay lại danh sách

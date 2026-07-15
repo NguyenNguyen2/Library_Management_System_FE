@@ -430,7 +430,7 @@ const ViTranslation = {
   menu_inventory: 'Quản lý Kho',
   menu_copy_list: 'Danh sách bản sao',
   menu_add_copy_qr: 'Thêm bản sao & In QR',
-  menu_import_retire: 'Import & Thanh lý',
+  menu_import_retire: 'Nhập & Thanh lý',
   menu_inventory_report: 'Báo cáo kho',
   menu_transactions: 'Giao dịch',
   menu_borrow_return: 'Mượn / Trả sách',

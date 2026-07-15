@@ -25,6 +25,7 @@ export function InventoryImportPage() {
       { title: '???', author: '', copies: 2, status: 'error' },
     ]);
     toast.success('Đã đọc file Excel');
+    
   };
 
   return (
@@ -33,7 +34,7 @@ export function InventoryImportPage() {
         <ArrowLeft className="w-4 h-4" /> Quay lại danh sách bản sao
       </Link>
       <div className="mb-6">
-        <h1 className="text-2xl" style={{ fontWeight: 600 }}>Import & Thanh lý</h1>
+        <h1 className="text-2xl" style={{ fontWeight: 600 }}>Nhập & Thanh lý</h1>
         <p className="text-sm text-gray-500 mt-1">Nhập hàng loạt từ Excel hoặc thanh lý sách hư hỏng</p>
       </div>
 
