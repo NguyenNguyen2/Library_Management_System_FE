@@ -3,7 +3,7 @@ import { clearCookie, getCookie } from '@shared/utils/cookie';
 import axios from 'axios';
 import { ROUTES } from '../constants/routers';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+const BASE_URL = "http://127.0.0.1:8000/api";
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
