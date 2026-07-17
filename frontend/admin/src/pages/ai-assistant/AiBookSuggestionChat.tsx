@@ -155,15 +155,33 @@ const ChatBubble = ({ message }: { message: ChatMessage }) => {
           <div className="flex flex-col gap-2 w-full">
             {message.recommendations.map((rec, idx) => (
               <Card key={rec.book_id} size="small" className="!rounded-xl w-full">
-                <div className="font-semibold text-navyDark">
-                  {idx + 1}. {rec.title}
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5">
-                  Tác giả: {rec.author} · Thể loại: {rec.category}
-                </div>
-                <div className="text-sm mt-2 flex gap-1.5">
-                  <span className="shrink-0">🤖</span>
-                  <span>{rec.reason}</span>
+                <div className="flex gap-3">
+                  {rec.cover_image ? (
+                    <img
+                      src={rec.cover_image}
+                      alt={rec.title}
+                      className="w-12 h-16 object-cover rounded shrink-0"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-12 h-16 bg-gray-100 rounded shrink-0 flex items-center justify-center text-gray-400 text-lg">
+                      📖
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-navyDark">
+                      {idx + 1}. {rec.title}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      Tác giả: {rec.author} · Thể loại: {rec.category}
+                    </div>
+                    <div className="text-sm mt-2 flex gap-1.5">
+                      <span className="shrink-0">🤖</span>
+                      <span>{rec.reason}</span>
+                    </div>
+                  </div>
                 </div>
               </Card>
             ))}

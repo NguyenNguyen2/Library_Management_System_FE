@@ -33,15 +33,18 @@ export interface ValidatedReturnCopy {
   penalty_fee: number;
 }
 
+export type BookCondition = 'good' | 'minor' | 'medium' | 'heavy' | 'lost';
+
 export interface ConfirmReturnPayload {
   user_id: number;
-  copy_ids: number[];
+  items: { copy_id: number; condition: BookCondition }[];
 }
 
 export interface ConfirmReturnResult {
   return_date: string;
   returned_books_count: number;
   total_penalty: number;
+  total_damage: number;
   closed_transactions: number[];
 }
 

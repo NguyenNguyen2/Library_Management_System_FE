@@ -5,6 +5,7 @@ export interface AiAssistantRecommendation {
   title: string;
   author: string;
   category: string;
+  cover_image: string | null;
   reason: string;
 }
 

@@ -128,7 +128,7 @@ export const userApi = {
     return response.data?.results?.object;
   },
 
-  getLoginLogs: async (params: { keyword?: string; status?: string; page?: number; limit?: number }) => {
+  getLoginLogs: async (params: { keyword?: string; status?: string; from?: string; to?: string; page?: number; limit?: number }) => {
     const response = await axiosInstance.get('/private/v1/login-logs', { params });
     return response.data;
   },

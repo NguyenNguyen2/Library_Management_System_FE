@@ -136,7 +136,7 @@ export const userHooks = {
     });
   },
 
-  useFetchLoginLogs: (params: { keyword?: string; status?: string; page?: number; limit?: number }) => {
+  useFetchLoginLogs: (params: { keyword?: string; status?: string; from?: string; to?: string; page?: number; limit?: number }) => {
     return useQuery({
       queryKey: ['login-logs-list', params],
       queryFn: () => userApi.getLoginLogs(params),

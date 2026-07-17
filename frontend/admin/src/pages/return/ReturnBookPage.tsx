@@ -5,6 +5,7 @@ import {
   Input,
   InputRef,
   Modal,
+  Select,
   Spin,
   Table,
   TableColumnsType,
@@ -20,12 +21,20 @@ import {
   CheckCircleOutlined,
 } from '@ant-design/icons';
 import { useRef, useState } from 'react';
-import { ReturnReaderInfo, BorrowedBook } from '../../api/returnApi';
+import { ReturnReaderInfo, BorrowedBook, BookCondition } from '../../api/returnApi';
 import { returnHooks } from '../../hooks/useReturnBook';
 import { receiptHooks } from '../../hooks/useReceipt';
 import { cn } from '@shared/constants/commonConst';
 import dayjs from 'dayjs';
 import { Printer } from 'lucide-react';
+
+const CONDITION_OPTIONS: { value: BookCondition; label: string }[] = [
+  { value: 'good', label: 'Tốt' },
+  { value: 'minor', label: 'Hư nhẹ' },
+  { value: 'medium', label: 'Hư vừa' },
+  { value: 'heavy', label: 'Hư nặng' },
+  { value: 'lost', label: 'Mất sách' },
+];
 
 const ReturnBookPage = () => {
   const [keyword, setKeyword] = useState('');
@@ -33,6 +42,7 @@ const ReturnBookPage = () => {
   const [selectedReader, setSelectedReader] = useState<ReturnReaderInfo | null>(null);
   const [borrowedBooks, setBorrowedBooks] = useState<BorrowedBook[]>([]);
   const [selectedCopyIds, setSelectedCopyIds] = useState<number[]>([]);
+  const [conditionByCopy, setConditionByCopy] = useState<Record<number, BookCondition>>({});
   const [barcode, setBarcode] = useState('');
   const barcodeRef = useRef<InputRef>(null);
 
@@ -68,6 +78,7 @@ const ReturnBookPage = () => {
     setReaderResults([]);
     setKeyword(reader.full_name);
     setSelectedCopyIds([]);
+    setConditionByCopy({});
     setBorrowedBooks([]);
     borrowedMutation.mutate(reader.user_id, {
       onSuccess: (books) => {
@@ -85,6 +96,7 @@ const ReturnBookPage = () => {
     setReaderResults([]);
     setKeyword('');
     setSelectedCopyIds([]);
+    setConditionByCopy({});
     setBorrowedBooks([]);
   };
 
@@ -121,8 +133,13 @@ const ReturnBookPage = () => {
     // Lấy borrow_id đầu tiên từ sách đang trả (dùng cho receipt)
     const firstBorrowId = borrowedBooks.find((b) => selectedCopyIds.includes(b.copy_id))?.borrow_id;
 
+    const items = selectedCopyIds.map((copyId) => ({
+      copy_id: copyId,
+      condition: conditionByCopy[copyId] ?? 'good',
+    }));
+
     confirmMutation.mutate(
-      { user_id: selectedReader.user_id, copy_ids: selectedCopyIds },
+      { user_id: selectedReader.user_id, items },
       {
         onSuccess: (result) => {
           // borrow_id cho receipt: ưu tiên closed_transactions, rồi firstBorrowId
@@ -143,9 +160,17 @@ const ReturnBookPage = () => {
                 </div>
                 {result.total_penalty > 0 && (
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Phí phạt phát sinh</span>
+                    <span className="text-gray-500">Phí phạt trễ hạn</span>
                     <span className="font-semibold text-red-500">
                       {new Intl.NumberFormat('vi-VN').format(result.total_penalty)} VND
+                    </span>
+                  </div>
+                )}
+                {result.total_damage > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Phí bồi thường hư hỏng/mất</span>
+                    <span className="font-semibold text-red-500">
+                      {new Intl.NumberFormat('vi-VN').format(result.total_damage)} VND
                     </span>
                   </div>
                 )}
@@ -175,6 +200,7 @@ const ReturnBookPage = () => {
           setKeyword('');
           setBorrowedBooks([]);
           setSelectedCopyIds([]);
+          setConditionByCopy({});
           setBarcode('');
           setReaderResults([]);
         },
@@ -250,6 +276,23 @@ const ReturnBookPage = () => {
         ) : (
           <span className="text-gray-400 text-xs">—</span>
         ),
+    },
+    {
+      title: 'Tình trạng trả',
+      key: 'condition',
+      width: 130,
+      render: (_: unknown, record: BorrowedBook) => (
+        <Select<BookCondition>
+          size="small"
+          style={{ width: '100%' }}
+          value={conditionByCopy[record.copy_id] ?? 'good'}
+          onChange={(v) =>
+            setConditionByCopy((prev) => ({ ...prev, [record.copy_id]: v }))
+          }
+          disabled={!selectedCopyIds.includes(record.copy_id) || confirmMutation.isPending}
+          options={CONDITION_OPTIONS}
+        />
+      ),
     },
   ];
 
