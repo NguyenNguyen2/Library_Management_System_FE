@@ -3,6 +3,7 @@ import { SendOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState } from 'react';
 import { aiAssistantHooks } from '../../hooks/useAiAssistant';
 import { AiAssistantRecommendation } from '../../api/aiAssistantApi';
+import { safeRandomUUID } from '@shared/utils/utils';
 
 interface ChatMessage {
   id: string;
@@ -21,7 +22,7 @@ const WELCOME_MESSAGE: ChatMessage = {
 };
 
 const AiBookSuggestionChat = () => {
-  const conversationIdRef = useRef<string>(crypto.randomUUID());
+  const conversationIdRef = useRef<string>(safeRandomUUID());
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -36,7 +37,7 @@ const AiBookSuggestionChat = () => {
     const message = input.trim();
     if (message === '' || chatMutation.isPending) return;
 
-    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'user', text: message }]);
+    setMessages((prev) => [...prev, { id: safeRandomUUID(), role: 'user', text: message }]);
     setInput('');
 
     chatMutation.mutate(
@@ -46,7 +47,7 @@ const AiBookSuggestionChat = () => {
           setMessages((prev) => [
             ...prev,
             {
-              id: crypto.randomUUID(),
+              id: safeRandomUUID(),
               role: 'assistant',
               text: data.reply,
               recommendations: data.recommendations,
@@ -57,7 +58,7 @@ const AiBookSuggestionChat = () => {
           setMessages((prev) => [
             ...prev,
             {
-              id: crypto.randomUUID(),
+              id: safeRandomUUID(),
               role: 'assistant',
               text: error?.response?.data?.message ?? 'Có lỗi xảy ra, vui lòng thử lại.',
               isError: true,
