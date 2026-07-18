@@ -427,6 +427,7 @@ export function BooksListPage() {
   const [form] = Form.useForm();
   const watchCreateFirstCopy = Form.useWatch('create_first_copy', form);
   const watchBarcode = Form.useWatch('barcode', form);
+  const watchCopiesCount = Form.useWatch('copies_count', form);
 
   const translateFieldName = (field: string) => {
     const map: Record<string, string> = {
@@ -923,6 +924,7 @@ export function BooksListPage() {
         delete dataToSave.create_first_copy;
         delete dataToSave.barcode;
         delete dataToSave.shelf_location;
+        delete dataToSave.copies_count;
       } else {
         dataToSave.create_first_copy = values.create_first_copy !== false;
       }
@@ -2443,25 +2445,12 @@ export function BooksListPage() {
               {watchCreateFirstCopy !== false && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                   <Form.Item
-                    name="barcode"
-                    label={<span className="font-semibold text-gray-700">Barcode đầu tiên</span>}
-                    rules={[{ required: true, message: 'Vui lòng nhập barcode hoặc bấm "Sinh barcode"!' }]}
+                    name="copies_count"
+                    label={<span className="font-semibold text-gray-700">Số lượng bản sao</span>}
+                    initialValue={1}
+                    rules={[{ required: true, message: 'Vui lòng nhập số lượng bản sao!' }]}
                   >
-                    <Input
-                      placeholder="Nhập barcode..."
-                      className="h-9 rounded-lg"
-                      addonAfter={
-                        <button
-                          type="button"
-                          onClick={handleGenerateBarcode}
-                          disabled={generatingBarcode}
-                          className="flex items-center gap-1 text-blue-600 disabled:text-gray-400"
-                        >
-                          <RefreshCw size={13} className={generatingBarcode ? 'animate-spin' : ''} />
-                          Sinh barcode
-                        </button>
-                      }
-                    />
+                    <InputNumber min={1} max={1000} className="h-9 rounded-lg w-full" />
                   </Form.Item>
 
                   <Form.Item
@@ -2471,7 +2460,37 @@ export function BooksListPage() {
                     <Input placeholder="Ví dụ: A1-01" className="h-9 rounded-lg" />
                   </Form.Item>
 
-                  {watchBarcode && (
+                  {(!watchCopiesCount || watchCopiesCount <= 1) ? (
+                    <Form.Item
+                      name="barcode"
+                      label={<span className="font-semibold text-gray-700">Barcode đầu tiên</span>}
+                      rules={[{ required: true, message: 'Vui lòng nhập barcode hoặc bấm "Sinh barcode"!' }]}
+                      className="col-span-1 md:col-span-2"
+                    >
+                      <Input
+                        placeholder="Nhập barcode..."
+                        className="h-9 rounded-lg"
+                        addonAfter={
+                          <button
+                            type="button"
+                            onClick={handleGenerateBarcode}
+                            disabled={generatingBarcode}
+                            className="flex items-center gap-1 text-blue-600 disabled:text-gray-400"
+                          >
+                            <RefreshCw size={13} className={generatingBarcode ? 'animate-spin' : ''} />
+                            Sinh barcode
+                          </button>
+                        }
+                      />
+                    </Form.Item>
+                  ) : (
+                    <div className="col-span-1 md:col-span-2 -mt-1 mb-2 text-xs text-gray-500">
+                      Sẽ tự động tạo <b>{watchCopiesCount}</b> bản sao, mã vạch dạng{' '}
+                      <span className="font-mono">BOOK000001, BOOK000002...</span>
+                    </div>
+                  )}
+
+                  {watchBarcode && (!watchCopiesCount || watchCopiesCount <= 1) && (
                     <div className="col-span-1 md:col-span-2 -mt-2 mb-2">
                       <span className="text-xs text-gray-400 mr-2">Xem trước:</span>
                       <span className="font-mono font-bold tracking-widest text-sm bg-gray-50 border border-gray-200 rounded px-2 py-1">

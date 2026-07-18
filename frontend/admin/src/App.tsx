@@ -34,7 +34,6 @@ const Reports = lazy(() => import('./pages/reports/ReportsPage'));
 const UserHistory = lazy(() => import('./pages/history/UserHistoryPage'));
 const TransactionHistory = lazy(() => import('./pages/history/TransactionHistoryPage'));
 const AIDemand = lazy(() => import('./pages/ai-demand/AIDemandPage'));
-const AiAssistant = lazy(() => import('./pages/ai-assistant/AiBookSuggestionChat'));
 
 import { useGlobalVariable } from './hooks/GlobalVariableProvider';
 
@@ -102,7 +101,6 @@ function App() {
                 <Route path={ROUTES.ACHIEVEMENTS} element={<Achievements />} />
                 <Route path={ROUTES.SETTINGS} element={<Settings />} />
                 <Route path={ROUTES.AI_DEMAND} element={<AIDemand />} />
-                <Route path={ROUTES.AI_ASSISTANT} element={<AiAssistant />} />
               </Route>
               {/* Những route cần bọc Auth Layout */}
               <Route

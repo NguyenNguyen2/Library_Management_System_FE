@@ -75,6 +75,18 @@ export interface MarkReadyResult {
   pickup_deadline: string;
 }
 
+export interface AvailableCopy {
+  copy_id: number;
+  barcode: string;
+  condition: string;
+  shelf_location: string | null;
+}
+
+export interface MarkReadyPayload {
+  reservation_id: number;
+  copy_id?: number;
+}
+
 export const reservationApi = {
   searchBook: async (keyword: string): Promise<BookSearchResult[]> => {
     const res = await axiosInstance.get('/private/v1/reservation/search-book', {
@@ -86,6 +98,10 @@ export const reservationApi = {
   listReservations: async (params?: {
     user_id?: number;
     status?: string;
+    keyword?: string;
+    from?: string;
+    to?: string;
+    queue_position?: number;
     per_page?: number;
     page?: number;
   }): Promise<ReservationListResponse> => {
@@ -96,6 +112,13 @@ export const reservationApi = {
       per_page: res.data?.results?.per_page ?? 20,
       page: res.data?.results?.page ?? 1,
     };
+  },
+
+  getAvailableCopiesByBook: async (bookId: number): Promise<AvailableCopy[]> => {
+    const res = await axiosInstance.get('/private/v1/reservation/available-copies', {
+      params: { book_id: bookId },
+    });
+    return res.data?.results?.objects ?? [];
   },
 
   createReservation: async (
@@ -112,10 +135,8 @@ export const reservationApi = {
     return res.data?.results?.object;
   },
 
-  markReady: async (reservationId: number): Promise<MarkReadyResult> => {
-    const res = await axiosInstance.post('/private/v1/reservation/mark-ready', {
-      reservation_id: reservationId,
-    });
+  markReady: async (payload: MarkReadyPayload): Promise<MarkReadyResult> => {
+    const res = await axiosInstance.post('/private/v1/reservation/mark-ready', payload);
     return res.data?.results?.object;
   },
 

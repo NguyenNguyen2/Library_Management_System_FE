@@ -8,7 +8,9 @@ import {
   CreateReservationResult,
   ConfirmReservationPayload,
   ConfirmReservationResult,
+  MarkReadyPayload,
   MarkReadyResult,
+  AvailableCopy,
 } from '../api/reservationApi';
 
 export const reservationHooks = {
@@ -20,12 +22,23 @@ export const reservationHooks = {
   useListReservations: (params?: {
     user_id?: number;
     status?: string;
+    keyword?: string;
+    from?: string;
+    to?: string;
+    queue_position?: number;
     per_page?: number;
     page?: number;
   }) =>
     useQuery<ReservationListResponse, AxiosError>({
       queryKey: ['reservations', params],
       queryFn: () => reservationApi.listReservations(params),
+    }),
+
+  useAvailableCopiesByBook: (bookId: number | undefined) =>
+    useQuery<AvailableCopy[], AxiosError>({
+      queryKey: ['reservation-available-copies', bookId],
+      queryFn: () => reservationApi.getAvailableCopiesByBook(bookId as number),
+      enabled: !!bookId,
     }),
 
   useCreateReservation: () => {
@@ -54,7 +67,7 @@ export const reservationHooks = {
 
   useMarkReady: () => {
     const qc = useQueryClient();
-    return useMutation<MarkReadyResult, AxiosError, number>({
+    return useMutation<MarkReadyResult, AxiosError, MarkReadyPayload>({
       mutationFn: reservationApi.markReady,
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: ['reservations'] });

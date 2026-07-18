@@ -430,7 +430,7 @@ const DamageFineTab = () => {
   const [form] = Form.useForm();
   const createDamage = feesHooks.useCreateDamageFine();
 
-  const handleSubmit = async (values: { user_id: number; copy_id: number; damage_level: 'minor' | 'heavy' | 'lost' }) => {
+  const handleSubmit = async (values: { user_id: number; copy_id: number; damage_level: 'minor' | 'medium' | 'heavy' | 'lost' }) => {
     try {
       const res = await createDamage.mutateAsync(values);
       message.success(`Đã tạo phí ${res.data.amount.toLocaleString('vi-VN')}đ cho sách "${res.data.book_title}"`);
@@ -444,7 +444,7 @@ const DamageFineTab = () => {
     <Card bordered={false} title={<Space><ToolOutlined />Tạo phí bồi thường sách hỏng / mất</Space>}>
       <div className="max-w-lg">
         <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-4 text-sm text-blue-700">
-          Phí được tính tự động: <strong>Hỏng nhẹ 20%</strong> · <strong>Hỏng nặng 50%</strong> · <strong>Mất sách 100%</strong> giá trị thay thế sách
+          Phí được tính tự động: <strong>Hỏng nhẹ 20%</strong> · <strong>Hỏng vừa 35%</strong> · <strong>Hỏng nặng 50%</strong> · <strong>Mất sách 100%</strong> giá trị thay thế sách
         </div>
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item name="user_id" label="ID Độc giả" rules={[{ required: true, message: 'Nhập ID độc giả' }]}>
@@ -459,6 +459,7 @@ const DamageFineTab = () => {
           <Form.Item name="damage_level" label="Mức độ hư hỏng" rules={[{ required: true }]}>
             <Select placeholder="Chọn mức độ">
               <Select.Option value="minor"><Tag color="orange">Hỏng nhẹ — 20%</Tag></Select.Option>
+              <Select.Option value="medium"><Tag color="gold">Hỏng vừa — 35%</Tag></Select.Option>
               <Select.Option value="heavy"><Tag color="volcano">Hỏng nặng — 50%</Tag></Select.Option>
               <Select.Option value="lost"><Tag color="red">Mất sách — 100%</Tag></Select.Option>
             </Select>
