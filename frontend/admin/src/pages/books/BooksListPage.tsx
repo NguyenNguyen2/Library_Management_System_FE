@@ -1215,15 +1215,51 @@ export function BooksListPage() {
               type="text"
               icon={<QrCode size={16} className="text-blue-600 hover:text-blue-800" />}
               onClick={() => {
+                const removeAccents = (str: string) => {
+                  return str
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/đ/g, 'd')
+                    .replace(/Đ/g, 'D');
+                };
+
+                const cost = record.book_replacement_cost 
+                  ? Number(record.book_replacement_cost).toLocaleString('vi-VN') + ' d'
+                  : '0 d';
+                const rating = `${record.book_avg_rating || '0.0'}/5 (${record.book_total_reviews || 0} luot)`;
+
+                const rawQrData = `[THONG TIN SACH]\n` +
+                               `=====================\n` +
+                               `Ma ban sao: ${record.barcode}\n` +
+                               `Ma sach: ${record.book_id || 'N/A'}\n` +
+                               `ISBN: ${record.book_isbn || 'N/A'}\n` +
+                               `Ke: ${record.location || 'Chua xep ke'}\n` +
+                               `---------------------\n` +
+                               `Ten sach: ${record.book_title}\n` +
+                               `Nha xuat ban: ${record.book_publisher || 'N/A'}\n` +
+                               `Ngay xuat ban: ${record.book_publish_year || 'Chua cap nhat'}\n` +
+                               `Phien ban: ${record.book_edition || 'Chua cap nhat'}\n` +
+                               `Ngon ngu: ${record.book_language || 'TIENG VIET'}\n` +
+                               `So trang: ${record.book_pages ? record.book_pages + ' trang' : 'Chua cap nhat'}\n` +
+                               `Kich thuoc: ${record.book_dimensions || 'Chua cap nhat'}\n` +
+                               `Loai bia: ${record.book_cover_type || 'Chua cap nhat'}\n` +
+                               `Gia den bu: ${cost}\n` +
+                               `Danh gia: ${rating}\n` +
+                               `---------------------\n` +
+                               `Mo ta:\n${record.book_description || 'Khong co mo ta'}\n` +
+                               `=====================`;
+
+                const qrData = removeAccents(rawQrData);
+
                 Modal.info({
                   title: 'Mã QR Bản sao: ' + record.barcode,
                   content: (
                     <div className="flex flex-col items-center justify-center p-4">
                       <div className="border p-4 bg-white rounded-lg shadow-sm">
                         <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${record.barcode}`} 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&charset-target=UTF-8&data=${encodeURIComponent(qrData)}`} 
                           alt="QR Code" 
-                          className="w-[150px] h-[150px]"
+                          className="w-[200px] h-[200px]"
                         />
                       </div>
                       <p className="mt-3 font-mono font-bold text-gray-700">{record.barcode}</p>
