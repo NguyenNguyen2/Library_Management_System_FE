@@ -904,15 +904,32 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
   const handleOpenAddModal = () => {
     setEditingReader(null);
     form.resetFields();
+    // antd bỏ qua giá trị `undefined` trong setFieldsValue (coi như "không đổi") —
+    // phải dùng `null` để đảm bảo xóa sạch dữ liệu của lần sửa độc giả trước đó,
+    // tránh rò rỉ SĐT/địa chỉ/ảnh của người khác sang phiếu tạo mới.
+    form.setFieldsValue({
+      phone: null,
+      address: null,
+      avatar: null,
+      date_of_birth: null,
+      gender: null,
+    });
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (record: any, index: number) => {
     setEditingReader({ record, index });
+    // Dùng `null` thay vì `undefined` — antd setFieldsValue bỏ qua field có giá trị
+    // `undefined` (coi như giữ nguyên), nên nếu record thiếu trường sẽ vô tình giữ lại
+    // dữ liệu của độc giả được sửa trước đó.
     form.setFieldsValue({
-      name: record.name,
-      email: record.email,
-      achievement: record.achievement ? { value: record.achievement.value, label: record.achievement.label } : undefined,
+      name: record.name ?? null,
+      email: record.email ?? null,
+      phone: record.phone ?? null,
+      address: record.address ?? null,
+      avatar: record.avatar ?? null,
+      date_of_birth: record.date_of_birth ? dayjs(record.date_of_birth) : null,
+      gender: record.gender ?? null,
       status: record.status?.value,
     });
     setIsModalOpen(true);
@@ -922,7 +939,11 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
     const body: any = {
       name: values.name,
       email: values.email,
-      achievement: values.achievement ? { value: values.achievement.value, label: values.achievement.label } : null,
+      phone: values.phone,
+      address: values.address,
+      avatar: values.avatar,
+      date_of_birth: values.date_of_birth ? values.date_of_birth.format('YYYY-MM-DD') : null,
+      gender: values.gender ?? null,
       status: values.status,
     };
     if (editingReader) {

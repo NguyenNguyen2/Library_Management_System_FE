@@ -23,7 +23,7 @@ export const useLogin = () => {
     mutationFn: authApi.signIn,
     onSuccess: (data) => {
       if (data?.requires_2fa) {
-        setCookie(STORAGES.ACCESS_TOKEN, data.tempToken);
+        setCookie(STORAGES.ACCESS_TOKEN, data.tempToken || '');
         return; // Stay on login page to verify OTP
       }
       const userClone = _.cloneDeep(data?.user);

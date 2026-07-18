@@ -1,9 +1,7 @@
 import { TableColumnsType, Tag, Card } from 'antd';
-import { TableColumnsType, Tag, Card } from 'antd';
 import dayjs from 'dayjs';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TrophyOutlined, BookOutlined, StarOutlined, FlagOutlined } from '@ant-design/icons';
 import { TrophyOutlined, BookOutlined, StarOutlined, FlagOutlined } from '@ant-design/icons';
 import { getKey } from '@shared/types/I18nKeyType';
 import { COLORS } from '@shared/constants/color';
@@ -37,11 +35,11 @@ const AchievementsPage = () => {
   const totalCount = allAchievements.length;
   
   const minRequired = allAchievements.length > 0
-    ? Math.min(...allAchievements.map((a) => a.requiredCourses))
+    ? Math.min(...allAchievements.map((a: IListAchievement) => a.requiredCourses))
     : 0;
     
   const maxRequired = allAchievements.length > 0
-    ? Math.max(...allAchievements.map((a) => a.requiredCourses))
+    ? Math.max(...allAchievements.map((a: IListAchievement) => a.requiredCourses))
     : 0;
 
   const createMutation = achievementHooks.useCreateAchievement();

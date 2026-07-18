@@ -42,6 +42,24 @@ export interface BorrowHistoryRow {
   fine_status: string | null;
 }
 
+// Chuyển object dữ liệu độc giả (có thể chứa File ảnh đại diện) thành multipart FormData.
+const buildUserFormData = (data: Record<string, unknown>): FormData => {
+  const formData = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    if (value === undefined) return;
+    if (value instanceof File) {
+      formData.append(key, value);
+    } else if (value === null) {
+      formData.append(key, '');
+    } else if (typeof value === 'object') {
+      formData.append(key, JSON.stringify(value));
+    } else {
+      formData.append(key, String(value));
+    }
+  });
+  return formData;
+};
+
 export const userApi = {
   getListUser: async (params: BaseListParams) => {
     const response = await axiosInstance.get<ListResponseType<IListUser>>(
@@ -64,6 +82,14 @@ export const userApi = {
     body: ICreateUser;
     params: BaseListParams;
   }) => {
+    const hasAvatarFile = (body as { avatar?: unknown }).avatar instanceof File;
+    if (hasAvatarFile) {
+      const formData = buildUserFormData(body as unknown as Record<string, unknown>);
+      const response = await axiosInstance.post('/private/v1/users', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data?.results?.object;
+    }
     const response = await axiosInstance.post('/private/v1/users', body);
     return response.data?.results?.object;
   },
@@ -77,6 +103,15 @@ export const userApi = {
     index: number;
     params: BaseListParams;
   }) => {
+    const hasAvatarFile = (body as { avatar?: unknown }).avatar instanceof File;
+    if (hasAvatarFile) {
+      const formData = buildUserFormData(body as unknown as Record<string, unknown>);
+      formData.append('_method', 'PATCH');
+      const response = await axiosInstance.post(`/private/v1/users/${id}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data?.results?.object;
+    }
     const response = await axiosInstance.patch(`/private/v1/users/${id}`, body);
     return response.data?.results?.object;
   },
