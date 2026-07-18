@@ -354,6 +354,7 @@ const ReservationPage = () => {
       title: 'Thao tác',
       key: 'actions',
       width: 120,
+      fixed: 'right',
       render: (_: unknown, r: ReservationRecord) => {
         const isCancelling =
           cancelMutation.isPending && cancelMutation.variables === r.reservation_id;
@@ -410,7 +411,7 @@ const ReservationPage = () => {
   ];
 
   return (
-    <div className="max-w-[1100px] mx-auto flex flex-col gap-6">
+    <div className="max-w-[1400px] mx-auto flex flex-col gap-6">
       {/* Page header */}
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
@@ -625,19 +626,6 @@ const ReservationPage = () => {
               />
             </div>
             <div>
-              <p className="m-0 mb-1 text-xs text-gray-500">User ID</p>
-              <Input
-                placeholder="Tất cả"
-                value={listUserId}
-                onChange={(e) => {
-                  setListUserId(e.target.value);
-                  setListPage(1);
-                }}
-                style={{ width: 100 }}
-                allowClear
-              />
-            </div>
-            <div>
               <p className="m-0 mb-1 text-xs text-gray-500">Trạng thái</p>
               <Select
                 placeholder="Tất cả"
@@ -699,6 +687,7 @@ const ReservationPage = () => {
               size="small"
               columns={columns}
               dataSource={listData?.objects ?? []}
+              scroll={{ x: 1200 }}
               pagination={{
                 total: listData?.total ?? 0,
                 pageSize: listData?.per_page ?? 20,

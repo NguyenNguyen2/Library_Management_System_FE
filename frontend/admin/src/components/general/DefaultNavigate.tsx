@@ -4,7 +4,6 @@ import {
   CreditCardOutlined,
   LockOutlined,
   LogoutOutlined,
-  MessageOutlined,
   RobotOutlined,
   SettingOutlined,
   UserOutlined,
@@ -114,12 +113,6 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       label: 'AI Phân tích nhu cầu',
       icon: <RobotOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.AI_DEMAND,
-    },
-    {
-      key: 'ai-assistant',
-      label: t(getKey('menu_ai_assistant')),
-      icon: <MessageOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.AI_ASSISTANT,
     },
     {
       key: 'settings',

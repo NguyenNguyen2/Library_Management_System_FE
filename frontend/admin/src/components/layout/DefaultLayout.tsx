@@ -10,6 +10,7 @@ import { cn } from '@shared/constants/commonConst';
 import DefaultNavigate from '../general/DefaultNavigate';
 import DefaultHeader from '../general/DefaultHeader';
 import Loading from '@shared/components/general/Loading';
+import AiChatWidget from '../ai-assistant/AiChatWidget';
 
 const { Header, Sider, Content } = Layout;
 
@@ -54,6 +55,7 @@ const AppLayout = () => {
             </Suspense>
           </Content>
         </Layout>
+        <AiChatWidget />
       </Layout>
     </StyleProvider>
   );
