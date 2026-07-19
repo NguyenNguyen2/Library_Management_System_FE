@@ -101,6 +101,12 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       label: 'Quản lý phí & Thanh toán',
       icon: <CreditCardOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.FEES,
+      children: [
+        { label: 'Phí chưa thu', to: ROUTES.FEES },
+        { label: 'Tạo phí hỏng/mất', to: ROUTES.FEES + '?tab=damage' },
+        { label: 'Lịch sử thu phí', to: ROUTES.FEES + '?tab=history' },
+        { label: 'Báo cáo doanh thu', to: ROUTES.FEES + '?tab=revenue' },
+      ],
     },
     {
       key: 'reports',
@@ -134,6 +140,14 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
     if (!pathname) return;
     const path = pathname.pathname + pathname.search;
     setSelectItem(path);
+
+    // Auto-expand parent menu if a child is active
+    const activeParent = menuConfig.find((item) =>
+      item.children?.some((child) => child.to === path)
+    );
+    if (activeParent) {
+      setOpenMenu(activeParent.key);
+    }
   }, [pathname]);
 
   const handleLogout = () => {

@@ -1,6 +1,6 @@
 import {
   Badge, Button, Card, Col, DatePicker, Form, Input,
-  Modal, Row, Select, Skeleton, Space, Statistic,
+  Modal, Row, Select, Skeleton, Space, Spin, Statistic,
   Table, TablePaginationConfig, Tabs, Tag, Typography, message,
 } from 'antd';
 import {
@@ -9,10 +9,15 @@ import {
   PrinterOutlined,
 } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import debounce from 'lodash/debounce';
 import dayjs from 'dayjs';
 import ColumnChart from '@shared/components/chart/ColumnChart';
 import { feesHooks } from '../../hooks/useFees';
 import { Fine, FineType, HistoryFine, PaymentMethod } from '../../api/feesApi';
+import { checkoutApi } from '../../api/checkoutApi';
+import { userApi } from '../../api/userApi';
+import { getBookCopies } from '../../services/copyService';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -604,6 +609,13 @@ const SummaryCards = () => {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 export function FeesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'list';
+
+  const handleTabChange = (key: string) => {
+    setSearchParams({ tab: key });
+  };
+
   const tabs = [
     {
       key: 'list',
@@ -634,7 +646,7 @@ export function FeesPage() {
         <p className="m-0 mt-1 text-sm text-gray-500">Theo dõi phí trễ hạn, phạt hỏng/mất sách và ghi nhận thanh toán tại quầy</p>
       </div>
       <SummaryCards />
-      <Tabs items={tabs} size="large" />
+      <Tabs activeKey={activeTab} onChange={handleTabChange} items={tabs} size="large" />
     </div>
   );
 }
@@ -644,13 +656,121 @@ const DamageFineTab = () => {
   const [form] = Form.useForm();
   const createDamage = feesHooks.useCreateDamageFine();
 
-  const handleSubmit = async (values: { user_id: number; copy_id: number; damage_level: 'minor' | 'medium' | 'heavy' | 'lost' }) => {
+  const [readers, setReaders] = useState<any[]>([]);
+  const [searchingReaders, setSearchingReaders] = useState(false);
+  const [selectedReaderId, setSelectedReaderId] = useState<number | null>(null);
+
+  const [borrowHistory, setBorrowHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const [copies, setCopies] = useState<any[]>([]);
+  const [searchingCopies, setSearchingCopies] = useState(false);
+
+  // Fetch readers (actual search call)
+  const fetchReaders = async (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+      setReaders([]);
+      return;
+    }
+    setSearchingReaders(true);
     try {
-      const res = await createDamage.mutateAsync(values);
-      message.success(`Đã tạo phí ${res.data.amount.toLocaleString('vi-VN')}đ cho sách "${res.data.book_title}"`);
+      const results = await checkoutApi.findReader(trimmed);
+      setReaders(results);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSearchingReaders(false);
+    }
+  };
+
+  // Debounced search handler for readers
+  const handleSearchReader = useMemo(
+    () => debounce(fetchReaders, 500),
+    []
+  );
+
+  // When a reader is selected
+  const handleSelectReader = async (readerId: number) => {
+    setSelectedReaderId(readerId);
+    setBorrowHistory([]);
+    form.setFieldsValue({ borrow_id: undefined, copy_id: undefined });
+    
+    setLoadingHistory(true);
+    try {
+      const history = await userApi.getReaderBorrowHistory(String(readerId));
+      setBorrowHistory(history);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // When a borrow transaction is selected
+  const handleSelectBorrow = async (borrowId: number) => {
+    const selectedBorrow = borrowHistory.find(b => b.borrow_id === borrowId);
+    if (!selectedBorrow) return;
+
+    try {
+      // Fetch all copies of the borrowed book by searching its title
+      const res = await getBookCopies(1, selectedBorrow.book_title);
+      if (res && res.data) {
+        setCopies(res.data);
+        
+        // Find the copy matching the borrowed copy barcode and pre-select it
+        const matchedCopy = res.data.find((c: any) => c.barcode === selectedBorrow.copy_barcode);
+        if (matchedCopy) {
+          form.setFieldsValue({ copy_id: matchedCopy.copy_id });
+        } else if (res.data.length > 0) {
+          form.setFieldsValue({ copy_id: res.data[0].copy_id });
+        }
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // Fetch copies (actual search call)
+  const fetchCopies = async (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+      setCopies([]);
+      return;
+    }
+    setSearchingCopies(true);
+    try {
+      const res = await getBookCopies(1, trimmed);
+      if (res && res.data) {
+        setCopies(res.data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSearchingCopies(false);
+    }
+  };
+
+  // Debounced search handler for copies
+  const handleSearchCopies = useMemo(
+    () => debounce(fetchCopies, 500),
+    []
+  );
+
+  const handleSubmit = async (values: any) => {
+    try {
+      await createDamage.mutateAsync({
+        user_id: values.user_id,
+        copy_id: values.copy_id,
+        borrow_id: values.borrow_id,
+        damage_level: values.damage_level,
+      });
+      message.success('Tạo khoản phí bồi thường thành công!');
       form.resetFields();
-    } catch {
-      message.error('Có lỗi xảy ra. Vui lòng kiểm tra lại thông tin.');
+      setSelectedReaderId(null);
+      setBorrowHistory([]);
+    } catch (err: any) {
+      message.error(err?.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại.');
     }
   };
 
@@ -661,15 +781,64 @@ const DamageFineTab = () => {
           Phí được tính tự động: <strong>Hỏng nhẹ 20%</strong> · <strong>Hỏng vừa 35%</strong> · <strong>Hỏng nặng 50%</strong> · <strong>Mất sách 100%</strong> giá trị thay thế sách
         </div>
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item name="user_id" label="ID Độc giả" rules={[{ required: true, message: 'Nhập ID độc giả' }]}>
-            <Input type="number" placeholder="VD: 42" />
+          {/* Reader select drop down */}
+          <Form.Item name="user_id" label="Độc giả nhận phạt" rules={[{ required: true, message: 'Vui lòng chọn độc giả' }]}>
+            <Select
+              showSearch
+              placeholder="Nhập tên, email hoặc số điện thoại độc giả..."
+              defaultActiveFirstOption={false}
+              suffixIcon={null}
+              filterOption={false}
+              onSearch={handleSearchReader}
+              onChange={handleSelectReader}
+              notFoundContent={searchingReaders ? <Spin size="small" /> : null}
+              loading={searchingReaders}
+            >
+              {readers.map(r => (
+                <Select.Option key={r.user_id} value={r.user_id}>
+                  {r.full_name} ({r.email} - {r.phone || 'Không số ĐT'})
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
-          <Form.Item name="copy_id" label="ID Bản sao sách" rules={[{ required: true, message: 'Nhập ID bản sao' }]}>
-            <Input type="number" placeholder="VD: 15" />
+
+          {/* Borrow Transaction selection (conditional) */}
+          <Form.Item name="borrow_id" label="Chọn giao dịch mượn liên quan (tùy chọn)">
+            <Select
+              placeholder={selectedReaderId ? "Chọn từ danh sách sách đang mượn..." : "Vui lòng chọn độc giả trước..."}
+              disabled={!selectedReaderId}
+              loading={loadingHistory}
+              onChange={handleSelectBorrow}
+              allowClear
+            >
+              {borrowHistory.map(b => (
+                <Select.Option key={b.borrow_id} value={b.borrow_id}>
+                  {b.book_title} (Mã mượn: BM-{b.borrow_id} - Barcode: {b.copy_barcode})
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
-          <Form.Item name="borrow_id" label="ID Giao dịch mượn (tùy chọn)">
-            <Input type="number" placeholder="Bỏ trống nếu không có" />
+
+          {/* Book Copy Select drop down */}
+          <Form.Item name="copy_id" label="Bản sao sách bị hỏng / mất" rules={[{ required: true, message: 'Vui lòng chọn bản sao sách' }]}>
+            <Select
+              showSearch
+              placeholder="Nhập tên sách hoặc barcode bản sao..."
+              defaultActiveFirstOption={false}
+              suffixIcon={null}
+              filterOption={false}
+              onSearch={handleSearchCopies}
+              notFoundContent={searchingCopies ? <Spin size="small" /> : null}
+              loading={searchingCopies}
+            >
+              {copies.map(c => (
+                <Select.Option key={c.copy_id} value={c.copy_id}>
+                  {c.book_title} (Barcode: {c.barcode})
+                </Select.Option>
+              ))}
+            </Select>
           </Form.Item>
+
           <Form.Item name="damage_level" label="Mức độ hư hỏng" rules={[{ required: true }]}>
             <Select placeholder="Chọn mức độ">
               <Select.Option value="minor"><Tag color="orange">Hỏng nhẹ — 20%</Tag></Select.Option>
