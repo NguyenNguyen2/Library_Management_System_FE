@@ -6,6 +6,7 @@ import {
 import {
   CreditCardOutlined, DollarOutlined, ExclamationCircleOutlined,
   HistoryOutlined, LineChartOutlined, SearchOutlined, ToolOutlined, DownloadOutlined,
+  PrinterOutlined,
 } from '@ant-design/icons';
 import { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
@@ -40,6 +41,7 @@ const FineListTab = () => {
   const [typeFilter, setTypeFilter] = useState<FineType | ''>('');
   const [page, setPage]             = useState(1);
   const [payModal, setPayModal]     = useState<{ open: boolean; fine: Fine | null }>({ open: false, fine: null });
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('cash');
   const [form] = Form.useForm();
 
   const { data, isLoading } = feesHooks.useFines({ search: search || undefined, type: typeFilter || undefined, page });
@@ -50,6 +52,7 @@ const FineListTab = () => {
 
   const handlePay = (fine: Fine) => {
     setPayModal({ open: true, fine });
+    setSelectedMethod('cash');
     form.setFieldsValue({ method: 'cash' });
   };
 
@@ -62,6 +65,151 @@ const FineListTab = () => {
     } catch {
       message.error('Có lỗi xảy ra, vui lòng thử lại.');
     }
+  };
+
+  const handlePrintQR = () => {
+    if (!payModal.fine) return;
+    const printWindow = window.open('', '_blank', 'width=600,height=600');
+    if (!printWindow) {
+      message.error('Không thể mở cửa sổ in. Vui lòng kiểm tra cài đặt chặn popup của trình duyệt.');
+      return;
+    }
+
+    const htmlContent = `
+      <html>
+        <head>
+          <title>In mã thanh toán PH-${payModal.fine.fine_id}</title>
+          <style>
+            body {
+              font-family: system-ui, -apple-system, sans-serif;
+              padding: 20px;
+              color: #333;
+              text-align: center;
+            }
+            .container {
+              max-width: 400px;
+              margin: 0 auto;
+              border: 1px dashed #ccc;
+              padding: 20px;
+              border-radius: 8px;
+            }
+            .title {
+              font-size: 18px;
+              font-weight: bold;
+              margin-bottom: 5px;
+            }
+            .subtitle {
+              font-size: 13px;
+              color: #666;
+              margin-bottom: 20px;
+            }
+            .qr-image {
+              width: 220px;
+              height: 220px;
+              object-fit: contain;
+              margin-bottom: 20px;
+            }
+            .info-table {
+              width: 100%;
+              border-collapse: collapse;
+              text-align: left;
+              font-size: 14px;
+            }
+            .info-table td {
+              padding: 6px 0;
+            }
+            .info-table td.label {
+              color: #888;
+              width: 40%;
+            }
+            .info-table td.value {
+              font-weight: 500;
+            }
+            .highlight {
+              color: #e53e3e;
+              font-weight: bold;
+            }
+            .code {
+              font-family: monospace;
+              background: #f7fafc;
+              padding: 2px 6px;
+              border-radius: 4px;
+              border: 1px solid #edf2f7;
+            }
+            @media print {
+              body { padding: 0; }
+              .container { border: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="title">THÔNG TIN THANH TOÁN</div>
+            <div class="subtitle">Mã khoản phí: PH-${payModal.fine.fine_id}</div>
+            
+            <img class="qr-image" src="${
+              selectedMethod === 'transfer'
+                ? `https://img.vietqr.io/image/TCB-2408057979-compact2.png?amount=${payModal.fine.amount}&addInfo=THANH%20TOAN%20PHI%20PH%20${payModal.fine.fine_id}&accountName=THU%20VIEN%20SACH%20VIET`
+                : `https://api.qrserver.com/v1/create-qr-code/?size=200x200&charset-target=UTF-8&data=${encodeURIComponent(
+                    `2|99|0971471076|THU VIEN SACH VIET||0|0|${payModal.fine.amount}|THANH TOAN PHI PH ${payModal.fine.fine_id}|transfer_mywallet`
+                  )}`
+            }" />
+            
+            <table class="info-table">
+              <tr>
+                <td class="label">Hình thức:</td>
+                <td class="value">${selectedMethod === 'transfer' ? 'Chuyển khoản (VietQR)' : 'Ví điện tử MoMo'}</td>
+              </tr>
+              <tr>
+                <td class="label">Độc giả:</td>
+                <td class="value">${payModal.fine.reader_name}</td>
+              </tr>
+              <tr>
+                <td class="label">Số tiền:</td>
+                <td class="value highlight">${payModal.fine.amount.toLocaleString('vi-VN')} đ</td>
+              </tr>
+              <tr>
+                <td class="label">Nội dung chuyển:</td>
+                <td class="value"><span class="code">THANH TOAN PHI PH ${payModal.fine.fine_id}</span></td>
+              </tr>
+              ${selectedMethod === 'transfer' ? `
+              <tr>
+                <td class="label">Ngân hàng:</td>
+                <td class="value">Techcombank (TCB)</td>
+              </tr>
+              <tr>
+                <td class="label">Số tài khoản:</td>
+                <td class="value">2408057979</td>
+              </tr>
+              ` : `
+              <tr>
+                <td class="label">Ví nhận:</td>
+                <td class="value">MoMo</td>
+              </tr>
+              <tr>
+                <td class="label">Số điện thoại:</td>
+                <td class="value">0971471076</td>
+              </tr>
+              `}
+              <tr>
+                <td class="label">Chủ tài khoản:</td>
+                <td class="value">THU VIEN SACH VIET</td>
+              </tr>
+            </table>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() { window.close(); }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   const pagination: TablePaginationConfig = {
@@ -146,13 +294,79 @@ const FineListTab = () => {
             <div><Text type="secondary">Số tiền: </Text><Text strong className="text-lg text-[#1E2A3B]">{payModal.fine?.amount.toLocaleString('vi-VN')}đ</Text></div>
           </div>
           <Form.Item name="method" label="Hình thức thanh toán" rules={[{ required: true }]}>
-            <Select>
+            <Select onChange={(value) => setSelectedMethod(value as PaymentMethod)}>
               <Select.Option value="cash"><DollarOutlined /> Tiền mặt</Select.Option>
-              <Select.Option value="transfer"><CreditCardOutlined /> Chuyển khoản</Select.Option>
+              <Select.Option value="transfer"><CreditCardOutlined /> Chuyển khoản (VietQR)</Select.Option>
               <Select.Option value="momo"><HistoryOutlined /> Ví MoMo</Select.Option>
             </Select>
           </Form.Item>
-          <div className="text-right">
+
+          {selectedMethod !== 'cash' && payModal.fine && (
+            <div className="border border-dashed border-blue-200 bg-blue-50/50 p-4 rounded-lg mb-4 flex flex-col md:flex-row items-center gap-4 animate-fade-in">
+              <div className="bg-white p-2 rounded-lg shadow-sm border border-blue-100 flex-shrink-0">
+                {selectedMethod === 'transfer' ? (
+                  <img
+                    src={`https://img.vietqr.io/image/TCB-2408057979-compact2.png?amount=${payModal.fine.amount}&addInfo=THANH%20TOAN%20PHI%20PH%20${payModal.fine.fine_id}&accountName=THU%20VIEN%20SACH%20VIET`}
+                    alt="VietQR Chuyen khoan"
+                    className="w-[180px] h-[180px] object-contain"
+                  />
+                ) : (
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&charset-target=UTF-8&data=${encodeURIComponent(
+                      `2|99|0971471076|THU VIEN SACH VIET||0|0|${payModal.fine.amount}|THANH TOAN PHI PH ${payModal.fine.fine_id}|transfer_mywallet`
+                    )}`}
+                    alt="MoMo QR Chuyen khoan"
+                    className="w-[180px] h-[180px] object-contain"
+                  />
+                )}
+              </div>
+              <div className="space-y-1 text-xs text-gray-600 w-full">
+                <p className="font-semibold text-sm text-blue-900 flex items-center gap-1.5">
+                  {selectedMethod === 'transfer' ? (
+                    <>🏦 THÔNG TIN CHUYỂN KHOẢN NGÂN HÀNG</>
+                  ) : (
+                    <>🔴 THÔNG TIN CHUYỂN KHOẢN VÍ MOMO</>
+                  )}
+                </p>
+                <div className="grid grid-cols-3 gap-y-1 pt-1.5">
+                  <span className="text-gray-400">Người nhận:</span>
+                  <span className="col-span-2 font-medium text-gray-800">
+                    {selectedMethod === 'transfer' ? 'Techcombank (TCB)' : 'Ví điện tử MoMo'}
+                  </span>
+                  
+                  <span className="text-gray-400">Số tài khoản:</span>
+                  <span className="col-span-2 font-mono font-bold text-gray-900">
+                    {selectedMethod === 'transfer' ? '2408057979' : '0971471076'}
+                  </span>
+
+                  <span className="text-gray-400">Tên tài khoản:</span>
+                  <span className="col-span-2 font-semibold text-gray-800">THU VIEN SACH VIET</span>
+
+                  <span className="text-gray-400">Số tiền:</span>
+                  <span className="col-span-2 font-bold text-red-600 text-sm">
+                    {payModal.fine.amount.toLocaleString('vi-VN')} đ
+                  </span>
+
+                  <span className="text-gray-400">Nội dung:</span>
+                  <span className="col-span-2 font-mono font-semibold text-blue-800 bg-blue-100/50 px-1 rounded">
+                    THANH TOAN PHI PH {payModal.fine.fine_id}
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-400 pt-2 italic">
+                  * Vui lòng quét đúng mã QR để hệ thống tự động ghi nhận chính xác số tiền cần thanh toán.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center text-right">
+            {selectedMethod !== 'cash' && payModal.fine ? (
+              <Button icon={<PrinterOutlined />} onClick={handlePrintQR}>
+                In mã thanh toán
+              </Button>
+            ) : (
+              <div />
+            )}
             <Space>
               <Button onClick={() => setPayModal({ open: false, fine: null })}>Hủy</Button>
               <Button type="primary" htmlType="submit" loading={recordPayment.isPending}>Xác nhận thu phí</Button>
