@@ -43,6 +43,20 @@ export interface CreateReservationPayload {
   book_id: number;
 }
 
+export interface ReaderSearchResult {
+  user_id: number;
+  full_name: string;
+  email: string;
+  phone: string;
+  library_card: {
+    card_id: number;
+    card_number: string;
+    status: number;
+    expiry_date: string;
+    is_expired: boolean;
+  } | null;
+}
+
 export interface CreateReservationResult {
   reservation_id: number;
   book_id: number;
@@ -112,6 +126,13 @@ export const reservationApi = {
       per_page: res.data?.results?.per_page ?? 20,
       page: res.data?.results?.page ?? 1,
     };
+  },
+
+  searchReader: async (keyword: string): Promise<ReaderSearchResult[]> => {
+    const res = await axiosInstance.get('/private/v1/reservation/search-reader', {
+      params: { keyword },
+    });
+    return res.data?.results?.objects ?? [];
   },
 
   getAvailableCopiesByBook: async (bookId: number): Promise<AvailableCopy[]> => {

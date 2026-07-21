@@ -94,6 +94,21 @@ export const userApi = {
     return response.data?.results?.object;
   },
 
+  requestReaderEmailVerification: async (body: ICreateUser & { password: string }) => {
+    const hasAvatarFile = (body as { avatar?: unknown }).avatar instanceof File;
+    const payload = hasAvatarFile
+      ? buildUserFormData(body as unknown as Record<string, unknown>)
+      : body;
+    const response = await axiosInstance.post('/private/v1/users/email-verification/request', payload,
+      hasAvatarFile ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined);
+    return response.data;
+  },
+
+  getReaderEmailVerificationStatus: async (token: string) => {
+    const response = await axiosInstance.get('/private/v1/users/email-verification/status', { params: { token } });
+    return response.data?.status as string;
+  },
+
   updateUser: async ({
     id,
     body,

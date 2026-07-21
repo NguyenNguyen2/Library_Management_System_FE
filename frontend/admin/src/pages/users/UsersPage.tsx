@@ -21,6 +21,7 @@ import {
 import { ROUTES } from '../../constants/routers';
 import FilterTable from '@shared/components/table/FilterTable';
 import { userHooks } from '../../hooks/useUsers';
+import { userApi } from '../../api/userApi';
 import { useGlobalVariable } from '../../hooks/GlobalVariableProvider';
 import {
   ICreateUser,
@@ -495,6 +496,18 @@ const LibrariansSection = ({ addTrigger, onTriggerReset }: { addTrigger: number;
           </div>
         </Form>
       </Modal>
+      <Modal
+        title="Đang chờ độc giả xác thực email"
+        open={isEmailOtpModalOpen}
+        onCancel={() => setIsEmailOtpModalOpen(false)}
+        footer={null}
+      >
+        <p className="mb-3">
+          Một liên kết xác thực đã được gửi tới <strong>{pendingReaderValues?.email}</strong>.
+          Tài khoản sẽ tự động được tạo sau khi độc giả nhấn vào liên kết trong email.
+        </p>
+        <p className="text-gray-500">Trạng thái: đang chờ xác thực...</p>
+      </Modal>
     </div>
   );
 };
@@ -508,6 +521,10 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEmailOtpModalOpen, setIsEmailOtpModalOpen] = useState(false);
+  const [emailVerificationToken, setEmailVerificationToken] = useState('');
+  const [pendingReaderValues, setPendingReaderValues] = useState<any>(null);
+  const [isSendingEmailOtp, setIsSendingEmailOtp] = useState(false);
   const [editingReader, setEditingReader] = useState<{ record: any; index: number } | null>(null);
   const [form] = Form.useForm();
 
@@ -625,27 +642,47 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
         }
       );
     } else {
-      createMutation.mutate(
-        {
-          body: {
-            ...body,
-            password: values.password,
-          },
-          params: { page, limit, keyword },
-        },
-        {
-          onSuccess: () => {
-            message.success('Tạo tài khoản độc giả thành công!');
-            setIsModalOpen(false);
-            refetch();
-          },
-          onError: (err: any) => {
-            message.error(err?.response?.data?.message || 'Không thể tạo tài khoản độc giả. Vui lòng thử lại.');
-          },
-        }
-      );
+      setPendingReaderValues({ ...body, password: values.password });
+      setEmailVerificationToken('');
+      setIsSendingEmailOtp(true);
+      userApi.requestReaderEmailVerification({ ...body, password: values.password })
+        .then((result) => {
+          setEmailVerificationToken(result.verification_token);
+          message.success('Đã gửi liên kết xác thực tới email độc giả.');
+          setIsEmailOtpModalOpen(true);
+        })
+        .catch((err: any) => {
+          message.error(err?.response?.data?.message || 'Không thể gửi mã xác thực email.');
+        })
+        .finally(() => setIsSendingEmailOtp(false));
     }
   };
+
+  useEffect(() => {
+    if (!emailVerificationToken) return undefined;
+    const timer = window.setInterval(async () => {
+      try {
+        const status = await userApi.getReaderEmailVerificationStatus(emailVerificationToken);
+        if (status === 'verified') {
+          window.clearInterval(timer);
+          message.success('Độc giả đã xác thực email và được tạo tài khoản thành công!');
+          setIsEmailOtpModalOpen(false);
+          setIsModalOpen(false);
+          setPendingReaderValues(null);
+          setEmailVerificationToken('');
+          refetch();
+        } else if (status === 'failed' || status === 'expired') {
+          window.clearInterval(timer);
+          message.error('Liên kết xác thực đã hết hạn hoặc không thể tạo tài khoản.');
+          setIsEmailOtpModalOpen(false);
+          setEmailVerificationToken('');
+        }
+      } catch {
+        // Giữ màn hình chờ; lần poll tiếp theo sẽ thử lại.
+      }
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [emailVerificationToken, refetch]);
 
   const handleDelete = (id: string) => {
     Modal.confirm({
@@ -947,7 +984,7 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
           onFinish={handleFormSubmit}
           initialValues={{ status: '1' }}
           className="mt-4 text-left"
-          disabled={createMutation.isPending || updateMutation.isPending}
+          disabled={createMutation.isPending || updateMutation.isPending || isSendingEmailOtp}
         >
           <ModalCreateEditUser detail={editingReader?.record} />
 

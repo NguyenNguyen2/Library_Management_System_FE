@@ -5,7 +5,6 @@ import {
   DatePicker,
   Divider,
   Input,
-  InputNumber,
   Modal,
   Select,
   Spin,
@@ -23,10 +22,12 @@ import {
   SyncOutlined,
   BookOutlined,
   UserOutlined,
+  IdcardOutlined,
 } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import {
   BookSearchResult,
+  ReaderSearchResult,
   ReservationRecord,
 } from '../../api/reservationApi';
 import { reservationHooks } from '../../hooks/useReservation';
@@ -51,7 +52,9 @@ const ReservationPage = () => {
   const [bookKeyword, setBookKeyword] = useState('');
   const [bookResults, setBookResults] = useState<BookSearchResult[]>([]);
   const [selectedBook, setSelectedBook] = useState<BookSearchResult | null>(null);
-  const [userId, setUserId] = useState<number | null>(null);
+  const [readerKeyword, setReaderKeyword] = useState('');
+  const [readerResults, setReaderResults] = useState<ReaderSearchResult[]>([]);
+  const [selectedReader, setSelectedReader] = useState<ReaderSearchResult | null>(null);
 
   // List filter state
   const [listUserId, setListUserId] = useState<string>('');
@@ -75,7 +78,8 @@ const ReservationPage = () => {
     copyId: number | null;
   }>({ open: false, reservation: null, copyId: null });
 
-  const searchMutation    = reservationHooks.useSearchBook();
+  const searchMutation       = reservationHooks.useSearchBook();
+  const searchReaderMutation = reservationHooks.useSearchReader();
   const createMutation    = reservationHooks.useCreateReservation();
   const confirmMutation   = reservationHooks.useConfirmReservation();
   const markReadyMutation = reservationHooks.useMarkReady();
@@ -132,10 +136,26 @@ const ReservationPage = () => {
     });
   };
 
+  const handleSearchReader = () => {
+    const trimmed = readerKeyword.trim();
+    if (trimmed.length < 2) {
+      message.info('Vui lòng nhập ít nhất 2 ký tự để tìm kiếm.');
+      return;
+    }
+    searchReaderMutation.mutate(trimmed, {
+      onSuccess: (data) => {
+        setReaderResults(data);
+        setSelectedReader(null);
+        if (data.length === 0) message.info('Không tìm thấy độc giả nào.');
+      },
+      onError: () => message.error('Lỗi tìm kiếm độc giả.'),
+    });
+  };
+
   const handleCreateReservation = () => {
-    if (!selectedBook || !userId) return;
+    if (!selectedBook || !selectedReader) return;
     createMutation.mutate(
-      { user_id: userId, book_id: selectedBook.book_id },
+      { user_id: selectedReader.user_id, book_id: selectedBook.book_id },
       {
         onSuccess: (result) => {
           Modal.success({
@@ -168,7 +188,9 @@ const ReservationPage = () => {
           setSelectedBook(null);
           setBookKeyword('');
           setBookResults([]);
-          setUserId(null);
+          setSelectedReader(null);
+          setReaderKeyword('');
+          setReaderResults([]);
           setActiveTab('list');
         },
         onError: (err) => {
@@ -578,16 +600,124 @@ const ReservationPage = () => {
                 <p className="m-0 mb-3 text-sm font-semibold text-gray-700">
                   Bước 2 — Chọn độc giả
                 </p>
-                <div className="flex items-center gap-3">
-                  <UserOutlined className="text-gray-400" />
-                  <InputNumber
-                    placeholder="Nhập User ID của độc giả"
-                    value={userId}
-                    onChange={(v) => setUserId(v)}
-                    style={{ width: 220 }}
-                    min={1}
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    placeholder="Nhập tên, User ID hoặc mã thẻ thư viện"
+                    value={readerKeyword}
+                    onChange={(e) => setReaderKeyword(e.target.value)}
+                    onPressEnter={handleSearchReader}
+                    prefix={<UserOutlined className="text-gray-400" />}
+                    allowClear
                   />
+                  <Button
+                    type="primary"
+                    style={{ background: '#7c3aed', borderColor: '#7c3aed' }}
+                    loading={searchReaderMutation.isPending}
+                    onClick={handleSearchReader}
+                  >
+                    Tìm
+                  </Button>
                 </div>
+
+                {/* Reader search results */}
+                {readerResults.length > 0 && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    {readerResults.map((reader) => (
+                      <button
+                        key={reader.user_id}
+                        onClick={() => {
+                          setSelectedReader(reader);
+                          setReaderResults([]);
+                          setReaderKeyword(reader.full_name);
+                        }}
+                        className={cn(
+                          'w-full text-left px-4 py-3 flex items-center justify-between',
+                          'hover:bg-purple-50 transition-colors border-0 bg-white cursor-pointer',
+                          'border-b border-gray-100 last:border-b-0'
+                        )}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 bg-gray-100 rounded-full shrink-0 flex items-center justify-center">
+                            <UserOutlined className="text-gray-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm text-gray-800 truncate">
+                              {reader.full_name}{' '}
+                              <span className="font-mono text-xs text-gray-400">
+                                #{reader.user_id}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {reader.email}
+                              {reader.phone ? ` · ${reader.phone}` : ''}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 shrink-0 ml-2">
+                          {reader.library_card ? (
+                            <Tag
+                              color={
+                                reader.library_card.status === 0
+                                  ? 'red'
+                                  : reader.library_card.is_expired
+                                  ? 'orange'
+                                  : 'green'
+                              }
+                              icon={<IdcardOutlined />}
+                            >
+                              {reader.library_card.card_number}
+                            </Tag>
+                          ) : (
+                            <Tag color="default">Chưa có thẻ</Tag>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Selected reader */}
+                {selectedReader && (
+                  <div className="mt-3 bg-purple-50 border border-purple-100 rounded-lg px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <UserOutlined className="text-purple-500" />
+                      <div>
+                        <span className="font-medium text-sm text-gray-800">
+                          {selectedReader.full_name}
+                        </span>
+                        <span className="ml-2 text-xs text-gray-400">
+                          #{selectedReader.user_id}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      {selectedReader.library_card ? (
+                        <Tag
+                          color={
+                            selectedReader.library_card.status === 0
+                              ? 'red'
+                              : selectedReader.library_card.is_expired
+                              ? 'orange'
+                              : 'green'
+                          }
+                          icon={<IdcardOutlined />}
+                        >
+                          {selectedReader.library_card.card_number}
+                        </Tag>
+                      ) : (
+                        <Tag color="default">Chưa có thẻ</Tag>
+                      )}
+                      <Button
+                        size="small"
+                        type="text"
+                        className="text-gray-400"
+                        onClick={() => setSelectedReader(null)}
+                      >
+                        Đổi
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Divider className="my-0" />
@@ -595,7 +725,7 @@ const ReservationPage = () => {
                 <Button
                   type="primary"
                   style={{ background: '#7c3aed', borderColor: '#7c3aed' }}
-                  disabled={!userId}
+                  disabled={!selectedReader}
                   loading={createMutation.isPending}
                   onClick={handleCreateReservation}
                   icon={<ClockCircleOutlined />}

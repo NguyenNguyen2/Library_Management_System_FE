@@ -11,12 +11,18 @@ import {
   MarkReadyPayload,
   MarkReadyResult,
   AvailableCopy,
+  ReaderSearchResult,
 } from '../api/reservationApi';
 
 export const reservationHooks = {
   useSearchBook: () =>
     useMutation<BookSearchResult[], AxiosError, string>({
       mutationFn: reservationApi.searchBook,
+    }),
+
+  useSearchReader: () =>
+    useMutation<ReaderSearchResult[], AxiosError, string>({
+      mutationFn: reservationApi.searchReader,
     }),
 
   useListReservations: (params?: {
