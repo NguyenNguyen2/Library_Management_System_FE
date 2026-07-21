@@ -156,7 +156,7 @@ const FineListTab = () => {
               selectedMethod === 'transfer'
                 ? `https://img.vietqr.io/image/TCB-2408057979-compact2.png?amount=${payModal.fine.amount}&addInfo=THANH%20TOAN%20PHI%20PH%20${payModal.fine.fine_id}&accountName=THU%20VIEN%20SACH%20VIET`
                 : `https://api.qrserver.com/v1/create-qr-code/?size=200x200&charset-target=UTF-8&data=${encodeURIComponent(
-                    `2|99|0971471076|THU VIEN SACH VIET||0|0|${payModal.fine.amount}|THANH TOAN PHI PH ${payModal.fine.fine_id}|transfer_mywallet`
+                    `2|99|0947740543|THU VIEN SACH VIET||0|0|${payModal.fine.amount}|THANH TOAN PHI PH ${payModal.fine.fine_id}|transfer_mywallet`
                   )}`
             }" />
             
@@ -193,7 +193,7 @@ const FineListTab = () => {
               </tr>
               <tr>
                 <td class="label">Số điện thoại:</td>
-                <td class="value">0971471076</td>
+                <td class="value">0947740543</td>
               </tr>
               `}
               <tr>
@@ -302,7 +302,6 @@ const FineListTab = () => {
             <Select onChange={(value) => setSelectedMethod(value as PaymentMethod)}>
               <Select.Option value="cash"><DollarOutlined /> Tiền mặt</Select.Option>
               <Select.Option value="transfer"><CreditCardOutlined /> Chuyển khoản (VietQR)</Select.Option>
-              <Select.Option value="momo"><HistoryOutlined /> Ví MoMo</Select.Option>
             </Select>
           </Form.Item>
 
@@ -318,7 +317,7 @@ const FineListTab = () => {
                 ) : (
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&charset-target=UTF-8&data=${encodeURIComponent(
-                      `2|99|0971471076|THU VIEN SACH VIET||0|0|${payModal.fine.amount}|THANH TOAN PHI PH ${payModal.fine.fine_id}|transfer_mywallet`
+                      `2|99|0947740543|THU VIEN SACH VIET||0|0|${payModal.fine.amount}|THANH TOAN PHI PH ${payModal.fine.fine_id}|transfer_mywallet`
                     )}`}
                     alt="MoMo QR Chuyen khoan"
                     className="w-[180px] h-[180px] object-contain"
@@ -341,7 +340,7 @@ const FineListTab = () => {
                   
                   <span className="text-gray-400">Số tài khoản:</span>
                   <span className="col-span-2 font-mono font-bold text-gray-900">
-                    {selectedMethod === 'transfer' ? '2408057979' : '0971471076'}
+                    {selectedMethod === 'transfer' ? '2408057979' : '0947740543'}
                   </span>
 
                   <span className="text-gray-400">Tên tài khoản:</span>
@@ -699,7 +698,12 @@ const DamageFineTab = () => {
     setLoadingHistory(true);
     try {
       const history = await userApi.getReaderBorrowHistory(String(readerId));
-      setBorrowHistory(history);
+      // API trả 1 dòng cho mỗi khoản phí gắn với bản sao (1 bản sao có thể có nhiều
+      // phí) — ở đây chỉ cần 1 dòng / bản sao để chọn đúng sách, nên khử trùng theo copy_id.
+      const uniqueByCopy = Array.from(
+        new Map(history.map(row => [row.copy_id, row])).values()
+      );
+      setBorrowHistory(uniqueByCopy);
     } catch (err) {
       console.error(err);
     } finally {
@@ -707,28 +711,24 @@ const DamageFineTab = () => {
     }
   };
 
-  // When a borrow transaction is selected
-  const handleSelectBorrow = async (borrowId: number) => {
-    const selectedBorrow = borrowHistory.find(b => b.borrow_id === borrowId);
+  // When a specific borrowed copy is selected (mỗi dòng lịch sử mượn ứng với 1 copy_id
+  // duy nhất — 1 giao dịch mượn nhiều sách sẽ có nhiều dòng trùng borrow_id, nên phải
+  // định danh theo copy_id chứ không phải borrow_id để tránh chọn nhầm sách).
+  const handleSelectBorrow = (copyId: number) => {
+    const selectedBorrow = borrowHistory.find(b => b.copy_id === copyId);
     if (!selectedBorrow) return;
 
-    try {
-      // Fetch all copies of the borrowed book by searching its title
-      const res = await getBookCopies(1, selectedBorrow.book_title);
-      if (res && res.data) {
-        setCopies(res.data);
-        
-        // Find the copy matching the borrowed copy barcode and pre-select it
-        const matchedCopy = res.data.find((c: any) => c.barcode === selectedBorrow.copy_barcode);
-        if (matchedCopy) {
-          form.setFieldsValue({ copy_id: matchedCopy.copy_id });
-        } else if (res.data.length > 0) {
-          form.setFieldsValue({ copy_id: res.data[0].copy_id });
-        }
-      }
-    } catch (err) {
-      console.error(err);
-    }
+    // Đảm bảo bản sao vừa chọn có mặt trong option của ô "Bản sao sách bị hỏng / mất"
+    setCopies(prev =>
+      prev.some(c => c.copy_id === selectedBorrow.copy_id)
+        ? prev
+        : [{ copy_id: selectedBorrow.copy_id, book_title: selectedBorrow.book_title, barcode: selectedBorrow.copy_barcode }, ...prev]
+    );
+
+    form.setFieldsValue({
+      copy_id: selectedBorrow.copy_id,
+      borrow_id: selectedBorrow.borrow_id,
+    });
   };
 
   // Fetch copies (actual search call)
@@ -802,22 +802,26 @@ const DamageFineTab = () => {
             </Select>
           </Form.Item>
 
-          {/* Borrow Transaction selection (conditional) */}
-          <Form.Item name="borrow_id" label="Chọn giao dịch mượn liên quan (tùy chọn)">
+          {/* Borrow Transaction selection (conditional) — chọn theo copy_id (định danh duy nhất
+              cho từng cuốn sách trong lịch sử mượn); borrow_id thật được set kèm qua
+              handleSelectBorrow, không bind trực tiếp field này vào form. */}
+          <Form.Item label="Chọn giao dịch mượn liên quan (tùy chọn)">
             <Select
               placeholder={selectedReaderId ? "Chọn từ danh sách sách đang mượn..." : "Vui lòng chọn độc giả trước..."}
               disabled={!selectedReaderId}
               loading={loadingHistory}
               onChange={handleSelectBorrow}
+              onClear={() => form.setFieldsValue({ borrow_id: undefined })}
               allowClear
             >
               {borrowHistory.map(b => (
-                <Select.Option key={b.borrow_id} value={b.borrow_id}>
+                <Select.Option key={b.copy_id} value={b.copy_id}>
                   {b.book_title} (Mã mượn: BM-{b.borrow_id} - Barcode: {b.copy_barcode})
                 </Select.Option>
               ))}
             </Select>
           </Form.Item>
+          <Form.Item name="borrow_id" hidden><Input /></Form.Item>
 
           {/* Book Copy Select drop down */}
           <Form.Item name="copy_id" label="Bản sao sách bị hỏng / mất" rules={[{ required: true, message: 'Vui lòng chọn bản sao sách' }]}>

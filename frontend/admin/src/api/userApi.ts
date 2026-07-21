@@ -34,6 +34,7 @@ export interface BorrowHistoryRow {
   status: string;
   librarian_name: string | null;
   book_title: string;
+  copy_id: number;
   copy_barcode: string;
   return_date: string | null;
   condition_return: string | null;
