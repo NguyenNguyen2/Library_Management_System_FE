@@ -1,12 +1,10 @@
-import { Flex, Button } from 'antd';
+import { Flex } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { matchPath, useLocation } from 'react-router-dom';
 import { DYNAMIC_ROUTES, HEADER_TITLES } from '../../constants/routers';
 import { useGlobalVariable } from '../../hooks/GlobalVariableProvider';
 import { getKey } from '@shared/types/I18nKeyType';
 import {
-  SearchOutlined,
-  BellOutlined,
   RightOutlined,
 } from '@ant-design/icons';
 
@@ -37,27 +35,8 @@ const DefaultHeader = () => {
         </span>
       </div>
 
-      {/* Right actions */}
-      <Flex align="center" gap={12}>
-        <Button
-          type="text"
-          icon={<SearchOutlined style={{ fontSize: 18, color: '#6B7280' }} />}
-          className="flex items-center justify-center w-9 h-9 hover:bg-[#F3F4F6] rounded-md border-0 cursor-pointer"
-        />
-        
-        <div className="relative">
-          <Button
-            type="text"
-            icon={<BellOutlined style={{ fontSize: 18, color: '#6B7280' }} />}
-            className="flex items-center justify-center w-9 h-9 hover:bg-[#F3F4F6] rounded-md border-0 cursor-pointer"
-          />
-          <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
-            3
-          </span>
-        </div>
-
-        <div className="h-6 w-[1px] bg-gray-200 mx-1" />
-
+      {/* User card */}
+      <Flex align="center">
         {/* User Card */}
         <Flex align="center" gap={8} className="pl-1 pr-2 py-1 hover:bg-[#F3F4F6] rounded-md cursor-pointer transition-colors duration-150">
           <div className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center font-bold text-sm">

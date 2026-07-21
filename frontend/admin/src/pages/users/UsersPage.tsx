@@ -1,6 +1,6 @@
 import { TableColumnsType, Tag, Card, Table, Button, Input, Select, Modal, Form, Space, message, Row, Col, Tooltip, Segmented } from 'antd';
 import dayjs from 'dayjs';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
@@ -496,18 +496,6 @@ const LibrariansSection = ({ addTrigger, onTriggerReset }: { addTrigger: number;
           </div>
         </Form>
       </Modal>
-      <Modal
-        title="Đang chờ độc giả xác thực email"
-        open={isEmailOtpModalOpen}
-        onCancel={() => setIsEmailOtpModalOpen(false)}
-        footer={null}
-      >
-        <p className="mb-3">
-          Một liên kết xác thực đã được gửi tới <strong>{pendingReaderValues?.email}</strong>.
-          Tài khoản sẽ tự động được tạo sau khi độc giả nhấn vào liên kết trong email.
-        </p>
-        <p className="text-gray-500">Trạng thái: đang chờ xác thực...</p>
-      </Modal>
     </div>
   );
 };
@@ -522,11 +510,49 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEmailOtpModalOpen, setIsEmailOtpModalOpen] = useState(false);
-  const [emailVerificationToken, setEmailVerificationToken] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [isVerifyingEmailOtp, setIsVerifyingEmailOtp] = useState(false);
   const [pendingReaderValues, setPendingReaderValues] = useState<any>(null);
   const [isSendingEmailOtp, setIsSendingEmailOtp] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [editingReader, setEditingReader] = useState<{ record: any; index: number } | null>(null);
   const [form] = Form.useForm();
+
+  const startResendCountdown = (seconds = 60) => {
+    setResendCountdown(seconds);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setResendCountdown((prev) => {
+        if (prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const handleResendOtp = () => {
+    if (!pendingReaderValues?.email || resendCountdown > 0 || isSendingEmailOtp) return;
+    setIsSendingEmailOtp(true);
+    startResendCountdown(60);
+    userApi
+      .requestReaderEmailOtp(pendingReaderValues.email)
+      .then(() => {
+        message.success(`Đã gửi lại mã OTP tới ${pendingReaderValues.email}`);
+      })
+      .catch((err: any) => {
+        message.error(err?.response?.data?.message || 'Không thể gửi lại mã OTP.');
+      })
+      .finally(() => setIsSendingEmailOtp(false));
+  };
 
   // Listen to parent action button trigger
   useEffect(() => {
@@ -643,13 +669,17 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
       );
     } else {
       setPendingReaderValues({ ...body, password: values.password });
-      setEmailVerificationToken('');
+      setEmailOtp('');
       setIsSendingEmailOtp(true);
-      userApi.requestReaderEmailVerification({ ...body, password: values.password })
-        .then((result) => {
-          setEmailVerificationToken(result.verification_token);
-          message.success('Đã gửi liên kết xác thực tới email độc giả.');
-          setIsEmailOtpModalOpen(true);
+
+      // Đóng giao diện thêm độc giả và mở giao diện nhập mã xác nhận (OTP) ngay lập tức
+      setIsModalOpen(false);
+      setIsEmailOtpModalOpen(true);
+      startResendCountdown(60);
+
+      userApi.requestReaderEmailOtp(values.email)
+        .then(() => {
+          message.success(`Mã OTP đã được gửi tới ${values.email}. Vui lòng nhập mã để hoàn tất.`);
         })
         .catch((err: any) => {
           message.error(err?.response?.data?.message || 'Không thể gửi mã xác thực email.');
@@ -658,31 +688,38 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
     }
   };
 
-  useEffect(() => {
-    if (!emailVerificationToken) return undefined;
-    const timer = window.setInterval(async () => {
-      try {
-        const status = await userApi.getReaderEmailVerificationStatus(emailVerificationToken);
-        if (status === 'verified') {
-          window.clearInterval(timer);
-          message.success('Độc giả đã xác thực email và được tạo tài khoản thành công!');
-          setIsEmailOtpModalOpen(false);
-          setIsModalOpen(false);
-          setPendingReaderValues(null);
-          setEmailVerificationToken('');
-          refetch();
-        } else if (status === 'failed' || status === 'expired') {
-          window.clearInterval(timer);
-          message.error('Liên kết xác thực đã hết hạn hoặc không thể tạo tài khoản.');
-          setIsEmailOtpModalOpen(false);
-          setEmailVerificationToken('');
+  const handleVerifyReaderEmail = async () => {
+    if (!pendingReaderValues || emailOtp.trim().length !== 6) return;
+    setIsVerifyingEmailOtp(true);
+    try {
+      const verificationToken = await userApi.verifyReaderEmailOtp(
+        pendingReaderValues.email,
+        emailOtp.trim()
+      );
+      createMutation.mutate(
+        {
+          body: { ...pendingReaderValues, email_verification_token: verificationToken },
+          params: { page, limit, keyword },
+        },
+        {
+          onSuccess: () => {
+            message.success('Tạo tài khoản độc giả thành công!');
+            setIsEmailOtpModalOpen(false);
+            setIsModalOpen(false);
+            setPendingReaderValues(null);
+            refetch();
+          },
+          onError: (err: any) => {
+            message.error(err?.response?.data?.message || 'Không thể tạo tài khoản độc giả. Vui lòng thử lại.');
+          },
         }
-      } catch {
-        // Giữ màn hình chờ; lần poll tiếp theo sẽ thử lại.
-      }
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, [emailVerificationToken, refetch]);
+      );
+    } catch (err: any) {
+      message.error(err?.response?.data?.message || 'Mã xác thực không chính xác.');
+    } finally {
+      setIsVerifyingEmailOtp(false);
+    }
+  };
 
   const handleDelete = (id: string) => {
     Modal.confirm({
@@ -1002,6 +1039,67 @@ const ReadersSection = ({ addTrigger, onTriggerReset }: { addTrigger: number; on
             </Button>
           </div>
         </Form>
+      </Modal>
+
+      {/* Modal nhập mã OTP xác thực email độc giả */}
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <KeyOutlined className="text-blue-600 text-lg" />
+            <span>Xác thực email độc giả</span>
+          </div>
+        }
+        open={isEmailOtpModalOpen}
+        onCancel={() => {
+          setIsEmailOtpModalOpen(false);
+          setEmailOtp('');
+        }}
+        onOk={handleVerifyReaderEmail}
+        okText="Xác nhận"
+        cancelText="Hủy"
+        confirmLoading={isVerifyingEmailOtp || createMutation.isPending}
+        okButtonProps={{ disabled: isSendingEmailOtp || emailOtp.trim().length !== 6 }}
+        destroyOnClose
+        centered
+        width={450}
+      >
+        <div className="py-2 text-left">
+          <p className="mb-4 text-gray-600 text-sm">
+            Mã OTP 6 số đã được gửi tới email{' '}
+            <strong className="text-blue-600 font-semibold">{pendingReaderValues?.email}</strong>.
+            Mã có hiệu lực trong 5 phút.
+          </p>
+
+          {isSendingEmailOtp && (
+            <div className="mb-3 text-sm text-blue-500 flex items-center gap-2 bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+              <ReloadOutlined spin />
+              <span>Đang gửi mã xác thực tới email...</span>
+            </div>
+          )}
+
+          <div className="mb-5 flex justify-center">
+            <Input.OTP
+              length={6}
+              value={emailOtp}
+              onChange={(value) => setEmailOtp(value)}
+              size="large"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t">
+            <span>Chưa nhận được mã?</span>
+            <Button
+              type="link"
+              size="small"
+              onClick={handleResendOtp}
+              disabled={resendCountdown > 0 || isSendingEmailOtp}
+              className="!p-0 !h-auto text-xs"
+            >
+              {resendCountdown > 0 ? `Gửi lại mã (${resendCountdown}s)` : 'Gửi lại mã OTP'}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
