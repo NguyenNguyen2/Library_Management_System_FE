@@ -20,8 +20,8 @@ export const useUpdateSettings = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (settings: SystemSettingsPayload) => settingsApi.update(settings),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(SETTINGS_KEY, updated);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
       message.success(i18n.t(getKey('settings_saved')));
     },
   });

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import {
   Button,
   Card,
@@ -46,6 +46,18 @@ const SETTING_META: Record<SettingKey, { labelKey: keyof I18nKey; hintKey: keyof
   reservation_expiry_days: { labelKey: 'settings_reservation_expiry_days_label', hintKey: 'settings_reservation_expiry_days_hint' },
 };
 
+const DEFAULT_SETTING_VALUES: Record<SettingKey, number> = {
+  card_regular_borrow_limit: 3,
+  card_regular_max_days: 14,
+  card_priority_borrow_limit: 5,
+  card_priority_max_days: 21,
+  fine_per_day: 5000,
+  fine_cap_amount: 500000,
+  max_renew_times: 2,
+  renew_extend_days: 7,
+  reservation_expiry_days: 3,
+};
+
 /**
  * Module 7 — Cài đặt hệ thống. Mỗi nhóm cấu hình một Card để admin dễ rà soát
  * và lưu từng phần. Lưu luôn là 1 POST duy nhất (API hỗ trợ cập nhật nhiều
@@ -59,17 +71,25 @@ const GeneralSettingsTab = () => {
   const { data, isLoading } = useFetchSettings();
   const { mutate: update, isPending: isSaving } = useUpdateSettings();
 
-  const toFormValues = (): Partial<Record<SettingKey, number>> =>
-    Object.fromEntries(
-      (data ?? []).map((s) => [s.config_key, Number(s.config_value)]),
-    );
+  const toFormValues = useCallback((): Record<SettingKey, number> => {
+    const values = { ...DEFAULT_SETTING_VALUES };
+    if (data) {
+      data.forEach((s) => {
+        if (s.config_key in values) {
+          const num = Number(s.config_value);
+          if (!isNaN(num)) {
+            values[s.config_key as SettingKey] = num;
+          }
+        }
+      });
+    }
+    return values;
+  }, [data]);
 
   // Seed form with server values on first load (and whenever they refresh).
   useEffect(() => {
-    if (data) {
-      form.setFieldsValue(toFormValues());
-    }
-  }, [data, form]);
+    form.setFieldsValue(toFormValues());
+  }, [data, form, toFormValues]);
 
   /** Non-negative integer validator — rejects decimals, negatives, NaN. */
   const positiveIntegerRule: FormRule = {
@@ -103,9 +123,9 @@ const GeneralSettingsTab = () => {
     });
   };
 
-  /** Reset pulls from the last-fetched server snapshot — no refetch needed. */
+  /** Reset pulls from the last-fetched server snapshot — clear errors & set values. */
   const handleReset = () => {
-    if (!data) return;
+    form.resetFields();
     form.setFieldsValue(toFormValues());
   };
 
