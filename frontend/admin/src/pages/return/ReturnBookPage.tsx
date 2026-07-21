@@ -130,8 +130,13 @@ const ReturnBookPage = () => {
   const handleConfirm = () => {
     if (!selectedReader || selectedCopyIds.length === 0) return;
 
-    // Lấy borrow_id đầu tiên từ sách đang trả (dùng cho receipt)
-    const firstBorrowId = borrowedBooks.find((b) => selectedCopyIds.includes(b.copy_id))?.borrow_id;
+    // Lấy borrow_id của sách có phí phạt lớn nhất (nếu có) để ưu tiên in biên lai phiếu đó
+    const selectedReturnedBooks = borrowedBooks.filter((b) => selectedCopyIds.includes(b.copy_id));
+    const bookWithMaxPenalty = selectedReturnedBooks.reduce(
+      (prev, curr) => (curr.penalty_fee > (prev?.penalty_fee ?? -1) ? curr : prev),
+      selectedReturnedBooks[0]
+    );
+    const preferredBorrowId = bookWithMaxPenalty?.borrow_id;
 
     const items = selectedCopyIds.map((copyId) => ({
       copy_id: copyId,
@@ -142,8 +147,11 @@ const ReturnBookPage = () => {
       { user_id: selectedReader.user_id, items },
       {
         onSuccess: (result) => {
-          // borrow_id cho receipt: ưu tiên closed_transactions, rồi firstBorrowId
-          const receiptBorrowId = result.closed_transactions[0] ?? firstBorrowId;
+          // borrow_id cho receipt: ưu tiên preferredBorrowId (có phí phạt), rồi closed_transactions, rồi fallback
+          const receiptBorrowId =
+            (preferredBorrowId && result.closed_transactions.includes(preferredBorrowId))
+              ? preferredBorrowId
+              : preferredBorrowId ?? result.closed_transactions[0];
 
           Modal.success({
             title: 'Trả sách thành công',
