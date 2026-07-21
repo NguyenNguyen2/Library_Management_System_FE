@@ -131,9 +131,13 @@ const COVER_IMAGE_ACCEPT = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'
 const COVER_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 // Ảnh bìa lưu trong DB là đường dẫn tương đối (storage local) hoặc URL đầy đủ (import ISBN / ảnh cũ).
+// Backend (Book::cover_image accessor) đã trả về URL đầy đủ cho dữ liệu mới — nhánh dưới
+// chỉ còn là fallback cho dữ liệu cũ/edge-case, không được hardcode localhost.
 const resolveCoverImageUrl = (coverImage?: string | null): string | null => {
   if (!coverImage) return null;
-  return coverImage.startsWith('http') ? coverImage : `http://127.0.0.1:8000/storage/${coverImage}`;
+  if (coverImage.startsWith('http')) return coverImage;
+  const base = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000/api').replace(/\/api\/?$/, '');
+  return `${base}/storage/${coverImage}`;
 };
 
 export function BooksListPage() {
