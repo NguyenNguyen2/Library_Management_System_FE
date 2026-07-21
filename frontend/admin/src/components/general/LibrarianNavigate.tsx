@@ -124,12 +124,38 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
     },
   ];
 
-  const isActive = (item: NavItem) => {
-    const path = pathname.pathname + pathname.search;
-    if (item.children) {
+  const checkChildActive = (to: string) => {
+    const currentPath = pathname.pathname;
+    const currentSearch = pathname.search;
+
+    if (to.includes('?')) {
+      const [basePath, query] = to.split('?');
+      return currentPath === basePath && currentSearch.includes(query);
+    }
+
+    if (currentPath !== to) return false;
+
+    const urlParams = new URLSearchParams(currentSearch);
+    const activeTab = urlParams.get('tab');
+    if (to === ROUTES.BOOKS && activeTab && ['authors', 'featured', 'copies', 'report'].includes(activeTab)) {
       return false;
     }
-    return path === item.to;
+    if (to === ROUTES.FEES && activeTab && ['damage', 'history', 'revenue'].includes(activeTab)) {
+      return false;
+    }
+
+    return true;
+  };
+
+  const isActive = (item: NavItem) => {
+    if (item.children) {
+      return item.children.some((child) => checkChildActive(child.to));
+    }
+    if (item.to.includes('?')) {
+      const [basePath, query] = item.to.split('?');
+      return pathname.pathname === basePath && pathname.search.includes(query);
+    }
+    return pathname.pathname === item.to;
   };
 
   useEffect(() => {
@@ -139,7 +165,7 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
 
     // Auto-expand parent menu if a child is active
     const activeParent = menuConfig.find((item) =>
-      item.children?.some((child) => child.to === path)
+      item.children?.some((child) => checkChildActive(child.to))
     );
     if (activeParent) {
       setOpenMenu(activeParent.key);
@@ -252,7 +278,7 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
               {item.children && isOpen && !collapsed && (
                 <div className="mt-0.5 pl-3 space-y-0.5">
                   {item.children.map((c) => {
-                    const isChildActive = selectItem === c.to;
+                    const isChildActive = checkChildActive(c.to);
                     return (
                       <button
                         key={c.label}
