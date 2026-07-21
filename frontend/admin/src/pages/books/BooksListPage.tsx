@@ -80,7 +80,8 @@ import {
   deleteBookCopy,
   importCopies,
   getInventorySummary,
-  generateBarcode
+  generateBarcode,
+  liquidateBookCopyByBarcode
 } from '../../services/copyService';
 
 type Author = {
@@ -219,6 +220,8 @@ export function BooksListPage() {
   const [isRetireModalOpen, setIsRetireModalOpen] = useState(false);
   const [retiringCopyId, setRetiringCopyId] = useState<number | null>(null);
   const [retireForm] = Form.useForm();
+  const [directRetireForm] = Form.useForm();
+  const [liquidatingDirectly, setLiquidatingDirectly] = useState(false);
   const [importResult, setImportResult] = useState<any | null>(null);
   const [importing, setImporting] = useState(false);
 
@@ -343,6 +346,31 @@ export function BooksListPage() {
       message.error(err?.response?.data?.message || "Lỗi khi thanh lý bản sao!");
     }
   };
+
+  const handleDirectRetire = async (values: any) => {
+    setLiquidatingDirectly(true);
+    try {
+      await liquidateBookCopyByBarcode({
+        barcode: values.barcode,
+        reason: values.reason,
+        retired_date: values.retired_date,
+        note: values.note
+      });
+      message.success(`Thanh lý bản sao có barcode "${values.barcode}" thành công!`);
+      directRetireForm.resetFields();
+      directRetireForm.setFieldsValue({
+        reason: 'Hư hỏng nặng không thể sửa',
+        retired_date: nowYMD(),
+        note: ''
+      });
+      loadCopies(copiesPage, copiesSearchText);
+    } catch (err: any) {
+      console.error(err);
+      message.error(err?.response?.data?.message || "Lỗi khi thanh lý bản sao!");
+    } finally {
+      setLiquidatingDirectly(false);
+    }
+  };
  
   const handleImportExcel = async (file: File) => {
     setImporting(true);
@@ -399,6 +427,7 @@ export function BooksListPage() {
   const [form] = Form.useForm();
   const watchCreateFirstCopy = Form.useWatch('create_first_copy', form);
   const watchBarcode = Form.useWatch('barcode', form);
+  const watchCopiesCount = Form.useWatch('copies_count', form);
 
   const translateFieldName = (field: string) => {
     const map: Record<string, string> = {
@@ -554,6 +583,17 @@ export function BooksListPage() {
       return () => clearTimeout(delayDebounceFn);
     }
   }, [copiesSearchText, activeTab]);
+
+  // Initialize direct retire form
+  useEffect(() => {
+    if (activeTab === 'import') {
+      directRetireForm.setFieldsValue({
+        reason: 'Hư hỏng nặng không thể sửa',
+        retired_date: nowYMD(),
+        note: ''
+      });
+    }
+  }, [activeTab]);
 
   // Trigger loading report summary data
   useEffect(() => {
@@ -884,6 +924,7 @@ export function BooksListPage() {
         delete dataToSave.create_first_copy;
         delete dataToSave.barcode;
         delete dataToSave.shelf_location;
+        delete dataToSave.copies_count;
       } else {
         dataToSave.create_first_copy = values.create_first_copy !== false;
       }
@@ -1174,15 +1215,51 @@ export function BooksListPage() {
               type="text"
               icon={<QrCode size={16} className="text-blue-600 hover:text-blue-800" />}
               onClick={() => {
+                const removeAccents = (str: string) => {
+                  return str
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/đ/g, 'd')
+                    .replace(/Đ/g, 'D');
+                };
+
+                const cost = record.book_replacement_cost 
+                  ? Number(record.book_replacement_cost).toLocaleString('vi-VN') + ' d'
+                  : '0 d';
+                const rating = `${record.book_avg_rating || '0.0'}/5 (${record.book_total_reviews || 0} luot)`;
+
+                const rawQrData = `[THONG TIN SACH]\n` +
+                               `=====================\n` +
+                               `Ma ban sao: ${record.barcode}\n` +
+                               `Ma sach: ${record.book_id || 'N/A'}\n` +
+                               `ISBN: ${record.book_isbn || 'N/A'}\n` +
+                               `Ke: ${record.location || 'Chua xep ke'}\n` +
+                               `---------------------\n` +
+                               `Ten sach: ${record.book_title}\n` +
+                               `Nha xuat ban: ${record.book_publisher || 'N/A'}\n` +
+                               `Ngay xuat ban: ${record.book_publish_year || 'Chua cap nhat'}\n` +
+                               `Phien ban: ${record.book_edition || 'Chua cap nhat'}\n` +
+                               `Ngon ngu: ${record.book_language || 'TIENG VIET'}\n` +
+                               `So trang: ${record.book_pages ? record.book_pages + ' trang' : 'Chua cap nhat'}\n` +
+                               `Kich thuoc: ${record.book_dimensions || 'Chua cap nhat'}\n` +
+                               `Loai bia: ${record.book_cover_type || 'Chua cap nhat'}\n` +
+                               `Gia den bu: ${cost}\n` +
+                               `Danh gia: ${rating}\n` +
+                               `---------------------\n` +
+                               `Mo ta:\n${record.book_description || 'Khong co mo ta'}\n` +
+                               `=====================`;
+
+                const qrData = removeAccents(rawQrData);
+
                 Modal.info({
                   title: 'Mã QR Bản sao: ' + record.barcode,
                   content: (
                     <div className="flex flex-col items-center justify-center p-4">
                       <div className="border p-4 bg-white rounded-lg shadow-sm">
                         <img 
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${record.barcode}`} 
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&charset-target=UTF-8&data=${encodeURIComponent(qrData)}`} 
                           alt="QR Code" 
-                          className="w-[150px] h-[150px]"
+                          className="w-[200px] h-[200px]"
                         />
                       </div>
                       <p className="mt-3 font-mono font-bold text-gray-700">{record.barcode}</p>
@@ -1666,7 +1743,7 @@ export function BooksListPage() {
                     onClick={() => handleTabChange('import')}
                     className="h-10 rounded-lg flex items-center justify-center font-semibold"
                   >
-                    Import / Thanh lý
+                    Nhập & Thanh lý kho
                   </Button>
                   <Button
                     type="default"
@@ -1851,7 +1928,7 @@ export function BooksListPage() {
       {activeTab === 'import' && (
           <Card 
             className="!rounded-[12px] border border-gray-100 shadow-sm max-w-[800px] mx-auto text-center py-6" 
-            title={<span className="font-bold text-navyDark text-base">Import & Thanh lý kho</span>}
+            title={<span className="font-bold text-navyDark text-base">Nhập & Thanh lý kho</span>}
             extra={
               <Button onClick={() => handleTabChange('copies')} className="rounded-lg h-9">
                 Quay lại danh sách
@@ -1948,9 +2025,79 @@ export function BooksListPage() {
               )}
  
               <div className="border-t border-gray-100 w-full my-4 pt-4 text-left">
-                <h4 className="font-bold text-gray-700 mb-1 text-sm">Thanh lý bản sao (Liquidation)</h4>
-                <p className="text-xs text-gray-400 mb-2">Chuyển trạng thái các bản sao hư hỏng nặng hoặc mất sang danh mục thanh lý.</p>
-                <Button danger className="rounded-lg h-9" onClick={() => handleTabChange('copies')}>Đi tới danh sách để chọn thanh lý</Button>
+                <h4 className="font-bold text-gray-700 mb-2 text-sm">Thanh lý bản sao (Liquidation)</h4>
+                <p className="text-xs text-gray-400 mb-4">
+                  Nhập mã Barcode của bản sao sách cần thanh lý. Bản sao sẽ chuyển sang trạng thái <strong>'Đã thanh lý'</strong> và ghi nhận thông tin vào hệ thống (không xóa khỏi cơ sở dữ liệu).
+                </p>
+
+                <Form
+                  form={directRetireForm}
+                  layout="vertical"
+                  onFinish={handleDirectRetire}
+                  className="bg-gray-50/50 p-4 rounded-xl border border-gray-100/80"
+                >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+                    <Form.Item
+                      name="barcode"
+                      label={<span className="font-semibold text-xs text-gray-600">Mã Barcode bản sao</span>}
+                      rules={[{ required: true, message: 'Vui lòng nhập mã Barcode bản sao!' }]}
+                    >
+                      <Input placeholder="Ví dụ: BC260705..." className="h-9 rounded-lg" />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="reason"
+                      label={<span className="font-semibold text-xs text-gray-600">Lý do thanh lý</span>}
+                      rules={[{ required: true, message: 'Vui lòng chọn hoặc nhập lý do!' }]}
+                    >
+                      <Select 
+                        className="h-9"
+                        options={[
+                          { value: 'Hư hỏng nặng không thể sửa', label: 'Hư hỏng nặng không thể sửa' },
+                          { value: 'Sách bị mất / Thất thoát', label: 'Sách bị mất / Thất thoát' },
+                          { value: 'Hết hạn sử dụng / Lỗi thời', label: 'Hết hạn sử dụng / Lỗi thời' },
+                          { value: 'Khác', label: 'Lý do khác' }
+                        ]}
+                      />
+                    </Form.Item>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4">
+                    <Form.Item
+                      name="retired_date"
+                      label={<span className="font-semibold text-xs text-gray-600">Ngày thanh lý</span>}
+                      rules={[{ required: true, message: 'Vui lòng chọn ngày thanh lý!' }]}
+                    >
+                      <Input type="date" className="h-9 rounded-lg" />
+                    </Form.Item>
+
+                    <Form.Item
+                      name="note"
+                      label={<span className="font-semibold text-xs text-gray-600">Ghi chú thêm (nếu có)</span>}
+                    >
+                      <Input placeholder="Chi tiết tình trạng..." className="h-9 rounded-lg" />
+                    </Form.Item>
+                  </div>
+
+                  <Form.Item className="mb-0 text-right">
+                    <Button 
+                      type="default" 
+                      onClick={() => handleTabChange('copies')} 
+                      className="mr-2 h-9 rounded-lg"
+                    >
+                      Đi tới danh sách bản sao
+                    </Button>
+                    <Button 
+                      type="primary" 
+                      danger 
+                      htmlType="submit" 
+                      loading={liquidatingDirectly} 
+                      className="h-9 rounded-lg"
+                    >
+                      Xác nhận thanh lý
+                    </Button>
+                  </Form.Item>
+                </Form>
               </div>
             </div>
           </Card>
@@ -2334,25 +2481,12 @@ export function BooksListPage() {
               {watchCreateFirstCopy !== false && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                   <Form.Item
-                    name="barcode"
-                    label={<span className="font-semibold text-gray-700">Barcode đầu tiên</span>}
-                    rules={[{ required: true, message: 'Vui lòng nhập barcode hoặc bấm "Sinh barcode"!' }]}
+                    name="copies_count"
+                    label={<span className="font-semibold text-gray-700">Số lượng bản sao</span>}
+                    initialValue={1}
+                    rules={[{ required: true, message: 'Vui lòng nhập số lượng bản sao!' }]}
                   >
-                    <Input
-                      placeholder="Nhập barcode..."
-                      className="h-9 rounded-lg"
-                      addonAfter={
-                        <button
-                          type="button"
-                          onClick={handleGenerateBarcode}
-                          disabled={generatingBarcode}
-                          className="flex items-center gap-1 text-blue-600 disabled:text-gray-400"
-                        >
-                          <RefreshCw size={13} className={generatingBarcode ? 'animate-spin' : ''} />
-                          Sinh barcode
-                        </button>
-                      }
-                    />
+                    <InputNumber min={1} max={1000} className="h-9 rounded-lg w-full" />
                   </Form.Item>
 
                   <Form.Item
@@ -2362,7 +2496,37 @@ export function BooksListPage() {
                     <Input placeholder="Ví dụ: A1-01" className="h-9 rounded-lg" />
                   </Form.Item>
 
-                  {watchBarcode && (
+                  {(!watchCopiesCount || watchCopiesCount <= 1) ? (
+                    <Form.Item
+                      name="barcode"
+                      label={<span className="font-semibold text-gray-700">Barcode đầu tiên</span>}
+                      rules={[{ required: true, message: 'Vui lòng nhập barcode hoặc bấm "Sinh barcode"!' }]}
+                      className="col-span-1 md:col-span-2"
+                    >
+                      <Input
+                        placeholder="Nhập barcode..."
+                        className="h-9 rounded-lg"
+                        addonAfter={
+                          <button
+                            type="button"
+                            onClick={handleGenerateBarcode}
+                            disabled={generatingBarcode}
+                            className="flex items-center gap-1 text-blue-600 disabled:text-gray-400"
+                          >
+                            <RefreshCw size={13} className={generatingBarcode ? 'animate-spin' : ''} />
+                            Sinh barcode
+                          </button>
+                        }
+                      />
+                    </Form.Item>
+                  ) : (
+                    <div className="col-span-1 md:col-span-2 -mt-1 mb-2 text-xs text-gray-500">
+                      Sẽ tự động tạo <b>{watchCopiesCount}</b> bản sao, mã vạch dạng{' '}
+                      <span className="font-mono">BOOK000001, BOOK000002...</span>
+                    </div>
+                  )}
+
+                  {watchBarcode && (!watchCopiesCount || watchCopiesCount <= 1) && (
                     <div className="col-span-1 md:col-span-2 -mt-2 mb-2">
                       <span className="text-xs text-gray-400 mr-2">Xem trước:</span>
                       <span className="font-mono font-bold tracking-widest text-sm bg-gray-50 border border-gray-200 rounded px-2 py-1">

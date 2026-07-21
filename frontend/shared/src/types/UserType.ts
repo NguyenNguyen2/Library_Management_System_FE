@@ -11,6 +11,9 @@ export interface IBaseUser {
   phone?: string;
   address?: string;
   avatar?: string;
+  /** ISO date string 'YYYY-MM-DD' */
+  date_of_birth?: string | null;
+  gender?: 'male' | 'female' | 'other' | null;
   achievement?: IValueLabel;
 }
 

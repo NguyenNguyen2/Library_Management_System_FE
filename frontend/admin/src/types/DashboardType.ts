@@ -51,9 +51,9 @@ export interface IOverdueSeverity {
 }
 
 export interface IReservationFlow {
-  waiting: number;
-  ready: number;
-  converted: number;
+  pending: number;
+  ready_for_pickup: number;
+  completed: number;
   expired: number;
   cancelled: number;
 }

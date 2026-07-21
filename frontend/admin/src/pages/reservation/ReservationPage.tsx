@@ -2,6 +2,7 @@ import {
   Alert,
   Badge,
   Button,
+  DatePicker,
   Divider,
   Input,
   InputNumber,
@@ -23,7 +24,7 @@ import {
   BookOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BookSearchResult,
   ReservationRecord,
@@ -36,11 +37,11 @@ const STATUS_CONFIG: Record<
   string,
   { label: string; color: string; icon: React.ReactNode }
 > = {
-  waiting: { label: 'Đang chờ', color: 'blue', icon: <ClockCircleOutlined /> },
-  ready:   { label: 'Sẵn sàng', color: 'green', icon: <CheckCircleOutlined /> },
-  expired: { label: 'Hết hạn', color: 'default', icon: <CloseCircleOutlined /> },
-  converted: { label: 'Đã mượn', color: 'purple', icon: <SyncOutlined /> },
-  cancelled: { label: 'Đã hủy', color: 'red', icon: <CloseCircleOutlined /> },
+  pending:          { label: 'Đang chờ', color: 'blue', icon: <ClockCircleOutlined /> },
+  ready_for_pickup: { label: 'Sẵn sàng nhận', color: 'green', icon: <CheckCircleOutlined /> },
+  expired:          { label: 'Hết hạn', color: 'default', icon: <CloseCircleOutlined /> },
+  completed:        { label: 'Đã hoàn thành', color: 'purple', icon: <SyncOutlined /> },
+  cancelled:        { label: 'Đã hủy', color: 'red', icon: <CloseCircleOutlined /> },
 };
 
 const ReservationPage = () => {
@@ -55,6 +56,9 @@ const ReservationPage = () => {
   // List filter state
   const [listUserId, setListUserId] = useState<string>('');
   const [listStatus, setListStatus] = useState<string>('');
+  const [listKeyword, setListKeyword] = useState<string>('');
+  const [listDateRange, setListDateRange] = useState<[string, string] | undefined>(undefined);
+  const [listQueuePosition, setListQueuePosition] = useState<string>('');
   const [listPage, setListPage] = useState(1);
 
   // Confirm modal state
@@ -64,17 +68,56 @@ const ReservationPage = () => {
     copyId: number | null;
   }>({ open: false, reservation: null, copyId: null });
 
-  const searchMutation  = reservationHooks.useSearchBook();
-  const createMutation  = reservationHooks.useCreateReservation();
-  const confirmMutation = reservationHooks.useConfirmReservation();
-  const cancelMutation  = reservationHooks.useCancelReservation();
+  // Mark-ready modal state — thủ thư chọn đúng 1 bản sao available để giữ chỗ
+  const [markReadyModal, setMarkReadyModal] = useState<{
+    open: boolean;
+    reservation: ReservationRecord | null;
+    copyId: number | null;
+  }>({ open: false, reservation: null, copyId: null });
+
+  const searchMutation    = reservationHooks.useSearchBook();
+  const createMutation    = reservationHooks.useCreateReservation();
+  const confirmMutation   = reservationHooks.useConfirmReservation();
+  const markReadyMutation = reservationHooks.useMarkReady();
+  const cancelMutation    = reservationHooks.useCancelReservation();
 
   const { data: listData, isLoading: listLoading } = reservationHooks.useListReservations({
     user_id: listUserId ? parseInt(listUserId) : undefined,
     status:  listStatus || undefined,
+    keyword: listKeyword || undefined,
+    from: listDateRange?.[0],
+    to: listDateRange?.[1],
+    queue_position: listQueuePosition ? parseInt(listQueuePosition) : undefined,
     per_page: 20,
     page: listPage,
   });
+
+  const needsCopyPicker =
+    !!confirmModal.reservation &&
+    confirmModal.reservation.status === 'pending' &&
+    confirmModal.reservation.pickup_type === 'counter';
+
+  const { data: confirmCopies, isLoading: confirmCopiesLoading } = reservationHooks.useAvailableCopiesByBook(
+    confirmModal.open && needsCopyPicker ? confirmModal.reservation?.book_id : undefined
+  );
+
+  const { data: markReadyCopies, isLoading: markReadyCopiesLoading } = reservationHooks.useAvailableCopiesByBook(
+    markReadyModal.open ? markReadyModal.reservation?.book_id : undefined
+  );
+
+  // Tự chọn sẵn bản sao đầu tiên khi danh sách available copies tải về (thủ thư vẫn có
+  // thể đổi lựa chọn khác trước khi xác nhận).
+  useEffect(() => {
+    if (markReadyModal.open && markReadyCopies && markReadyCopies.length > 0 && !markReadyModal.copyId) {
+      setMarkReadyModal((prev) => ({ ...prev, copyId: markReadyCopies[0].copy_id }));
+    }
+  }, [markReadyModal.open, markReadyCopies]);
+
+  useEffect(() => {
+    if (confirmModal.open && needsCopyPicker && confirmCopies && confirmCopies.length > 0 && !confirmModal.copyId) {
+      setConfirmModal((prev) => ({ ...prev, copyId: confirmCopies[0].copy_id }));
+    }
+  }, [confirmModal.open, needsCopyPicker, confirmCopies]);
 
   const handleSearchBook = () => {
     const trimmed = bookKeyword.trim();
@@ -103,14 +146,21 @@ const ReservationPage = () => {
                   <span className="text-gray-500">Sách</span>
                   <span className="font-medium">{result.title}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Vị trí hàng chờ</span>
-                  <Badge
-                    count={result.queue_position}
-                    style={{ backgroundColor: '#3b82f6' }}
-                    overflowCount={99}
-                  />
-                </div>
+                {result.pickup_type === 'counter' || result.queue_position == null ? (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Hình thức</span>
+                    <Tag color="cyan">Tại quầy — đến nhận ngay</Tag>
+                  </div>
+                ) : (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Vị trí hàng chờ</span>
+                    <Badge
+                      count={result.queue_position}
+                      style={{ backgroundColor: '#3b82f6' }}
+                      overflowCount={99}
+                    />
+                  </div>
+                )}
               </div>
             ),
             okText: 'Đóng',
@@ -131,9 +181,13 @@ const ReservationPage = () => {
 
   const handleConfirm = () => {
     const { reservation, copyId } = confirmModal;
-    if (!reservation || !copyId) return;
+    if (!reservation) return;
+    if (needsCopyPicker && !copyId) return;
     confirmMutation.mutate(
-      { reservation_id: reservation.reservation_id, copy_id: copyId },
+      {
+        reservation_id: reservation.reservation_id,
+        ...(needsCopyPicker ? { copy_id: copyId! } : {}),
+      },
       {
         onSuccess: (result) => {
           Modal.success({
@@ -164,6 +218,28 @@ const ReservationPage = () => {
         onError: (err) => {
           const msg = (err.response?.data as { message?: string })?.message;
           message.error(msg ?? 'Xác nhận không thành công.');
+        },
+      }
+    );
+  };
+
+  const handleOpenMarkReady = (r: ReservationRecord) => {
+    setMarkReadyModal({ open: true, reservation: r, copyId: null });
+  };
+
+  const handleConfirmMarkReady = () => {
+    const { reservation, copyId } = markReadyModal;
+    if (!reservation) return;
+    markReadyMutation.mutate(
+      { reservation_id: reservation.reservation_id, ...(copyId ? { copy_id: copyId } : {}) },
+      {
+        onSuccess: () => {
+          message.success('Đã xác nhận có sách, độc giả sẽ được thông báo.');
+          setMarkReadyModal({ open: false, reservation: null, copyId: null });
+        },
+        onError: (err) => {
+          const msg = (err.response?.data as { message?: string })?.message;
+          message.error(msg ?? 'Không thể xác nhận có sách.');
         },
       }
     );
@@ -212,31 +288,38 @@ const ReservationPage = () => {
       title: 'Sách',
       dataIndex: 'title',
       key: 'title',
+      width: 220,
       ellipsis: true,
     },
     {
-      title: 'Vị trí',
-      key: 'queue',
-      width: 80,
-      align: 'center',
+      title: 'Vị trí hàng chờ',
+      key: 'queue_location',
+      width: 130,
       render: (_: unknown, r: ReservationRecord) =>
-        r.status === 'waiting' || r.status === 'ready' ? (
-          <Tooltip title={`Hàng chờ thực tế: #${r.actual_queue_position}`}>
-            <Badge
-              count={r.actual_queue_position}
-              style={{ backgroundColor: '#3b82f6' }}
-              overflowCount={99}
-            />
+        r.status === 'pending' && r.pickup_type === 'online' ? (
+          <Tooltip title="Phải xác nhận Có sách đúng theo thứ tự hàng chờ">
+            <Tag color="blue">Hạng chờ #{r.actual_queue_position}</Tag>
           </Tooltip>
         ) : (
-          <span className="text-gray-300">—</span>
+          <span className="text-gray-300 text-xs">—</span>
+        ),
+    },
+    {
+      title: 'Vị trí kho',
+      key: 'shelf_location',
+      width: 120,
+      render: (_: unknown, r: ReservationRecord) =>
+        r.shelf_location ? (
+          <Tag color="geekblue">{r.shelf_location}</Tag>
+        ) : (
+          <span className="text-gray-300 text-xs">Chưa xác định</span>
         ),
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      width: 130,
+      width: 140,
       render: (v: string) => {
         const cfg = STATUS_CONFIG[v] ?? { label: v, color: 'default', icon: null };
         return (
@@ -254,14 +337,14 @@ const ReservationPage = () => {
       render: (v: string) => dayjs(v).format('DD/MM/YYYY'),
     },
     {
-      title: 'Hết hạn',
-      dataIndex: 'expired_at',
-      key: 'expired_at',
-      width: 110,
+      title: 'Hạn nhận sách',
+      dataIndex: 'pickup_deadline',
+      key: 'pickup_deadline',
+      width: 120,
       render: (v: string | null) =>
         v ? (
           <span className={dayjs(v).isBefore(dayjs()) ? 'text-red-500' : 'text-gray-600'}>
-            {dayjs(v).format('DD/MM/YYYY')}
+            {dayjs(v).format('DD/MM/YYYY HH:mm')}
           </span>
         ) : (
           <span className="text-gray-300 text-xs">—</span>
@@ -270,37 +353,65 @@ const ReservationPage = () => {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 180,
-      render: (_: unknown, r: ReservationRecord) => (
-        <div className="flex gap-1.5">
-          {(r.status === 'waiting' || r.status === 'ready') && (
-            <>
-              <Button
-                size="small"
-                type="primary"
-                onClick={() =>
-                  setConfirmModal({ open: true, reservation: r, copyId: null })
-                }
-              >
-                Xác nhận
-              </Button>
+      width: 120,
+      fixed: 'right',
+      render: (_: unknown, r: ReservationRecord) => {
+        const isCancelling =
+          cancelMutation.isPending && cancelMutation.variables === r.reservation_id;
+
+        return (
+          <div className="flex flex-col gap-1 items-stretch">
+            {r.status === 'pending' && r.pickup_type === 'online' && (
+              <Tooltip title="Chọn bản sao sẽ giữ chỗ cho độc giả">
+                <Button
+                  size="small"
+                  type="primary"
+                  block
+                  className="text-xs px-1"
+                  style={{ background: '#059669', borderColor: '#059669' }}
+                  onClick={() => handleOpenMarkReady(r)}
+                >
+                  Có sách
+                </Button>
+              </Tooltip>
+            )}
+            {(r.status === 'ready_for_pickup' ||
+              (r.status === 'pending' && r.pickup_type === 'counter')) && (
+              <Tooltip title="Xác nhận đã nhận sách">
+                <Button
+                  size="small"
+                  type="primary"
+                  block
+                  className="text-xs px-1"
+                  onClick={() =>
+                    setConfirmModal({ open: true, reservation: r, copyId: null })
+                  }
+                >
+                  Đã nhận
+                </Button>
+              </Tooltip>
+            )}
+            {(r.status === 'pending' || r.status === 'ready_for_pickup') && (
               <Button
                 size="small"
                 danger
+                block
+                className="text-xs px-1"
                 onClick={() => handleCancel(r.reservation_id)}
-                loading={cancelMutation.isPending}
+                loading={isCancelling}
+                disabled={cancelMutation.isPending && !isCancelling}
               >
                 Hủy
               </Button>
-            </>
-          )}
-        </div>
-      ),
+            )}
+          </div>
+        );
+      },
     },
   ];
 
   return (
-    <div className="max-w-[1100px] mx-auto flex flex-col gap-6">
+    <div className="max-w-[1400px] mx-auto flex flex-col gap-6">
       {/* Page header */}
       <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
@@ -446,19 +557,21 @@ const ReservationPage = () => {
                   </div>
                 </div>
 
-                {selectedBook.available_copies > 0 && (
-                  <Alert
-                    type="warning"
-                    showIcon
-                    message="Sách này còn bản sẵn có. Đặt trước chỉ áp dụng khi sách hết bản."
-                    className="mt-2"
-                  />
-                )}
+                <Alert
+                  type={selectedBook.available_copies > 0 ? 'info' : 'warning'}
+                  showIcon
+                  message={
+                    selectedBook.available_copies > 0
+                      ? 'Sách còn bản sẵn có — phiếu sẽ ở hình thức "Tại quầy", độc giả có thể đến nhận ngay.'
+                      : 'Sách đã hết bản — phiếu sẽ ở hình thức "Online", xếp vào hàng chờ.'
+                  }
+                  className="mt-2"
+                />
               </div>
             )}
           </div>
 
-          {selectedBook && selectedBook.available_copies === 0 && (
+          {selectedBook && (
             <>
               <Divider className="my-0" />
               <div className="px-6 py-5">
@@ -501,16 +614,15 @@ const ReservationPage = () => {
           {/* Filters */}
           <div className="px-6 py-4 border-b border-gray-100 flex gap-3 flex-wrap items-end">
             <div>
-              <p className="m-0 mb-1 text-xs text-gray-500">User ID</p>
-              <Input
-                placeholder="Tất cả"
-                value={listUserId}
-                onChange={(e) => {
-                  setListUserId(e.target.value);
+              <p className="m-0 mb-1 text-xs text-gray-500">Tìm kiếm</p>
+              <Input.Search
+                placeholder="Tên độc giả, mã thẻ, tên sách..."
+                allowClear
+                onSearch={(v) => {
+                  setListKeyword(v.trim());
                   setListPage(1);
                 }}
-                style={{ width: 120 }}
-                allowClear
+                style={{ width: 240 }}
               />
             </div>
             <div>
@@ -525,12 +637,42 @@ const ReservationPage = () => {
                 allowClear
                 style={{ width: 140 }}
                 options={[
-                  { value: 'waiting',   label: 'Đang chờ' },
-                  { value: 'ready',     label: 'Sẵn sàng' },
-                  { value: 'expired',   label: 'Hết hạn' },
-                  { value: 'converted', label: 'Đã mượn' },
-                  { value: 'cancelled', label: 'Đã hủy' },
+                  { value: 'pending',          label: 'Đang chờ' },
+                  { value: 'ready_for_pickup', label: 'Sẵn sàng nhận' },
+                  { value: 'expired',          label: 'Hết hạn' },
+                  { value: 'completed',        label: 'Đã hoàn thành' },
+                  { value: 'cancelled',        label: 'Đã hủy' },
                 ]}
+              />
+            </div>
+            <div>
+              <p className="m-0 mb-1 text-xs text-gray-500">Hàng chờ</p>
+              <Select
+                placeholder="Tất cả"
+                value={listQueuePosition || undefined}
+                onChange={(v) => {
+                  setListQueuePosition(v ?? '');
+                  setListPage(1);
+                }}
+                allowClear
+                style={{ width: 130 }}
+                options={Array.from({ length: 20 }, (_, i) => i + 1).map((n) => ({
+                  value: String(n),
+                  label: `Hàng chờ số ${n}`,
+                }))}
+              />
+            </div>
+            <div>
+              <p className="m-0 mb-1 text-xs text-gray-500">Ngày đặt</p>
+              <DatePicker.RangePicker
+                onChange={(values) => {
+                  setListDateRange(
+                    values && values[0] && values[1]
+                      ? [values[0].format('YYYY-MM-DD'), values[1].format('YYYY-MM-DD')]
+                      : undefined
+                  );
+                  setListPage(1);
+                }}
               />
             </div>
           </div>
@@ -545,6 +687,7 @@ const ReservationPage = () => {
               size="small"
               columns={columns}
               dataSource={listData?.objects ?? []}
+              scroll={{ x: 1200 }}
               pagination={{
                 total: listData?.total ?? 0,
                 pageSize: listData?.per_page ?? 20,
@@ -561,13 +704,15 @@ const ReservationPage = () => {
       {/* Confirm Modal */}
       <Modal
         open={confirmModal.open}
-        title="Xác nhận đặt trước tại quầy"
+        title="Xác nhận đã nhận sách"
         onCancel={() => setConfirmModal({ open: false, reservation: null, copyId: null })}
         onOk={handleConfirm}
-        okText="Xác nhận mượn sách"
+        okText="Xác nhận đã nhận sách"
         cancelText="Hủy"
         confirmLoading={confirmMutation.isPending}
-        okButtonProps={{ disabled: !confirmModal.copyId }}
+        okButtonProps={{
+          disabled: needsCopyPicker && !confirmModal.copyId,
+        }}
       >
         {confirmModal.reservation && (
           <div className="space-y-4 mt-2">
@@ -584,22 +729,77 @@ const ReservationPage = () => {
               </div>
             </div>
 
+            {needsCopyPicker ? (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">
+                  Chọn bản sao sẽ giao cho độc giả
+                </p>
+                <Select
+                  placeholder="Chọn bản sao còn trống"
+                  loading={confirmCopiesLoading}
+                  value={confirmModal.copyId ?? undefined}
+                  onChange={(v) => setConfirmModal((prev) => ({ ...prev, copyId: v }))}
+                  style={{ width: '100%' }}
+                  notFoundContent={confirmCopiesLoading ? <Spin size="small" /> : 'Không còn bản sao nào trống'}
+                  options={(confirmCopies ?? []).map((c) => ({
+                    value: c.copy_id,
+                    label: `${c.barcode} — ${c.shelf_location ?? 'Chưa xác định vị trí'}`,
+                  }))}
+                />
+              </div>
+            ) : (
+              <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-sm text-green-700">
+                Bản sao đã được giữ sẵn cho phiếu này (Copy #{confirmModal.reservation.copy_id}
+                {confirmModal.reservation.shelf_location
+                  ? ` — vị trí ${confirmModal.reservation.shelf_location}`
+                  : ''}
+                ).
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Mark Ready Modal — thủ thư chọn đúng bản sao sẽ giữ chỗ cho hàng chờ */}
+      <Modal
+        open={markReadyModal.open}
+        title="Xác nhận có sách — chọn bản sao giữ chỗ"
+        onCancel={() => setMarkReadyModal({ open: false, reservation: null, copyId: null })}
+        onOk={handleConfirmMarkReady}
+        okText="Xác nhận giữ chỗ"
+        cancelText="Hủy"
+        confirmLoading={markReadyMutation.isPending}
+        okButtonProps={{ disabled: !markReadyModal.copyId }}
+      >
+        {markReadyModal.reservation && (
+          <div className="space-y-4 mt-2">
+            <div className="bg-gray-50 rounded-lg p-3 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Độc giả</span>
+                <span className="font-medium">{markReadyModal.reservation.full_name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Sách</span>
+                <span className="font-medium truncate max-w-[200px]">
+                  {markReadyModal.reservation.title}
+                </span>
+              </div>
+            </div>
+
             <div>
-              <p className="text-sm font-medium text-gray-700 mb-1">
-                Copy ID của bản sao sẽ giao
-              </p>
-              <InputNumber
-                placeholder="Nhập Copy ID"
-                value={confirmModal.copyId}
-                onChange={(v) =>
-                  setConfirmModal((prev) => ({ ...prev, copyId: v }))
-                }
+              <p className="text-sm font-medium text-gray-700 mb-1">Chọn bản sao dành cho độc giả</p>
+              <Select
+                placeholder="Chọn bản sao còn trống"
+                loading={markReadyCopiesLoading}
+                value={markReadyModal.copyId ?? undefined}
+                onChange={(v) => setMarkReadyModal((prev) => ({ ...prev, copyId: v }))}
                 style={{ width: '100%' }}
-                min={1}
+                notFoundContent={markReadyCopiesLoading ? <Spin size="small" /> : 'Không còn bản sao nào trống'}
+                options={(markReadyCopies ?? []).map((c) => ({
+                  value: c.copy_id,
+                  label: `${c.barcode} — ${c.shelf_location ?? 'Chưa xác định vị trí'}`,
+                }))}
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Quét barcode để lấy copy_id hoặc nhập thủ công.
-              </p>
             </div>
           </div>
         )}

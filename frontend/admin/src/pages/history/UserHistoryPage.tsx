@@ -34,11 +34,14 @@ const FMT = 'DD/MM/YYYY';
 const VND = (v: number) => new Intl.NumberFormat('vi-VN').format(v) + ' ₫';
 
 const CONDITION_LABEL: Record<string, string> = {
-  new:   'Mới',
-  good:  'Tốt',
-  old:   'Cũ',
-  light: 'Hỏng nhẹ',
-  heavy: 'Hỏng nặng',
+  new:    'Mới',
+  good:   'Tốt',
+  old:    'Cũ',
+  light:  'Hỏng nhẹ',
+  heavy:  'Hỏng nặng',
+  minor:  'Hư nhẹ',
+  medium: 'Hư vừa',
+  lost:   'Mất sách',
 };
 
 const RESERVATION_STATUS: Record<string, { label: string; color: string }> = {

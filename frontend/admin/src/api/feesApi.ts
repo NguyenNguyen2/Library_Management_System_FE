@@ -51,7 +51,7 @@ export const feesApi = {
     axiosInstance.get<{ data: Fine[]; meta: PaginatedMeta }>('/private/v1/fees', { params }).then(r => r.data),
 
   // Feature 2: Tạo phí bồi thường
-  createDamageFine: (data: { user_id: number; copy_id: number; borrow_id?: number; damage_level: 'minor' | 'heavy' | 'lost' }) =>
+  createDamageFine: (data: { user_id: number; copy_id: number; borrow_id?: number; damage_level: 'minor' | 'medium' | 'heavy' | 'lost' }) =>
     axiosInstance.post('/private/v1/fees/damage', data).then(r => r.data),
 
   // Feature 3: Ghi nhận thanh toán

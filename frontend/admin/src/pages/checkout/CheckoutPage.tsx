@@ -41,12 +41,18 @@ const CheckoutPage = () => {
   const [readerResults, setReaderResults] = useState<ReaderInfo[]>([]);
   const [selectedReader, setSelectedReader] = useState<ReaderInfo | null>(null);
   const [barcode, setBarcode] = useState('');
+  // Từ khóa tìm kiếm bản sao — tách riêng khỏi `barcode` (giá trị hiển thị trong ô nhập):
+  // gõ chữ thì cả 2 cùng cập nhật, nhưng khi CHỌN 1 bản sao từ dropdown thì chỉ `barcode`
+  // đổi thành barcode vừa chọn còn `searchQuery` giữ nguyên tên sách đang tìm — nhờ vậy
+  // danh sách gợi ý (autoOptions) không bị rỗng, thủ thư chọn tiếp được bản sao khác của
+  // CÙNG cuốn sách đó ngay lập tức mà không cần gõ lại tên sách.
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedBooks, setSelectedBooks] = useState<SelectedBook[]>([]);
   const barcodeInputRef = useRef<InputRef>(null);
 
   const findReaderMutation = checkoutHooks.useFindReader();
   const { data: availableCopies = [], isFetching: searchingCopies } =
-    checkoutHooks.useSearchAvailableCopies(selectedReader ? barcode : '');
+    checkoutHooks.useSearchAvailableCopies(selectedReader ? searchQuery : '');
   const validateCopyMutation = checkoutHooks.useValidateCopy();
   const checkoutMutation = checkoutHooks.useCheckout();
   const checkoutReceiptMutation = receiptHooks.useCheckoutReceipt();
@@ -76,6 +82,8 @@ const CheckoutPage = () => {
     setReaderResults([]);
     setKeyword(reader.full_name);
     setSelectedBooks([]);
+    setBarcode('');
+    setSearchQuery('');
     setTimeout(() => barcodeInputRef.current?.focus(), 100);
   };
 
@@ -84,15 +92,25 @@ const CheckoutPage = () => {
     setReaderResults([]);
     setKeyword('');
     setSelectedBooks([]);
+    setBarcode('');
+    setSearchQuery('');
   };
 
-  const addCopyByBarcode = (barcodeValue: string) => {
+  // keepSearch=true (chọn từ dropdown gõ tên sách): KHÔNG xóa từ khóa tìm kiếm sau khi
+  // thêm, để danh sách bản sao của cùng cuốn sách đó vẫn còn hiển thị (đã lọc bớt bản
+  // vừa thêm) — thủ thư bấm liên tiếp là mượn được nhiều bản sao của cùng 1 cuốn sách.
+  // keepSearch=false (gõ/quét barcode rồi Enter/bấm Thêm): xóa ô nhập sau mỗi lần thêm,
+  // đúng luồng máy quét mã vạch vật lý (mỗi lần quét gửi 1 chuỗi barcode khác nhau).
+  const addCopyByBarcode = (barcodeValue: string, opts?: { keepSearch?: boolean }) => {
     const trimmed = barcodeValue.trim();
     if (!trimmed) return;
 
     if (selectedBooks.some((b) => b.barcode === trimmed)) {
       message.warning(`"${trimmed}" đã có trong danh sách.`);
-      setBarcode('');
+      if (!opts?.keepSearch) {
+        setBarcode('');
+        setSearchQuery('');
+      }
       return;
     }
 
@@ -107,20 +125,30 @@ const CheckoutPage = () => {
             condition: copy.condition,
           },
         ]);
-        setBarcode('');
+        if (!opts?.keepSearch) {
+          setBarcode('');
+          setSearchQuery('');
+        }
         setTimeout(() => barcodeInputRef.current?.focus(), 50);
       },
       onError: (err) => {
         const msg = (err.response?.data as { message?: string })?.message;
         message.error(msg ?? 'Không tìm thấy sách hoặc sách không khả dụng.');
-        setBarcode('');
+        if (!opts?.keepSearch) {
+          setBarcode('');
+          setSearchQuery('');
+        }
         setTimeout(() => barcodeInputRef.current?.focus(), 50);
       },
     });
   };
 
-  // Gợi ý từ search (khi chưa có kết quả search, vẫn cho dùng barcode cứng)
-  const autoOptions = (availableCopies as AvailableCopy[]).map((c) => ({
+  // Gợi ý từ search — loại bỏ các bản sao đã có trong danh sách mượn, để dropdown luôn
+  // hiện đúng những bản sao CÒN có thể thêm (kể cả khi tìm cùng 1 tên sách nhiều lần).
+  const addedCopyIds = new Set(selectedBooks.map((b) => b.copy_id));
+  const autoOptions = (availableCopies as AvailableCopy[])
+    .filter((c) => !addedCopyIds.has(c.copy_id))
+    .map((c) => ({
     value: c.barcode,
     label: (
       <div className="flex items-center justify-between gap-2 py-0.5">
@@ -415,10 +443,11 @@ const CheckoutPage = () => {
               options={autoOptions}
               value={barcode}
               onChange={(val) => setBarcode(val)}
-              onSelect={(val: string) => addCopyByBarcode(val)}
+              onSearch={(val) => setSearchQuery(val)}
+              onSelect={(val: string) => addCopyByBarcode(val, { keepSearch: true })}
               disabled={!selectedReader || !selectedReader.can_borrow}
               notFoundContent={
-                barcode.trim().length >= 1 && !searchingCopies
+                searchQuery.trim().length >= 1 && !searchingCopies
                   ? <span className="text-xs text-gray-400 px-2">Không tìm thấy — nhấn Enter để quét trực tiếp</span>
                   : null
               }
@@ -453,7 +482,8 @@ const CheckoutPage = () => {
           )}
           {selectedReader && selectedReader.can_borrow && (
             <p className="mt-1.5 text-xs text-gray-400">
-              Gõ tên sách để tìm nhanh, hoặc quét barcode trực tiếp rồi nhấn Enter.
+              Gõ tên sách để tìm nhanh (có thể chọn nhiều bản sao khác nhau của cùng 1 cuốn
+              sách), hoặc quét barcode trực tiếp rồi nhấn Enter.
             </p>
           )}
         </div>

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { message } from 'antd';
 import _ from 'lodash';
 import { authApi } from '../api/authApi';
 import { ROUTES } from '../constants/routers';
@@ -22,7 +23,7 @@ export const useLogin = () => {
     mutationFn: authApi.signIn,
     onSuccess: (data) => {
       if (data?.requires_2fa) {
-        setCookie(STORAGES.ACCESS_TOKEN, data.tempToken);
+        setCookie(STORAGES.ACCESS_TOKEN, data.tempToken || '');
         return; // Stay on login page to verify OTP
       }
       const userClone = _.cloneDeep(data?.user);
@@ -30,6 +31,9 @@ export const useLogin = () => {
       setCookie(STORAGES.USER_LOGIN, userClone);
       setCookie(STORAGES.ACCESS_TOKEN, data?.accessToken);
       navigate(ROUTES.DASHBOARD);
+    },
+    onError: (err) => {
+      message.error(err?.response?.data?.message || 'Email hoặc mật khẩu không chính xác.');
     },
   });
 };

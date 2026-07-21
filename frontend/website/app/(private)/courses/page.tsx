@@ -48,7 +48,7 @@ function CoursesPageContent() {
     available_only: onlyAvailable ? 1 : undefined,
   };
 
-  const { data: books, isLoading, isFetching } = useSearchBooks(params);
+  const { data: booksResult, isLoading, isFetching } = useSearchBooks(params);
 
   // Delay showing the loading state by 150ms to prevent flicker on fast responses
   const [showFetching, setShowFetching] = useState(false);
@@ -72,7 +72,7 @@ function CoursesPageContent() {
       .map((item) => [item.book_id, item])
   );
 
-  const filtered = books ?? [];
+  const filtered = booksResult?.data ?? [];
 
   const hasActiveFilters = !!(categoryId || authorId || publisherId || language || yearFrom || yearTo || onlyAvailable);
 
@@ -185,16 +185,17 @@ function CoursesPageContent() {
         </div>
       </div>
 
-      <p className="text-sm text-gray-500 mb-4 flex items-center gap-2">
+      {/* div (không phải <p>): <Spin> render ra <div>, đặt trong <p> vi phạm content-model HTML. */}
+      <div className="text-sm text-gray-500 mb-4 flex items-center gap-2">
         {debouncedSearch || hasActiveFilters ? (
           <>Tìm thấy <span className="font-semibold text-gray-900">{filtered.length}</span> kết quả</>
         ) : (
           <>Hiển thị <span className="font-semibold text-gray-900">{filtered.length}</span> cuốn sách</>
         )}
         {showFetching && <Spin size="small" />}
-      </p>
+      </div>
 
-      <div className={`transition-opacity duration-150 ${showFetching ? 'opacity-75' : ''}`}>
+      <div>
       {filtered.length === 0 ? (
         <div className="text-center py-16">
           <BookOutlined className="text-5xl text-gray-300 mb-4" />
@@ -202,12 +203,14 @@ function CoursesPageContent() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {filtered.map((book) => {
+          {filtered.map((book, index) => {
             const favItem = favoriteItemMap.get(book.book_id) ?? null;
             const isFav = !!favItem;
             return (
             <div
-              key={book.book_id}
+              // Key theo vị trí (không theo book_id) để React giữ nguyên DOM
+              // node khi danh sách đổi (search/filter) -> rerender tại chỗ, không remount cả thẻ.
+              key={index}
               className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:border-blue-300 transition-all cursor-pointer group"
               onClick={() => router.push(`${APP_ROUTE.courses}/${book.book_id}`)}
             >

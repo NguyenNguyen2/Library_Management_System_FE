@@ -20,6 +20,18 @@ export interface IBookSearchParams {
   available_only?: 1;
 }
 
+export interface IBookSearchPagination {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+export interface IBookSearchResponse {
+  data: IBookSearchResult[];
+  pagination: IBookSearchPagination;
+}
+
 export interface IBookFilterOptions {
   categories: { category_id: number; category_name: string }[];
   authors: { author_id: number; author_name: string }[];
@@ -101,7 +113,7 @@ export interface ISubmitReviewParams {
 }
 
 export const bookApi = {
-  search: async (params: IBookSearchParams): Promise<IBookSearchResult[]> => {
+  search: async (params: IBookSearchParams): Promise<IBookSearchResponse> => {
     const response = await axiosInstance.get('/v1/books/search', { params });
     return response.data;
   },

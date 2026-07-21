@@ -51,12 +51,10 @@ const LoginPage = () => {
         <Card className="w-full shadow-lg rounded-2xl">
           <div className="mb-4 text-center">
             <Typography.Title level={4} className="!m-0">
-              {isSetup ? 'Thiết lập Google Authenticator' : 'Xác thực OTP'}
+              Xác thực Google Authenticator (2FA)
             </Typography.Title>
             <Typography.Text type="secondary" className="text-xs block mt-1">
-              {isSetup 
-                ? 'Quét mã QR dưới đây hoặc nhập mã thủ công vào ứng dụng của bạn'
-                : 'Mở ứng dụng Google Authenticator và nhập mã xác thực 6 chữ số'}
+              Quét mã QR dưới đây hoặc nhập mã thủ công vào ứng dụng/tiện ích Google Authenticator của bạn để lấy mã xác thực 6 chữ số
             </Typography.Text>
           </div>
 
@@ -66,7 +64,7 @@ const LoginPage = () => {
             onFinish={handleVerifyOtp}
             disabled={verifyMutation.isPending}
           >
-            {isSetup && qrCodeUrl && (
+            {qrCodeUrl && (
               <div className="flex flex-col items-center justify-center p-3 border rounded-xl bg-gray-50 mb-4 gap-2">
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrCodeUrl)}`} 

@@ -4,7 +4,6 @@ import {
   CreditCardOutlined,
   LockOutlined,
   LogoutOutlined,
-  MessageOutlined,
   RobotOutlined,
   SettingOutlined,
   UserOutlined,
@@ -102,6 +101,12 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       label: 'Quản lý phí & Thanh toán',
       icon: <CreditCardOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.FEES,
+      children: [
+        { label: 'Phí chưa thu', to: ROUTES.FEES },
+        { label: 'Tạo phí hỏng/mất', to: ROUTES.FEES + '?tab=damage' },
+        { label: 'Lịch sử thu phí', to: ROUTES.FEES + '?tab=history' },
+        { label: 'Báo cáo doanh thu', to: ROUTES.FEES + '?tab=revenue' },
+      ],
     },
     {
       key: 'reports',
@@ -116,22 +121,10 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
       to: ROUTES.AI_DEMAND,
     },
     {
-      key: 'ai-assistant',
-      label: t(getKey('menu_ai_assistant')),
-      icon: <MessageOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.AI_ASSISTANT,
-    },
-    {
       key: 'settings',
       label: t(getKey('menu_settings')),
       icon: <SettingOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.SETTINGS,
-      children: [
-        { label: t(getKey('menu_all_settings')), to: ROUTES.SETTINGS },
-        { label: t(getKey('menu_librarian_permission')), to: ROUTES.USERS + '?tab=librarians' },
-        { label: t(getKey('menu_audit_log')), to: ROUTES.USERS + '?tab=audit' },
-        { label: t(getKey('menu_system_log')), to: ROUTES.USERS + '?tab=system-log' },
-      ],
     },
   ];
 
@@ -147,6 +140,14 @@ const DefaultNavigate = ({ collapsed, onToggle }: IDefaultNavigate) => {
     if (!pathname) return;
     const path = pathname.pathname + pathname.search;
     setSelectItem(path);
+
+    // Auto-expand parent menu if a child is active
+    const activeParent = menuConfig.find((item) =>
+      item.children?.some((child) => child.to === path)
+    );
+    if (activeParent) {
+      setOpenMenu(activeParent.key);
+    }
   }, [pathname]);
 
   const handleLogout = () => {

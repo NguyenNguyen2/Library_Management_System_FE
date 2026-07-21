@@ -9,6 +9,7 @@ import { cn } from '@shared/constants/commonConst';
 import LibrarianNavigate from '../general/LibrarianNavigate';
 import LibrarianHeader from '../general/LibrarianHeader';
 import Loading from '@shared/components/general/Loading';
+import AiChatWidget from '../ai-assistant/AiChatWidget';
 
 const { Header, Sider, Content } = Layout;
 
@@ -53,6 +54,7 @@ const LibrarianLayout = () => {
             </Suspense>
           </Content>
         </Layout>
+        <AiChatWidget />
       </Layout>
     </StyleProvider>
   );

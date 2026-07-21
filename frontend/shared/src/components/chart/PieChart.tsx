@@ -42,7 +42,7 @@ const PieChart: React.FC<PieChartProps> = ({
       (acc, d, i) => {
         acc.series.push(d.value ?? 0);
         acc.labels.push(d.label ?? NotAvailable);
-        acc.colors.push(palette[i % palette.length]);
+        acc.colors.push(d.color ?? palette[i % palette.length]);
         return acc;
       },
       {

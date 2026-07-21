@@ -22,10 +22,15 @@ export const useBorrowHistory = () => {
   });
 };
 
+export interface IRenewalTarget {
+  borrowId: number;
+  copyId: number;
+}
+
 export const useRenewBorrowing = () => {
   const queryClient = useQueryClient();
-  return useMutation<IBorrowRenewalRequestResponse, Error, number>({
-    mutationFn: (borrowId: number) => borrowingApi.submitRenewalRequest(borrowId),
+  return useMutation<IBorrowRenewalRequestResponse, Error, IRenewalTarget>({
+    mutationFn: ({ borrowId, copyId }: IRenewalTarget) => borrowingApi.submitRenewalRequest(borrowId, copyId),
     onSuccess: () => {
       // Refresh danh sách để hiển thị trạng thái renewal_pending = true
       queryClient.invalidateQueries({ queryKey: ['my-borrowing'] });
@@ -36,8 +41,8 @@ export const useRenewBorrowing = () => {
 // Reader tự hủy yêu cầu gia hạn sách khi còn Pending.
 export const useCancelRenewBorrowing = () => {
   const queryClient = useQueryClient();
-  return useMutation<{ message: string }, Error, number>({
-    mutationFn: (borrowId: number) => borrowingApi.cancelRenewalRequest(borrowId),
+  return useMutation<{ message: string }, Error, IRenewalTarget>({
+    mutationFn: ({ borrowId, copyId }: IRenewalTarget) => borrowingApi.cancelRenewalRequest(borrowId, copyId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-borrowing'] });
     },

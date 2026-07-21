@@ -1,13 +1,13 @@
 import { useQuery, useMutation, keepPreviousData } from '@tanstack/react-query';
 import {
   bookApi,
-  IBookSearchResult, IBookSearchParams, IBookFilterOptions, IBookDetail,
+  IBookSearchResponse, IBookSearchParams, IBookFilterOptions, IBookDetail,
   IRelatedBooks, IHomeBooks,
   IReviewResponse, IReviewPermission, ISubmitReviewParams,
 } from '../api/bookApi';
 
 export const useSearchBooks = (params: IBookSearchParams) => {
-  return useQuery<IBookSearchResult[]>({
+  return useQuery<IBookSearchResponse>({
     queryKey: ['books-search', params],
     queryFn: () => bookApi.search(params),
     staleTime: 30_000,

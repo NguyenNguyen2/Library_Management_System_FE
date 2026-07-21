@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { sendChatMessage } from '../api/chatApi';
 import type { ChatMessage } from '../api/chatApi';
+import { safeRandomUUID } from '@shared/utils/utils';
 
 const BOT_NAME = 'Trợ lý Thư viện';
 
@@ -30,7 +31,7 @@ const ChatWidget: React.FC = () => {
 
   useEffect(() => {
     if (!sessionIdRef.current) {
-      sessionIdRef.current = crypto.randomUUID();
+      sessionIdRef.current = safeRandomUUID();
     }
   }, []);
 

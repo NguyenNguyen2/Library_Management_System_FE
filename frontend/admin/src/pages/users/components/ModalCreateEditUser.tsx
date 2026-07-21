@@ -1,12 +1,12 @@
-import { Button, Flex, Form, Modal, Table, Tag, Select } from 'antd';
+import { Button, DatePicker, Flex, Form, message, Modal, Table, Tag, Select, Upload } from 'antd';
+import { UploadOutlined, UserOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getKey } from '@shared/types/I18nKeyType';
 import CustomInput from '@shared/components/input/CustomInput';
 import { PASSWORD_PATTERN } from '@shared/constants/regex';
 import { generateRandomPassword } from '@shared/utils/passwordGenerator';
 import { DEFAULT_PASSWORD } from '@shared/constants/commonConst';
-import { SearchSelect } from '@shared/components/select/SearchSelect';
-import { achievementHooks } from '../../../hooks/useAchievements';
 import { userHooks } from '../../../hooks/useUsers';
 import { IDetailUser } from '@shared/types/UserType';
 import dayjs from 'dayjs';
@@ -16,10 +16,54 @@ interface IModalCreateEditUser {
   detail?: IDetailUser;
 }
 
+const AVATAR_ACCEPT = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+
+// Backend trả về đường dẫn tương đối (/storage/avatars/xxx.jpg) — cần prepend base URL của Laravel để hiển thị.
+const resolveAvatarUrl = (avatar?: string | null): string | null => {
+  if (!avatar) return null;
+  return avatar.startsWith('http') ? avatar : `http://127.0.0.1:8000${avatar}`;
+};
+
+const ACHIEVEMENT_COLOR: Record<string, string> = {
+  new: 'blue',
+  expert: 'gold',
+  master: 'purple',
+};
+
+// Độc giả mới tạo luôn có 0 lượt mượn sách -> luôn ở mức "Độc giả Mới".
+const DEFAULT_NEW_ACHIEVEMENT = { value: 'new', label: 'Độc giả Mới' };
+
 const ModalCreateEditUser = ({ detail }: IModalCreateEditUser) => {
   const { t } = useTranslation();
   const form = Form.useFormInstance();
   const isEditMode = !!detail?.id;
+  const achievement = (isEditMode && detail?.achievement) || DEFAULT_NEW_ACHIEVEMENT;
+
+  // Ảnh đại diện được gửi kèm dưới dạng File thô trong payload lưu (giống ảnh bìa sách),
+  // không qua endpoint upload chung /v1/uploads (endpoint đó chưa tồn tại ở backend).
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(
+    resolveAvatarUrl(detail?.avatar)
+  );
+
+  const handleAvatarFileSelect = (file: File) => {
+    if (!AVATAR_ACCEPT.includes(file.type)) {
+      message.error('Chỉ chấp nhận ảnh định dạng JPG, JPEG, PNG hoặc WEBP!');
+      return Upload.LIST_IGNORE;
+    }
+    if (file.size > AVATAR_MAX_BYTES) {
+      message.error('Ảnh đại diện không được vượt quá 5MB!');
+      return Upload.LIST_IGNORE;
+    }
+    setAvatarPreviewUrl(URL.createObjectURL(file));
+    form?.setFieldValue('avatar', file);
+    return false; // ngăn antd tự upload — file được gửi kèm khi lưu độc giả
+  };
+
+  const handleRemoveAvatar = () => {
+    setAvatarPreviewUrl(null);
+    form?.setFieldValue('avatar', '');
+  };
 
   const { mutate: resetUserPassword, isPending: isResetting } =
     userHooks.useResetUserPassword();
@@ -124,6 +168,78 @@ const ModalCreateEditUser = ({ detail }: IModalCreateEditUser) => {
         </Form.Item>
       </Flex>
 
+      <Flex gap={16}>
+        <Form.Item label="Số điện thoại" name="phone" className="flex-1">
+          <CustomInput placeholder="09xxxxxxx" />
+        </Form.Item>
+
+        <Form.Item label="Địa chỉ liên hệ" name="address" className="flex-1">
+          <CustomInput placeholder="Nhập địa chỉ..." />
+        </Form.Item>
+      </Flex>
+
+      <Flex gap={16}>
+        <Form.Item
+          label="Ngày sinh"
+          name="date_of_birth"
+          className="flex-1"
+          rules={[
+            {
+              validator: (_, value) => {
+                if (!value) return Promise.resolve();
+                if (dayjs().diff(value, 'year') < 6) {
+                  return Promise.reject(new Error('Độc giả phải từ đủ 6 tuổi trở lên.'));
+                }
+                return Promise.resolve();
+              },
+            },
+          ]}
+        >
+          <DatePicker
+            className="w-full"
+            size="large"
+            format="DD/MM/YYYY"
+            placeholder="Chọn ngày sinh"
+            disabledDate={(current) => !!current && current > dayjs().endOf('day')}
+          />
+        </Form.Item>
+
+        <Form.Item label="Giới tính" name="gender" className="flex-1">
+          <Select size="large" placeholder="Chọn giới tính" allowClear>
+            <Select.Option value="male">Nam</Select.Option>
+            <Select.Option value="female">Nữ</Select.Option>
+            <Select.Option value="other">Khác</Select.Option>
+          </Select>
+        </Form.Item>
+      </Flex>
+
+      <div className="mb-4">
+        <p className="mb-1.5 text-sm font-medium text-blackSoft">Ảnh đại diện</p>
+        <div className="flex items-center gap-4">
+          {avatarPreviewUrl ? (
+            <div className="relative w-20 h-20 rounded-full overflow-hidden border border-gray-200 shadow-sm group">
+              <img src={avatarPreviewUrl} alt="Ảnh đại diện" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={handleRemoveAvatar}
+                className="absolute top-0 right-0 bg-white/90 rounded-full p-0.5 shadow hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Xóa ảnh"
+              >
+                <CloseCircleOutlined style={{ color: '#ef4444', fontSize: 16 }} />
+              </button>
+            </div>
+          ) : (
+            <div className="w-20 h-20 rounded-full border border-dashed border-gray-300 flex items-center justify-center bg-gray-50 text-gray-400">
+              <UserOutlined style={{ fontSize: 22 }} />
+            </div>
+          )}
+          <Upload accept=".jpg,.jpeg,.png,.webp" showUploadList={false} beforeUpload={handleAvatarFileSelect} maxCount={1}>
+            <Button icon={<UploadOutlined />}>{avatarPreviewUrl ? 'Đổi ảnh khác' : 'Tải ảnh lên'}</Button>
+          </Upload>
+          <span className="text-xs text-gray-400">JPG, JPEG, PNG, WEBP · tối đa 5MB</span>
+        </div>
+      </div>
+
       {!isEditMode && (
         <Form.Item
           name="password"
@@ -155,21 +271,20 @@ const ModalCreateEditUser = ({ detail }: IModalCreateEditUser) => {
         </Form.Item>
       )}
 
-      {isEditMode ? (
-        <Flex gap={16}>
-          <Form.Item
-            label={t(getKey('achievement_optional'))}
-            name="achievement"
-            className="flex-1"
+      <Flex gap={16} align="flex-start" className="mb-4">
+        <div className="flex-1">
+          <p className="mb-1 text-sm font-medium text-blackSoft">Danh hiệu độc giả</p>
+          <Tag
+            color={ACHIEVEMENT_COLOR[achievement.value] ?? 'default'}
+            className="!rounded-md border-0 font-medium"
           >
-            <SearchSelect
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              useQueryHook={achievementHooks.useFetchListAchievements as any}
-              fieldNames={{ label: 'name', value: 'id' }}
-              labelInValue
-              placeholder={t(getKey('no_achievement'))}
-            />
-          </Form.Item>
+            {achievement.label}
+          </Tag>
+          <p className="mt-1 text-xs text-grayMedium">
+            Tự động tính theo số lượt mượn sách (Độc giả Mới / Độc giả Thân Thiết / Bậc Thầy Đọc Sách), không thể chỉnh sửa trực tiếp.
+          </p>
+        </div>
+        {isEditMode && (
           <Form.Item
             label="Trạng thái tài khoản"
             name="status"
@@ -181,21 +296,8 @@ const ModalCreateEditUser = ({ detail }: IModalCreateEditUser) => {
               <Select.Option value="0">Đang khóa</Select.Option>
             </Select>
           </Form.Item>
-        </Flex>
-      ) : (
-        <Form.Item label={t(getKey('achievement_optional'))} name="achievement">
-          <SearchSelect
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            useQueryHook={achievementHooks.useFetchListAchievements as any}
-            fieldNames={{ label: 'name', value: 'id' }}
-            labelInValue
-            placeholder={t(getKey('no_achievement'))}
-          />
-        </Form.Item>
-      )}
-      <p className="-mt-4 mb-4 text-xs text-grayMedium">
-        {t(getKey('achievement_note'))}
-      </p>
+        )}
+      </Flex>
 
       {isEditMode && (
         <div className="mt-6 border-t pt-4">

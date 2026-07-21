@@ -5,7 +5,6 @@ import { Button, Flex } from 'antd';
 import {
   BarChartOutlined,
   LogoutOutlined,
-  MessageOutlined,
   RobotOutlined,
   UserOutlined,
   BookOutlined,
@@ -104,6 +103,12 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
       label: 'Quản lý phí & Thanh toán',
       icon: <CreditCardOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.FEES,
+      children: [
+        { label: 'Phí chưa thu', to: ROUTES.FEES },
+        { label: 'Tạo phí hỏng/mất', to: ROUTES.FEES + '?tab=damage' },
+        { label: 'Lịch sử thu phí', to: ROUTES.FEES + '?tab=history' },
+        { label: 'Báo cáo doanh thu', to: ROUTES.FEES + '?tab=revenue' },
+      ],
     },
     {
       key: 'reports',
@@ -116,12 +121,6 @@ const LibrarianNavigate = ({ collapsed, onToggle }: ILibrarianNavigate) => {
       label: 'AI Phân tích nhu cầu',
       icon: <RobotOutlined style={{ fontSize: 18 }} />,
       to: ROUTES.AI_DEMAND,
-    },
-    {
-      key: 'ai-assistant',
-      label: 'AI Gợi Ý Sách',
-      icon: <MessageOutlined style={{ fontSize: 18 }} />,
-      to: ROUTES.AI_ASSISTANT,
     },
   ];
 

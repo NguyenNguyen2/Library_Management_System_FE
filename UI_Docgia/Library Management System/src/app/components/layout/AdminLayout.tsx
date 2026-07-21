@@ -47,7 +47,7 @@ const NAV: NavItem[] = [
     children: [
       { label: 'Danh sách bản sao', to: '/admin/inventory' },
       { label: 'Thêm bản sao & In QR', to: '/admin/inventory/add' },
-      { label: 'Import & Thanh lý', to: '/admin/inventory/import' },
+      { label: 'Nhập & Thanh lý', to: '/admin/inventory/import' },
       { label: 'Báo cáo kho', to: '/admin/inventory/report' },
     ],
   },

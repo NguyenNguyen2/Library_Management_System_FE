@@ -6,6 +6,7 @@ import {
   Form,
   Modal,
   Skeleton,
+  Tabs,
   type FormRule,
 } from 'antd';
 import { ExclamationCircleFilled } from '@ant-design/icons';
@@ -15,6 +16,9 @@ import { getKey } from '@shared/types/I18nKeyType';
 import type { I18nKey } from '@shared/types/I18nKeyType';
 import { SystemSettingsPayload } from '../../api/settingsApi';
 import { useFetchSettings, useUpdateSettings } from '../../hooks/useSettings';
+import { useGlobalVariable } from '../../hooks/GlobalVariableProvider';
+import LoginLogsSection from '../../components/logs/LoginLogsSection';
+import SystemActivityLogsSection from '../../components/logs/SystemActivityLogsSection';
 
 const { confirm } = Modal;
 
@@ -48,7 +52,7 @@ const SETTING_META: Record<SettingKey, { labelKey: keyof I18nKey; hintKey: keyof
  * config_key cùng lúc trong 1 transaction). Reset đưa form về đúng giá trị
  * API đang trả, không cần gọi lại API.
  */
-const SettingsPage = () => {
+const GeneralSettingsTab = () => {
   const { t } = useTranslation();
   const [form] = Form.useForm<Record<SettingKey, number>>();
 
@@ -139,16 +143,6 @@ const SettingsPage = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Page header — same typography as the other admin pages (FilterTable). */}
-      <div>
-        <h1 className="m-0 text-[30px] font-bold leading-[36px] text-navyDark">
-          {t(getKey('settings_title'))}
-        </h1>
-        <p className="m-0 mt-1 text-base leading-6 text-grayDark">
-          {t(getKey('settings_description'))}
-        </p>
-      </div>
-
       <Form<Record<SettingKey, number>>
         form={form}
         layout="vertical"
@@ -218,6 +212,57 @@ const SettingsPage = () => {
           </Button>
         </Flex>
       </Form>
+    </div>
+  );
+};
+
+/**
+ * Trang "Cài đặt hệ thống": cấu hình chung + 2 mục nhật ký (hệ thống / truy cập).
+ * 2 mục nhật ký tái dùng đúng component đang chạy ở trang Người dùng
+ * (components/logs/*) — không viết lại logic, chỉ thêm lối vào mới.
+ * Cả 2 tab nhật ký chỉ hiện với admin, đồng nhất trải nghiệm với UsersPage
+ * dù backend cho phép librarian xem nhật ký truy cập.
+ */
+const SettingsPage = () => {
+  const { t } = useTranslation();
+  const { user } = useGlobalVariable();
+  const isAdmin = user?.role === 'admin';
+
+  const items = [
+    {
+      key: 'general',
+      label: 'Cấu hình chung',
+      children: <GeneralSettingsTab />,
+    },
+    ...(isAdmin
+      ? [
+          {
+            key: 'system-log',
+            label: 'Nhật ký hệ thống',
+            children: <SystemActivityLogsSection />,
+          },
+          {
+            key: 'login-log',
+            label: 'Nhật ký truy cập',
+            children: <LoginLogsSection />,
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Page header — same typography as the other admin pages (FilterTable). */}
+      <div>
+        <h1 className="m-0 text-[30px] font-bold leading-[36px] text-navyDark">
+          {t(getKey('settings_title'))}
+        </h1>
+        <p className="m-0 mt-1 text-base leading-6 text-grayDark">
+          {t(getKey('settings_description'))}
+        </p>
+      </div>
+
+      <Tabs defaultActiveKey="general" items={items} />
     </div>
   );
 };
